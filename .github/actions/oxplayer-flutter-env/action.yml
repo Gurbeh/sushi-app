@@ -1,0 +1,87 @@
+name: OXPlayer dart-define env
+description: Validate OX secrets/variables and write JSON for flutter --dart-define-from-file
+runs:
+  using: composite
+  steps:
+    - name: Validate required environment
+      shell: bash
+      run: |
+        missing=()
+        for var in BOT_USERNAME OXPLAYER_API_BASE_URL TELEGRAM_API_ID TELEGRAM_API_HASH; do
+          [ -z "${!var:-}" ] && missing+=("$var")
+        done
+        if [ ${#missing[@]} -gt 0 ]; then
+          echo "Missing required secrets/variables: ${missing[*]}"
+          echo "Set TELEGRAM_API_ID/HASH in Infisical /core/client-ci (same my.telegram.org app as stream CLIENT_ID/HASH)."
+          exit 1
+        fi
+
+    - name: Generate dart-defines file and bundled default.env
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        import json, os
+        from pathlib import Path
+
+        def env_first(*names: str) -> str:
+            for name in names:
+                value = (os.environ.get(name) or "").strip()
+                if value:
+                    return value
+            return ""
+
+        keys = {
+            "OXPLAYER": "true",
+            "BOT_USERNAME": env_first("BOT_USERNAME"),
+            "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
+            # TDLib user-session (native playback + Telegram login) — baked at build time.
+            "TELEGRAM_API_ID": env_first("TELEGRAM_API_ID"),
+            "TELEGRAM_API_HASH": env_first("TELEGRAM_API_HASH"),
+        }
+        iran_api = env_first("OXPLAYER_API_BASE_IRAN", "OXPLAYER_API_BASE_ARVAN") or "https://api.oxplayer.ir"
+        iran_stream = env_first("OXPLAYER_STREAM_BASE_IRAN", "OXPLAYER_STREAM_BASE_ARVAN") or "https://stream.oxplayer.ir"
+        keys["OXPLAYER_API_BASE_IRAN"] = iran_api
+        keys["OXPLAYER_STREAM_BASE_IRAN"] = iran_stream
+        sentry_env = env_first("SENTRY_ENVIRONMENT") or "production"
+        keys["SENTRY_ENVIRONMENT"] = sentry_env
+
+        webapp_short = env_first("TELEGRAM_WEBAPP_SHORT_NAME")
+        if webapp_short:
+            keys["TELEGRAM_WEBAPP_SHORT_NAME"] = webapp_short
+        hosted_webapp = env_first("TELEGRAM_HOSTED_WEBAPP_HTTPS_URL")
+        if hosted_webapp:
+            keys["TELEGRAM_HOSTED_WEBAPP_HTTPS_URL"] = hosted_webapp
+        # Dedicated Mini App auth bot (e.g. @OxplayerPublicProviderBot) — falls back to
+        # BOT_USERNAME/main-bot client-side when unset, see oxplayer_env.dart.
+        webapp_bot = env_first("TELEGRAM_WEBAPP_BOT_USERNAME")
+        if webapp_bot:
+            keys["TELEGRAM_WEBAPP_BOT_USERNAME"] = webapp_bot
+
+        sentry_dsn = env_first("SENTRY_DSN")
+        require_sentry = env_first("REQUIRE_SENTRY_DSN").lower() in ("1", "true", "yes")
+        if sentry_dsn:
+            keys["SENTRY_DSN"] = sentry_dsn
+        elif require_sentry:
+            print("Missing SENTRY_DSN — required for production client builds (Infisical /core/client-ci).")
+            raise SystemExit(1)
+
+        out = Path(os.environ["RUNNER_TEMP"]) / "flutter-build-env.json"
+        out.write_text(json.dumps(keys), encoding="utf-8")
+
+        # pubspec.yaml bundles assets/env/default.env (gitignored locally; CI must materialize it).
+        env_path = Path("assets/env/default.env")
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        env_path.write_text(
+            "\n".join(f"{k}={v}" for k, v in keys.items()) + "\n",
+            encoding="utf-8",
+        )
+        print(f"Wrote {env_path} ({env_path.stat().st_size} bytes)")
+        print(
+            "TELEGRAM_API_ID set=",
+            bool(keys.get("TELEGRAM_API_ID")),
+            " TELEGRAM_API_HASH set=",
+            bool(keys.get("TELEGRAM_API_HASH")),
+            sep="",
+        )
+        PY
+        echo "FLUTTER_BUILD_ENV_FILE=$RUNNER_TEMP/flutter-build-env.json" >> "$GITHUB_ENV"

@@ -1,0 +1,1354 @@
+# CI aligned with upstream Fladder (DonutWare/fladder).
+# Tag v* → release. Schedule / push main / workflow_dispatch → nightly. PR → development (Android debug only).
+# Main push skips nightly when commit is release-related (bump / prepare / Release X.Y.Z) so tag alone builds.
+# Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
+# OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols, Play app.oxplayer, admin Telegram notify.
+# Bootstrap GitHub secrets: INFISICAL_API_URL, INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET, TS_CI_AUTHKEY
+name: Build OXPlayer
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+  pull_request:
+    paths:
+      - pubspec.yaml
+      - .github/workflows/build.yml
+      - .fvmrc
+    types:
+      - opened
+      - reopened
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Build type (release, nightly)"
+        required: false
+        default: "nightly"
+        type: choice
+        options:
+          - release
+          - nightly
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NIGHTLY_TAG: nightly
+
+jobs:
+  check-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      build_type: ${{ steps.check.outputs.build_type }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BUILD_TYPE="${{ github.event.inputs.build_type }}"
+          elif [[ "${{ startsWith(github.ref, 'refs/tags/v') }}" == "true" ]]; then
+            BUILD_TYPE="release"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            git checkout main
+            COMMITS_LAST_24H=$(git log --since="24 hours ago" --oneline | wc -l)
+            if [[ $COMMITS_LAST_24H -gt 0 ]]; then
+              BUILD_TYPE="nightly"
+            else
+              echo "No commits to main in the last 24 hours, skipping nightly build"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Release flow pushes main then tags the same commit. Without this skip we
+            # build twice: nightly (main) + release (v*). Tag workflow owns the build.
+            # Do NOT use [skip ci] on release commits — GitHub skips tag push workflows too.
+            MSG="$(git log -1 --pretty=%B)"
+            if echo "${MSG}" | grep -qiE '^(Release [0-9]+\.[0-9]+\.[0-9]+:|chore: prepare release|chore: bump version)'; then
+              echo "Release-related commit on main — skip nightly (tag v* builds release)"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if git tag --points-at HEAD 2>/dev/null | grep -qE '^v[0-9]'; then
+              echo "HEAD already tagged v* — skip nightly"
+              echo "should_run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            BUILD_TYPE="nightly"
+          else
+            BUILD_TYPE="development"
+          fi
+
+          echo "build_type=${BUILD_TYPE}" >> "$GITHUB_OUTPUT"
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "Build type determined: ${BUILD_TYPE}"
+
+  fetch-info:
+    needs: [check-trigger]
+    if: needs.check-trigger.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      version_name: ${{ steps.fetch.outputs.version_name }}
+      android_version_code: ${{ steps.fetch.outputs.android_version_code }}
+      flutter_version: ${{ steps.fetch.outputs.flutter_version }}
+      nightly_version: ${{ steps.fetch.outputs.nightly_version }}
+      build_type: ${{ needs.check-trigger.outputs.build_type }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: fetch
+        shell: bash
+        run: |
+          VERSION_NAME=$(grep '^version:' pubspec.yaml | cut -d ':' -f2 | cut -d '+' -f1 | tr -d ' ')
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+
+          FLUTTER_VERSION=$(jq -r '.flutter' .fvmrc)
+          echo "flutter_version=${FLUTTER_VERSION}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ needs.check-trigger.outputs.build_type }}" == "nightly" ]]; then
+            NIGHTLY_VERSION="${VERSION_NAME}-nightly"
+            echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "Nightly version: $NIGHTLY_VERSION"
+          else
+            echo "nightly_version=" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Must exceed legacy split-APK versionCodes on Play (base*1000+abi) and pubspec-era +N codes.
+          ANDROID_VERSION_CODE=$((10000 + ${GITHUB_RUN_NUMBER}))
+          echo "android_version_code=${ANDROID_VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+          echo "Base version: $VERSION_NAME"
+          echo "Flutter version: $FLUTTER_VERSION"
+          echo "Android versionCode: ${ANDROID_VERSION_CODE}"
+
+  build-android:
+    needs: [fetch-info]
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_suffix: ${{ steps.meta.outputs.artifact_suffix }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      SENTRY_ENVIRONMENT: ${{ needs.fetch-info.outputs.build_type == 'development' && 'development' || 'production' }}
+      REQUIRE_SENTRY_DSN: ${{ needs.fetch-info.outputs.build_type != 'development' && 'true' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - id: meta
+        shell: bash
+        run: echo "artifact_suffix=${{ needs.fetch-info.outputs.build_type }}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Android signing
+        if: needs.fetch-info.outputs.build_type != 'development'
+        shell: bash
+        run: |
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] || \
+             [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || \
+             [ -z "${ANDROID_KEY_ALIAS:-}" ] || \
+             [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "Signing secrets incomplete — cannot produce signed release APK/AAB."
+            exit 1
+          fi
+
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/keystore.jks
+
+          cat > android/app/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          EOF
+
+          # Isolated key for the `direct` flavor (GitHub/website APK) — optional so this
+          # step doesn't break existing releases before ANDROID_DIRECT_* is added to Infisical.
+          # Falls back to signing `direct` release builds with the Play key above until then.
+          if [ -n "${ANDROID_DIRECT_KEYSTORE_BASE64:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEYSTORE_PASSWORD:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEY_ALIAS:-}" ] && \
+             [ -n "${ANDROID_DIRECT_KEY_PASSWORD:-}" ]; then
+            echo "${ANDROID_DIRECT_KEYSTORE_BASE64}" | base64 --decode > android/app/keystore-direct.jks
+
+            cat > android/app/key-direct.properties <<EOF
+          storePassword=${ANDROID_DIRECT_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_DIRECT_KEY_PASSWORD}
+          keyAlias=${ANDROID_DIRECT_KEY_ALIAS}
+          EOF
+          else
+            echo "::warning::ANDROID_DIRECT_* signing secrets not set in Infisical — 'direct' flavor (GitHub/website APK) is signed with the Play upload key instead of its own isolated key."
+          fi
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Materialize Firebase client config (CONSOLE_FIREBASE)
+        shell: bash
+        run: |
+          if [ -z "${CONSOLE_FIREBASE:-}" ]; then
+            echo "CONSOLE_FIREBASE not set — skipping Firebase client config sync"
+          else
+            node scripts/sync-firebase-client-config.mjs
+          fi
+
+      - name: Materialize Firebase google-services.json (legacy fallback)
+        shell: bash
+        run: |
+          if [ -n "${CONSOLE_FIREBASE:-}" ]; then
+            echo "google-services.json already synced from CONSOLE_FIREBASE"
+            exit 0
+          fi
+          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "Wrote android/app/google-services.json (${#FIREBASE_GOOGLE_SERVICES_JSON} bytes from Infisical)"
+          else
+            echo "No CONSOLE_FIREBASE or FIREBASE_GOOGLE_SERVICES_JSON — Crashlytics native config skipped"
+          fi
+
+      - name: Cache libmpv Android JARs
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/libmpv-android-v1.1.8
+          key: libmpv-android-v1.1.8
+
+      - name: Pre-fetch libmpv Android JARs
+        run: |
+          chmod +x .github/scripts/prefetch_libmpv_android.sh
+          .github/scripts/prefetch_libmpv_android.sh
+
+      - name: Build Android APK (PRs)
+        if: needs.fetch-info.outputs.build_type == 'development'
+        run: |
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 5 60 -- \
+            flutter build apk --debug --split-per-abi \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor direct \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Build Android APK and AAB
+        if: needs.fetch-info.outputs.build_type != 'development'
+        run: |
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 5 60 -- \
+            flutter build apk --release --split-per-abi \
+              --split-debug-info=build/debug-info \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor direct \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+          .github/scripts/retry_command.sh 5 60 -- \
+            flutter build appbundle --release \
+              --split-debug-info=build/debug-info \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Upload debug symbols to Sentry
+        if: needs.fetch-info.outputs.build_type != 'development'
+        continue-on-error: true
+        env:
+          SENTRY_URL: https://de.sentry.io
+          SENTRY_RELEASE: oxplayer-client@${{ needs.fetch-info.outputs.version_name }}+${{ needs.fetch-info.outputs.android_version_code }}
+          SENTRY_DIST: ${{ needs.fetch-info.outputs.android_version_code }}
+        run: |
+          set -euo pipefail
+          for var in SENTRY_AUTH_TOKEN SENTRY_DSN; do
+            if [ -z "${!var:-}" ]; then
+              echo "Missing ${var} — bootstrap Infisical /core/client-ci (scripts/infisical-bootstrap-client-ci.py)."
+              exit 1
+            fi
+          done
+          chmod +x .github/scripts/retry_command.sh
+          .github/scripts/retry_command.sh 3 45 -- dart run sentry_dart_plugin
+
+      - name: Verify native ABI parity (Play 64-bit / no x86)
+        if: needs.fetch-info.outputs.build_type != 'development'
+        run: |
+          set -euo pipefail
+          AAB="build/app/outputs/bundle/productionRelease/app-production-release.aab"
+          test -f "$AAB"
+          dart run tool/android/verify_native_abi_parity.dart --aab "$AAB"
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f android/app/keystore.jks android/app/key.properties android/app/keystore-direct.jks android/app/key-direct.properties
+
+      - name: Collect Android artifacts (development)
+        if: needs.fetch-info.outputs.build_type == 'development'
+        shell: bash
+        run: |
+          mkdir -p build/app/outputs/android_artifacts
+          SUF="${{ steps.meta.outputs.artifact_suffix }}"
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-direct-debug.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
+
+      - name: Collect Android artifacts (release)
+        if: needs.fetch-info.outputs.build_type != 'development'
+        shell: bash
+        run: |
+          mkdir -p build/app/outputs/android_artifacts
+          SUF="${{ steps.meta.outputs.artifact_suffix }}"
+          cp "build/app/outputs/flutter-apk/app-armeabi-v7a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
+          cp "build/app/outputs/flutter-apk/app-x86_64-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
+          mv "build/app/outputs/bundle/productionRelease/app-production-release.aab" "build/app/outputs/android_artifacts/${SUF}.aab"
+
+      - name: Attest APKs
+        if: needs.fetch-info.outputs.build_type != 'development'
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            build/app/outputs/android_artifacts/${{ steps.meta.outputs.artifact_suffix }}-arm64-v8a.apk
+            build/app/outputs/android_artifacts/${{ steps.meta.outputs.artifact_suffix }}-armeabi-v7a.apk
+            build/app/outputs/android_artifacts/${{ steps.meta.outputs.artifact_suffix }}-x86_64.apk
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-android
+          path: build/app/outputs/android_artifacts/
+
+  build-windows:
+    needs: [fetch-info]
+    runs-on: windows-2022
+    env:
+      SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
+      OX_MEDIAKIT_MPV_SCRIPT: ${{ github.workspace }}/tool/ci/extract_mpv_windows.ps1
+      OX_MEDIAKIT_ANGLE_SCRIPT: ${{ github.workspace }}/tool/ci/extract_angle_windows.ps1
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/oxtelegram/go.mod
+          cache-dependency-path: go/oxtelegram/go.sum
+
+      - name: Rebuild oxtelegram.dll
+        shell: pwsh
+        run: |
+          choco install mingw -y --no-progress
+          $env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
+          gcc --version
+          & "$env:GITHUB_WORKSPACE/windows/oxtelegram/build.ps1"
+          if (-not (Select-String -Path windows/oxtelegram/oxtelegram.h -Pattern 'ox_submit_bot_token' -Quiet)) {
+            throw 'oxtelegram.dll rebuild missing ox_submit_bot_token'
+          }
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - name: Patch media_kit Windows CMake (7z extract via PowerShell)
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import os
+          import pathlib
+          import re
+
+          fatal = 'message(FATAL_ERROR "${locationForArchive} Integrity check failed, please try to re-build project again.")'
+          warn = 'message(WARNING "${locationForArchive} integrity check failed; continuing (CI)")'
+
+          roots = [
+              pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "Pub" / "Cache",
+              pathlib.Path(os.environ.get("PUB_CACHE", "")),
+              pathlib.Path.home() / "AppData" / "Local" / "Pub" / "Cache",
+              pathlib.Path.home() / ".pub-cache",
+          ]
+
+          libmpv_re = re.compile(
+              r'(add_custom_command\(\s*TARGET\s+"\$\{PROJECT_NAME\}_LIBMPV_EXTRACT"\s*)'
+              r'.*?'
+              r'(\s*WORKING_DIRECTORY\s+"\$\{LIBMPV_SRC\}"\s*\))',
+              re.DOTALL,
+          )
+          angle_re = re.compile(
+              r'(add_custom_command\(\s*TARGET\s+"\$\{PROJECT_NAME\}_ANGLE_EXTRACT"\s*)'
+              r'.*?'
+              r'(\s*WORKING_DIRECTORY\s+"\$\{ANGLE_SRC\}"\s*\))',
+              re.DOTALL,
+          )
+
+          def sub_lib(m: re.Match) -> str:
+              return (
+                  m.group(1)
+                  + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
+                  + '-File "$ENV{OX_MEDIAKIT_MPV_SCRIPT}" '
+                  + '-Archive "${LIBMPV_ARCHIVE}" -DestDir "${LIBMPV_SRC}"'
+                  + m.group(2)
+              )
+
+          def sub_angle(m: re.Match) -> str:
+              return (
+                  m.group(1)
+                  + '\n COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass '
+                  + '-File "$ENV{OX_MEDIAKIT_ANGLE_SCRIPT}" '
+                  + '-Archive "${ANGLE_ARCHIVE}" -DestDir "${ANGLE_SRC}"'
+                  + m.group(2)
+              )
+
+          for root in roots:
+              if not root.is_dir():
+                  continue
+              for cm in root.rglob("CMakeLists.txt"):
+                  if "media_kit_libs_windows_video" not in cm.parts or cm.parent.name != "windows":
+                      continue
+                  text = cm.read_text(encoding="utf-8", errors="replace")
+                  orig = text
+                  text = text.replace(fatal, warn)
+                  text, n_lib = libmpv_re.subn(sub_lib, text, count=1)
+                  text, n_ang = angle_re.subn(sub_angle, text, count=1)
+                  if text != orig:
+                      cm.write_text(text, encoding="utf-8")
+                      print("Patched", cm, "libmpv_block=", n_lib, "angle_block=", n_ang)
+          PY
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Cache Windows media_kit archives
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/mpv-windows
+          key: mpv-windows-20260531-angle-v1.0.1
+
+      - name: Pre-fetch Windows media_kit archives
+        shell: pwsh
+        run: |
+          .\.github\scripts\prefetch_mpv_windows.ps1
+
+      - name: Build Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            rm -f build/windows/x64/*.7z 2>/dev/null || true
+            rm -rf build/windows/x64/libmpv build/windows/x64/ANGLE 2>/dev/null || true
+            pwsh -NoProfile -File .github/scripts/prefetch_mpv_windows.ps1
+            if flutter build windows --release \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "Windows build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
+
+      - name: Compile Inno Setup installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: windows/windows_setup.iss
+          options: /O+ /DFLADDER_VERSION="${{ needs.fetch-info.outputs.version_name }}"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-windows-portable
+          path: build\windows\x64\runner\Release\
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-windows-installer
+          path: windows\Output\fladder_setup.exe
+
+  build-ios:
+    needs: [fetch-info]
+    runs-on: macos-latest
+    env:
+      SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build iOS IPA (unsigned)
+        run: |
+          set -uo pipefail
+
+          # media_kit_libs_ios_video downloads Mpv.xcframework via `make` during pod install,
+          # but the podspec ignores curl failures — a transient 504 leaves the framework missing
+          # ("Framework 'Mpv' not found"). Materialize it explicitly with retries before archiving.
+          prepare_ios_deps() {
+            flutter build ios --config-only --no-codesign --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE" || return 1
+            mk_makefile="$(find "${PUB_CACHE}/git" -path '*/media_kit_libs_ios_video/ios/Makefile' 2>/dev/null | head -1 || true)"
+            if [[ -n "${mk_makefile}" ]]; then
+              ( cd "${mk_makefile%/Makefile}" && make clean && make ) || return 1
+            fi
+            ( cd ios && pod install --repo-update ) || return 1
+          }
+
+          for attempt in 1 2 3 4 5; do
+            if prepare_ios_deps && flutter build ipa --no-codesign --flavor production \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "iOS build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
+
+      - name: Package unsigned IPA
+        run: |
+          cd build/ios/archive/Runner.xcarchive/Products/Applications/
+          mkdir Payload
+          mv Runner.app Payload/
+          zip -r iOS.ipa Payload
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-iOS
+          path: build/ios/archive/Runner.xcarchive/Products/Applications/iOS.ipa
+
+  build-macos:
+    needs: [fetch-info]
+    runs-on: macos-latest
+    env:
+      SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build macOS app
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/retry_command.sh
+
+          prepare_macos_deps() {
+            flutter build macos --config-only --flavor production \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+            mk_makefile="$(find "${PUB_CACHE}/git" -path '*/media_kit_libs_macos_video/macos/Makefile' 2>/dev/null | head -1 || true)"
+            if [[ -n "${mk_makefile}" ]]; then
+              make -C "${mk_makefile%/Makefile}" clean || true
+            fi
+            cd macos
+            pod install --repo-update
+            cd ..
+          }
+
+          for attempt in 1 2 3 4 5; do
+            prepare_macos_deps
+            if flutter build macos --flavor production --release \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
+              exit 0
+            fi
+            echo "macOS build failed (attempt ${attempt}/5), retrying in 45s..."
+            sleep 45
+          done
+          exit 1
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg
+          bash scripts/create_dmg.sh
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-macOS
+          path: build/macos/Build/Products/Release-production/macOS.dmg
+
+  build-linux:
+    needs: [fetch-info]
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - name: Sync pubspec build number for Linux packaging
+        run: |
+          sed -i -E 's/(version: [0-9]+\.[0-9]+\.[0-9]+\+)[0-9]+/\1${{ needs.fetch-info.outputs.android_version_code }}/' pubspec.yaml
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev libcurl4-openssl-dev patchelf cmake clang libfuse2
+
+      - name: Cache mimalloc tarball
+        uses: actions/cache@v4
+        with:
+          path: .ci-cache/mimalloc-2.1.2.tar.gz
+          key: mimalloc-2.1.2-linux-x64
+
+      - name: Build Linux app
+        run: |
+          chmod +x .github/scripts/prefetch_mimalloc_linux.sh .github/scripts/retry_command.sh
+          .github/scripts/prefetch_mimalloc_linux.sh
+          .github/scripts/retry_command.sh 3 30 -- \
+            flutter build linux --release \
+              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - name: Fix RPATH
+        run: |
+          for lib in build/linux/x64/release/bundle/lib/*.so; do
+            [[ -f "$lib" && -n "$(patchelf --print-rpath "$lib")" ]] && \
+            patchelf --set-rpath '$ORIGIN' "$lib"
+          done
+          patchelf --set-rpath '$ORIGIN/lib' "build/linux/x64/release/bundle/fladder"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: build/linux/x64/release/bundle
+
+      - name: Cache AppImage tooling
+        uses: actions/cache@v4
+        with:
+          path: |
+            .ci-cache/appimage-builder-x86_64.AppImage
+            appimage-build/AppRun
+          key: appimage-tooling-v2.0.0-x86_64-${{ runner.os }}
+          restore-keys: |
+            appimage-tooling-v2.0.0-x86_64-${{ runner.os }}
+
+      - name: Build AppImage
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/download_with_retry.sh .github/scripts/retry_command.sh
+          mkdir -p .ci-cache
+
+          VERSION_TO_USE="${{ needs.fetch-info.outputs.version_name }}"
+          sed -i -E "s/(version:\\s*)latest/\\1${VERSION_TO_USE}/" AppImageBuilder.yml
+          sed -i "s|PLACEHOLDER_OWNER|${{ github.repository_owner }}|g" AppImageBuilder.yml
+          sed -i "s|PLACEHOLDER_REPO|${{ github.event.repository.name }}|g" AppImageBuilder.yml
+
+          BUILDER_DEST=".ci-cache/appimage-builder-x86_64.AppImage"
+          if [ ! -f "${BUILDER_DEST}" ]; then
+            .github/scripts/download_with_retry.sh \
+              "https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage" \
+              "${BUILDER_DEST}"
+          fi
+          install -m 755 "${BUILDER_DEST}" /usr/local/bin/appimage-builder
+
+          APPRUN_VERSION="v2.0.0"
+          CACHE_DIR="appimage-build/AppRun/${APPRUN_VERSION}"
+          mkdir -p "${CACHE_DIR}"
+          for asset in AppRun-Release-x86_64 libapprun_hooks-Release-x86_64.so; do
+            dest="${CACHE_DIR}/${asset}"
+            if [ ! -f "${dest}" ]; then
+              url="https://github.com/AppImageCrafters/AppRun/releases/download/${APPRUN_VERSION}/${asset}"
+              .github/scripts/download_with_retry.sh "${url}" "${dest}"
+            fi
+          done
+
+          .github/scripts/retry_command.sh 3 45 -- \
+            appimage-builder --recipe AppImageBuilder.yml
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux-appimage
+          path: |
+            OXPlayer_x86_64.AppImage
+            OXPlayer_x86_64.AppImage.zsync
+
+  build-linux-flatpak:
+    needs: [fetch-info, build-linux]
+    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:gnome-46
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: build/linux/x64/release/bundle
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: OXPlayer-Linux.flatpak
+          manifest-path: flatpak/nl.jknaapen.fladder.yaml
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-linux-flatpak
+          path: OXPlayer-Linux.flatpak
+
+  # Temporarily disabled — Flutter web app paused (Coming soon on marketing site).
+  build-web:
+    if: false
+    needs: [fetch-info]
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_ENVIRONMENT: production
+      REQUIRE_SENTRY_DSN: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
+          cache: true
+          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
+
+      - run: flutter pub get
+
+      - uses: ./.github/actions/oxplayer-flutter-env
+
+      - name: Build web app
+        run: |
+          flutter build web --release \
+            --base-href / \
+            --no-web-resources-cdn \
+            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
+            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-web
+          path: build/web
+
+  create_release:
+    name: Create Release
+    needs:
+      - fetch-info
+      - build-android
+      - build-windows
+      - build-ios
+      - build-macos
+      - build-linux
+      - build-linux-flatpak
+      # build-web temporarily disabled
+    runs-on: ubuntu-latest
+    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - id: version
+        shell: bash
+        run: |
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "nightly" ]]; then
+            echo "version=${{ needs.fetch-info.outputs.nightly_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ needs.fetch-info.outputs.version_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Delete existing nightly release
+        if: needs.fetch-info.outputs.build_type == 'nightly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view ${{ env.NIGHTLY_TAG }} >/dev/null 2>&1; then
+            gh release delete ${{ env.NIGHTLY_TAG }} --yes --cleanup-tag
+          fi
+          if git tag -l | grep -q "^${{ env.NIGHTLY_TAG }}$"; then
+            git push origin --delete ${{ env.NIGHTLY_TAG }} || true
+          fi
+
+      - name: Generate nightly changelog
+        if: needs.fetch-info.outputs.build_type == 'nightly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          LATEST_STABLE=$(gh release list --limit 50 --exclude-drafts --json tagName,isPrerelease --jq '.[] | select(.isPrerelease == false) | .tagName' | head -1 || echo "")
+          {
+            echo "# $(date -u "+%Y-%m-%d %H:%M:%S UTC")"
+            echo ""
+            echo "Automated nightly build from \`main\`."
+            echo ""
+            echo "**Warning:** prerelease; may be unstable."
+            echo ""
+          } > changelog.md
+          if [ -n "$LATEST_STABLE" ]; then
+            echo "Changes since ${LATEST_STABLE}: https://github.com/${{ github.repository }}/compare/${LATEST_STABLE}...HEAD" >> changelog.md
+          else
+            echo "Commits: https://github.com/${{ github.repository }}/commits/main" >> changelog.md
+          fi
+          {
+            echo ""
+            echo "---"
+            echo "Build: ${{ github.run_number }} | SHA: ${{ github.sha }}"
+          } >> changelog.md
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-android
+          path: oxplayer-android
+
+      - name: Stage Android assets
+        shell: bash
+        run: |
+          SUF="${{ needs.build-android.outputs.artifact_suffix }}"
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "OXPlayer-Android-${V}-armeabi-v7a.apk" || true
+          mv "oxplayer-android/${SUF}-arm64-v8a.apk" "OXPlayer-Android-${V}-arm64-v8a.apk" || true
+          mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk" || true
+          mv "oxplayer-android/${SUF}.aab" "OXPlayer-Android-${V}.aab"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-windows-portable
+          path: oxplayer-windows-portable
+
+      - name: Stage Windows portable
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          cd oxplayer-windows-portable
+          zip -r "../OXPlayer-Windows-${V}.zip" .
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-windows-installer
+          path: oxplayer-windows-installer
+
+      - name: Stage Windows installer
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-windows-installer/fladder_setup.exe" "OXPlayer-Windows-${V}-Setup.exe"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-iOS
+          path: oxplayer-iOS
+
+      - name: Stage iOS IPA
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-iOS/iOS.ipa" "OXPlayer-iOS-${V}.ipa"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-macOS
+          path: oxplayer-macOS
+
+      - name: Stage macOS DMG
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-macOS/macOS.dmg" "OXPlayer-macOS-${V}.dmg"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux
+          path: oxplayer-linux
+
+      - name: Stage Linux bundle
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          cd oxplayer-linux
+          zip -r "../OXPlayer-Linux-${V}.zip" .
+
+      - uses: actions/download-artifact@v5
+        if: needs.fetch-info.outputs.build_type == 'release'
+        with:
+          name: oxplayer-linux-flatpak
+          path: oxplayer-linux-flatpak
+
+      - name: Stage Linux Flatpak
+        if: needs.fetch-info.outputs.build_type == 'release'
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-linux-flatpak/OXPlayer-Linux.flatpak" "OXPlayer-Linux-${V}.flatpak"
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-linux-appimage
+          path: oxplayer-linux-appimage
+
+      - name: Stage Linux AppImage
+        shell: bash
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
+          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
+
+      # Web artifact staging skipped while build-web is disabled.
+
+      - name: Prepare GitHub release body file
+        shell: bash
+        run: |
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "nightly" ]]; then
+            cp changelog.md gh-release-body.md
+          else
+            printf '%s\n' "" > gh-release-body.md
+          fi
+
+      # softprops/action-gh-release alone fails hard on GitHub API Unicorn/503 flakes.
+      # Prefer gh with retries; fall back to softprops once if gh still fails.
+      - name: Create GitHub Release (retry)
+        id: gh_release
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "nightly" ]]; then
+            TAG="${{ env.NIGHTLY_TAG }}"
+            TITLE="OXPlayer nightly — ${V}"
+            EXTRA_FLAGS=(--prerelease --notes-file gh-release-body.md)
+          else
+            TAG="${{ github.ref_name }}"
+            TITLE="OXPlayer ${V}"
+            EXTRA_FLAGS=(--latest --generate-notes)
+          fi
+
+          FILES=(
+            "OXPlayer-Android-${V}-arm64-v8a.apk"
+            "OXPlayer-Android-${V}-armeabi-v7a.apk"
+            "OXPlayer-Android-${V}-x86_64.apk"
+            "OXPlayer-Android-${V}.aab"
+            "OXPlayer-Windows-${V}-Setup.exe"
+            "OXPlayer-Windows-${V}.zip"
+            "OXPlayer-iOS-${V}.ipa"
+            "OXPlayer-macOS-${V}.dmg"
+            "OXPlayer-Linux-${V}.zip"
+            "OXPlayer-Linux-${V}.AppImage"
+            "OXPlayer-Linux-${V}.AppImage.zsync"
+          )
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
+            FILES+=("OXPlayer-Linux-${V}.flatpak")
+          fi
+
+          for f in "${FILES[@]}"; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::missing release asset: $f"
+              exit 1
+            fi
+          done
+
+          # Replace existing draft/broken release for this tag if present.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Deleting existing release $TAG before recreate"
+            gh release delete "$TAG" --yes || true
+          fi
+
+          attempt=1
+          max=6
+          while (( attempt <= max )); do
+            echo "=== gh release create attempt ${attempt}/${max} ==="
+            if gh release create "$TAG" \
+              --title "$TITLE" \
+              "${EXTRA_FLAGS[@]}" \
+              "${FILES[@]}"; then
+              echo "Release ${TAG} created"
+              exit 0
+            fi
+            sleep_s=$(( attempt * 20 ))
+            echo "Release create failed; sleeping ${sleep_s}s"
+            sleep "${sleep_s}"
+            attempt=$((attempt + 1))
+          done
+          echo "::error::gh release create failed after ${max} attempts"
+          exit 1
+
+      - uses: softprops/action-gh-release@v3
+        if: steps.gh_release.outcome != 'success'
+        with:
+          tag_name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}
+          name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && format('OXPlayer nightly — {0}', steps.version.outputs.version) || format('OXPlayer {0}', steps.version.outputs.version) }}
+          body_path: gh-release-body.md
+          draft: false
+          prerelease: ${{ needs.fetch-info.outputs.build_type == 'nightly' }}
+          make_latest: ${{ needs.fetch-info.outputs.build_type == 'release' }}
+          generate_release_notes: ${{ needs.fetch-info.outputs.build_type == 'release' }}
+          fail_on_unmatched_files: true
+          files: |
+            OXPlayer-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
+            OXPlayer-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+            OXPlayer-Android-${{ steps.version.outputs.version }}-x86_64.apk
+            OXPlayer-Android-${{ steps.version.outputs.version }}.aab
+            OXPlayer-Windows-${{ steps.version.outputs.version }}-Setup.exe
+            OXPlayer-Windows-${{ steps.version.outputs.version }}.zip
+            OXPlayer-iOS-${{ steps.version.outputs.version }}.ipa
+            OXPlayer-macOS-${{ steps.version.outputs.version }}.dmg
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
+            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
+            ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Fail if release still missing
+        if: steps.gh_release.outcome != 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} exists (softprops fallback succeeded)"
+            exit 0
+          fi
+          echo "::error::Create Release failed (gh + softprops)"
+          exit 1
+
+      # Website short links (/dl/*) redirect to R2 releases/latest/* — not GitHub CDN.
+      # Nightly must not overwrite stable latest keys.
+      - name: Mirror release assets to R2
+        if: needs.fetch-info.outputs.build_type == 'release'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_S3_ACCESS_KEY_ID:?CLOUDFLARE_S3_ACCESS_KEY_ID missing from Infisical /core/client-ci}"
+          : "${CLOUDFLARE_S3_SECRET_ACCESS_KEY:?CLOUDFLARE_S3_SECRET_ACCESS_KEY missing}"
+          : "${CLOUDFLARE_S3_API_ENDPOINT:?CLOUDFLARE_S3_API_ENDPOINT missing}"
+          export CLOUDFLARE_R2_BUCKET="${CLOUDFLARE_R2_BUCKET:-oxplayer-channel-news}"
+          bash scripts/mirror-release-to-r2.sh
+
+      - name: Notify admins (Telegram via oxplayer API)
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BUILD_TYPE: ${{ needs.fetch-info.outputs.build_type }}
+        shell: bash
+        run: |
+          API_BASE="${OXPLAYER_API_BASE_URL:-}"
+          NOTIFY_TOKEN="${OXPLAYER_CLIENT_RELEASE_NOTIFY_TOKEN:-${PROVIDER_INTERNAL_TOKEN:-}}"
+          if [ -z "${API_BASE}" ] || [ -z "${NOTIFY_TOKEN}" ]; then
+            echo "Skipping admin release notify."
+            exit 0
+          fi
+          if [[ "${BUILD_TYPE}" == "nightly" ]]; then
+            TAG="${{ env.NIGHTLY_TAG }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          BASE="${API_BASE%/}"
+          if ! JSON=$(gh release view "${TAG}" --repo "${REPO}" --json url,name,assets 2>/tmp/gh-release-view.err); then
+            echo "::warning::Could not read release ${TAG}: $(cat /tmp/gh-release-view.err)"
+            exit 0
+          fi
+          RELEASE_URL=$(echo "$JSON" | jq -r .url)
+          RELEASE_NAME=$(echo "$JSON" | jq -r .name)
+          ASSETS=$(echo "$JSON" | jq -c '[.assets[] | {name:.name, url:.url}]')
+          BODY=$(jq -n \
+            --arg releaseUrl "$RELEASE_URL" \
+            --arg releaseTag "$TAG" \
+            --arg releaseTitle "$RELEASE_NAME" \
+            --arg buildType "$BUILD_TYPE" \
+            --arg repository "$REPO" \
+            --argjson assets "$ASSETS" \
+            '{releaseUrl:$releaseUrl, releaseTag:$releaseTag, releaseTitle:$releaseTitle, buildType:$buildType, repository:$repository, assets:$assets}')
+          HTTP_CODE=$(curl -sS -o /tmp/ox-release-notify.json -w "%{http_code}" -X POST \
+            "${BASE}/internal/oxplayer-client/release-admin-notify" \
+            -H "Authorization: Bearer ${NOTIFY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+          NOTIFY_OK=$(jq -r '.ok // false' /tmp/ox-release-notify.json 2>/dev/null || echo false)
+          if [ "$HTTP_CODE" != "200" ] || [ "$NOTIFY_OK" != "true" ]; then
+            echo "::warning::Admin Telegram notify failed (HTTP ${HTTP_CODE})"
+          else
+            echo "Admin release notify sent."
+          fi
+
+  release_play_console:
+    name: Upload AAB to Google Play Console
+    needs:
+      - fetch-info
+      - create_release
+      - build-android
+    runs-on: ubuntu-latest
+    if: |
+      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
+      needs.create_release.result == 'success'
+    concurrency:
+      group: google-play-upload-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - name: Download Artifacts Android
+        uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-android
+          path: oxplayer-android
+
+      - name: Upload AAB to Google Play Console
+        uses: r0adkll/upload-google-play@v1.1.4
+        continue-on-error: true
+        with:
+          serviceAccountJsonPlainText: ${{ env.SERVICE_ACCOUNT_JSON }}
+          packageName: "app.oxplayer"
+          releaseFiles: "oxplayer-android/${{ needs.build-android.outputs.artifact_suffix }}.aab"
+          # OX: internal track until production is promoted in Play Console (Fladder uses production/draft for release).
+          tracks: internal
+          status: completed
+          releaseName: "${{ needs.fetch-info.outputs.version_name }} (${{ needs.fetch-info.outputs.android_version_code }})"
+
+  # Temporarily disabled — Flutter web app paused.
+  release_web:
+    name: Release Web (Docker)
+    needs:
+      - fetch-info
+      - create_release
+      - build-web
+    runs-on: ubuntu-latest
+    if: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: oxplayer-web
+          path: build/web
+
+      - name: Deploy to ghcr.io
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          image: oxplayer
+          addLatest: true
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64,linux/arm/v7
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy rootless image to ghcr.io
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          dockerfile: Dockerfile-rootless
+          image: oxplayer-rootless
+          addLatest: true
+          multiPlatform: true
+          platform: linux/amd64,linux/arm64,linux/arm/v7
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+  # Temporarily disabled — Flutter web app paused (Coming soon).
+  deploy-web-hetzner:
+    name: Deploy Web · Hetzner
+    needs: [fetch-info, create_release]
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - name: Trigger oxplayer-be static web deploy
+        id: dispatch
+        env:
+          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.fetch-info.outputs.version_name }}
+          BE_REPO: Aryan-mor/oxplayer-be
+        run: |
+          set -euo pipefail
+          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::Missing OXPLAYER_BE_DISPATCH_TOKEN — set in Infisical /core/client-ci or Gurbeh/oxplayer-client GitHub Secrets (PAT with repo + workflow on oxplayer-be). See docs/RELEASE.md § Web (Hetzner)."
+            exit 1
+          fi
+          export GH_TOKEN
+          echo "dispatch_before=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
+          gh api "repos/${BE_REPO}/dispatches" \
+            -f event_type=deploy-client-web \
+            -f "client_payload[version]=${VERSION}"
+
+      - name: Wait for oxplayer-be web deploy
+        env:
+          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
+          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
+          BE_REPO: Aryan-mor/oxplayer-be
+          DISPATCH_BEFORE: ${{ steps.dispatch.outputs.dispatch_before }}
+        run: |
+          set -euo pipefail
+          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
+          export GH_TOKEN
+
+          run_id=""
+          for attempt in $(seq 1 24); do
+            if run_id="$(gh run list --repo "${BE_REPO}" \
+              --workflow="Deploy · Web (Hetzner static)" \
+              --event repository_dispatch \
+              --limit 5 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"${DISPATCH_BEFORE}\")] | .[0].databaseId // empty" 2>/dev/null)"; then
+              if [ -n "${run_id}" ]; then
+                echo "Web deploy run: ${run_id}"
+                break
+              fi
+            else
+              echo "Attempt ${attempt}/24: gh run list failed (API flake); retrying..."
+            fi
+            echo "Attempt ${attempt}/24: waiting for web deploy workflow..."
+            sleep 10
+          done
+          if [ -z "${run_id}" ]; then
+            echo "::error::Timed out waiting for Deploy · Web (Hetzner static) on ${BE_REPO}"
+            exit 1
+          fi
+
+          # gh run watch often 503s during GitHub incidents; poll conclusion with retries.
+          for watch_attempt in $(seq 1 40); do
+            if gh run watch "${run_id}" --repo "${BE_REPO}" --exit-status; then
+              echo "Web deploy succeeded: ${run_id}"
+              exit 0
+            fi
+            watch_rc=$?
+            conclusion="$(gh run view "${run_id}" --repo "${BE_REPO}" --json conclusion --jq .conclusion 2>/dev/null || true)"
+            if [ "${conclusion}" = "success" ]; then
+              echo "Web deploy succeeded (watch flake, conclusion=success): ${run_id}"
+              exit 0
+            fi
+            if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "cancelled" ] || [ "${conclusion}" = "timed_out" ]; then
+              echo "::error::Web deploy ${run_id} finished with conclusion=${conclusion}"
+              exit 1
+            fi
+            echo "Watch attempt ${watch_attempt}/40 failed (rc=${watch_rc}, conclusion=${conclusion:-unknown}); retry in 15s..."
+            sleep 15
+          done
+          echo "::error::Timed out watching web deploy ${run_id} on ${BE_REPO}"
+          exit 1

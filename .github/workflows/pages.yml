@@ -1,0 +1,76 @@
+# Marketing site on GitHub Pages: https://oxplayer.app/
+# Flutter web app: https://web.oxplayer.app (global) + https://web.oxplayer.ir (Iran CDN.ir)
+name: Deploy website (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "web/**"
+      - "lib/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".fvmrc"
+      - "docs/privacy-policy.html"
+      - ".github/workflows/pages.yml"
+      - ".github/actions/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_ENVIRONMENT: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/oxplayer-infisical-secrets
+        with:
+          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
+          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
+          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
+          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Sync Play Store privacy policy HTML into static output
+        run: cp docs/privacy-policy.html website/public/privacy-policy.html
+
+      - name: Build Next.js static site
+        working-directory: website
+        run: |
+          npm ci --include=dev
+          NODE_ENV=production npm run build
+          npm run verify:export
+          node scripts/patch-404-share.mjs
+
+      - name: Merge marketing site (web app lives on web.oxplayer.app)
+        run: |
+          mkdir -p website/out/web
+          cp website/public/web/index.html website/out/web/index.html
+
+      - uses: actions/configure-pages@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/out
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

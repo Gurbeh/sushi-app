@@ -1,0 +1,94 @@
+# Load oxplayer-client CI secrets from self-hosted Infisical (/core/client-ci).
+# Bootstrap GitHub secrets: INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET,
+# INFISICAL_API_URL, TS_CI_AUTHKEY (Tailscale — Infisical API is Tailscale-only).
+name: OXPlayer Infisical secrets
+description: Connect Tailscale and export /core/client-ci into job environment
+inputs:
+  infisical-domain:
+    description: Infisical API base URL
+    required: false
+    default: http://100.67.35.80:8080
+  infisical-client-id:
+    description: Universal Auth client id (oxplayer-client-ci-identity)
+    required: true
+  infisical-client-secret:
+    description: Universal Auth client secret
+    required: true
+  infisical-project-slug:
+    description: Infisical project slug
+    required: false
+    default: ox-player-f-asb
+  infisical-env-slug:
+    description: Infisical environment slug
+    required: false
+    default: core-api
+  infisical-secret-path:
+    description: Secret folder path
+    required: false
+    default: /core/client-ci
+  tailscale-authkey:
+    description: Tailscale auth key (reusable, ephemeral, tag:github-ci)
+    required: true
+  connect-tailscale:
+    description: Join Tailscale before Infisical fetch
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    # macOS: brew binary — tailscale/github-action@v3 compiles from source and often
+    # times out on proxy.golang.org during go mod download.
+    - name: Connect Tailscale (macOS)
+      if: inputs.connect-tailscale == 'true' && runner.os == 'macOS'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v tailscale &>/dev/null; then
+          brew install tailscale
+        fi
+        sudo tailscaled --state=mem: &
+        for i in $(seq 1 30); do
+          if tailscale status &>/dev/null; then break; fi
+          sleep 1
+        done
+        tailscale up --auth-key="${TS_AUTHKEY}" --accept-routes --reset
+      env:
+        TS_AUTHKEY: ${{ inputs.tailscale-authkey }}
+
+    - name: Connect Tailscale (Linux / Windows)
+      if: inputs.connect-tailscale == 'true' && runner.os != 'macOS'
+      uses: tailscale/github-action@v3
+      with:
+        authkey: ${{ inputs.tailscale-authkey }}
+        version: 1.78.1
+
+    - name: Wait for Infisical API
+      if: inputs.connect-tailscale == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        status_url="${{ inputs.infisical-domain }}"
+        status_url="${status_url%/}/api/status"
+        for attempt in $(seq 1 36); do
+          if curl -fsS --max-time 5 "${status_url}" >/dev/null 2>&1; then
+            echo "Infisical healthy (${status_url})"
+            exit 0
+          fi
+          echo "Attempt ${attempt}/36: Infisical not reachable yet..."
+          sleep 5
+        done
+        echo "::error::Infisical unreachable at ${status_url} after 180s"
+        exit 1
+
+    - name: Fetch secrets from Infisical
+      uses: Infisical/secrets-action@v1.0.12
+      with:
+        method: universal
+        domain: ${{ inputs.infisical-domain }}
+        client-id: ${{ inputs.infisical-client-id }}
+        client-secret: ${{ inputs.infisical-client-secret }}
+        project-slug: ${{ inputs.infisical-project-slug }}
+        env-slug: ${{ inputs.infisical-env-slug }}
+        secret-path: ${{ inputs.infisical-secret-path }}
+        export-type: env
+        recursive: true

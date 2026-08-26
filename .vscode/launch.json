@@ -1,0 +1,105 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Fladder Development (debug)",
+			"request": "launch",
+			"type": "dart",
+			"args": [
+				"--flavor",
+				"development",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Fladder Development HTPC (debug)",
+			"request": "launch",
+			"type": "dart",
+			"args": [
+				"--flavor",
+				"development",
+				"--dart-define-from-file=dart_defines.ngrok.json",
+				"-a",
+				"--htpc",
+			]
+		},
+		{
+			"name": "Fladder Production (debug)",
+			"request": "launch",
+			"type": "dart",
+			"args": [
+				"--flavor",
+				"production",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Fladder Development (profile mode)",
+			"request": "launch",
+			"type": "dart",
+			"flutterMode": "profile",
+			"args": [
+				"--flavor",
+				"development",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Fladder Production (profile mode)",
+			"request": "launch",
+			"type": "dart",
+			"flutterMode": "profile",
+			"args": [
+				"--flavor",
+				"production",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Fladder Development (release mode)",
+			"request": "launch",
+			"type": "dart",
+			"flutterMode": "release",
+			"args": [
+				"--flavor",
+				"development",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Fladder Production (release mode)",
+			"request": "launch",
+			"type": "dart",
+			"flutterMode": "release",
+			"args": [
+				"--flavor",
+				"production",
+				"--dart-define-from-file=dart_defines.ngrok.json"
+			]
+		},
+		{
+			"name": "Web",
+			"request": "launch",
+			"type": "dart",
+			"args": [
+				"--dart-define-from-file=dart_defines.ngrok.json",
+				"--web-port",
+				"9090",
+			],
+		},
+		{
+			"name": "Web (release mode)",
+			"request": "launch",
+			"type": "dart",
+			"flutterMode": "release",
+			"args": [
+				"--dart-define-from-file=dart_defines.ngrok.json",
+				"--web-port",
+				"9090",
+			],
+		},
+	],
+}

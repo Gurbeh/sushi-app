@@ -1,0 +1,116 @@
+name: Bug report
+description: Something is broken in the OXPlayer app
+title: "BUG: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before filing:** If Fladder works against real Jellyfin but OXPlayer fails on the same flow, the bug is often in [oxplayer-be](https://github.com/Aryan-mor/oxplayer-be/issues/new/choose) (API shim), not Fladder client code.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - lib/oxplayer (OX-specific)
+        - Home / library / empty or wrong content
+        - Playback / streaming
+        - Seerr / requests
+        - Login / session
+        - Settings
+        - Website
+        - Crash / performance
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What is wrong?
+      placeholder: Short and explicit description...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reprod
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open OXPlayer on Android
+        2. Sign in with Telegram
+        3. Open Home
+        4. See empty screen
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshots
+      placeholder: Drag and drop in a follow-up comment, or paste image URLs
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: shell
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Android
+        - Android TV
+        - iOS
+        - Linux
+        - Windows
+        - macOS
+        - Web
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: OXPlayer build or version
+      placeholder: e.g. 1.0.0+42
+
+  - type: input
+    id: server
+    attributes:
+      label: OXPlayer API / environment
+      placeholder: e.g. prod API, dev stack, user role VIP/admin
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: Triage hints (optional)
+      options:
+        - label: "Compared API response to Jellyfin docs or curl"
+          required: false
+        - label: "Likely oxplayer-be — please move or link issue there"
+          required: false

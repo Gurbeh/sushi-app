@@ -1,0 +1,1 @@
+Fix OOM on low-memory Android TVs: use small optimized Iran flag assets (256px splash, 128px icons) instead of multi-megabyte images.

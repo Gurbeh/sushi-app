@@ -1,0 +1,61 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare-release:
+    name: Update metadata and tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Version
+        id: version
+        run: |
+          FULL_VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //')
+          VERSION_NAME=$(echo "$FULL_VERSION" | cut -d'+' -f1)
+          BUILD_NUMBER=$(echo "$FULL_VERSION" | cut -d'+' -f2)
+
+          echo "version=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (Build: $BUILD_NUMBER)"
+
+          if git rev-parse "v${VERSION_NAME}" >/dev/null 2>&1; then
+            echo "is_new_version=false" >> "$GITHUB_OUTPUT"
+            echo "Status: Version v${VERSION_NAME} is already tagged."
+          else
+            echo "is_new_version=true" >> "$GITHUB_OUTPUT"
+            echo "Status: New version v${VERSION_NAME} detected."
+          fi
+
+      - name: Update Fastlane Changelog
+        if: steps.version.outputs.is_new_version == 'true'
+        env:
+          CHANGELOG_MSG: "See the full changelog at: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p fastlane/metadata/android/en-US/changelogs
+          printf '%s' "${{ env.CHANGELOG_MSG }}" > "fastlane/metadata/android/en-US/changelogs/${VERSION}.txt"
+
+      - name: Commit and Tag
+        if: steps.version.outputs.is_new_version == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          VERSION="v${{ steps.version.outputs.version }}"
+
+          git add fastlane/metadata/android/en-US/changelogs/ 2>/dev/null || true
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: prepare release $VERSION"
+            git push origin main
+          fi
+
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "Tagged and pushed $VERSION"

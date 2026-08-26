@@ -1,0 +1,26 @@
+icons_launcher:
+  image_path: "icons/development/oxplayer_icon.png"
+  platforms:
+    android:
+      adaptive_foreground_image: "icons/development/oxplayer_icon.png"
+      adaptive_background_color: "#ff2d95"
+      adaptive_monochrome_image: "icons/development/oxplayer_adaptive_icon.png"
+      notification_image: icons/oxplayer_notification_icon.png
+      enable: true
+    ios:
+      image_path: "icons/development/oxplayer_store_icon.png"
+      enable: true
+    # Windows/linux/web have no flavor-specific output paths; keep production icons
+    # in the repo so release builds are not overwritten by the dev (pink) assets.
+    windows:
+      image_path: "icons/development/oxplayer_icon_desktop.png"
+      enable: false
+    macos:
+      image_path: "icons/development/oxplayer_macos_icon.png"
+      enable: true
+    linux:
+      image_path: "icons/development/oxplayer_icon_desktop.png"
+      enable: false
+    web:
+      favicon_path: "icons/development/oxplayer_icon_desktop.png"
+      enable: false

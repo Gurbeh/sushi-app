@@ -1,0 +1,339 @@
+import 'package:flutter/material.dart';
+
+import 'package:auto_route/auto_route.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
+
+import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/providers/items/series_details_provider.dart';
+import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
+import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
+import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
+import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
+import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_detail_play_buttons.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
+import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
+import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
+import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
+import 'package:fladder/screens/details_screens/components/overview_header.dart';
+import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
+import 'package:fladder/screens/shared/detail_scaffold.dart';
+import 'package:fladder/screens/shared/media/components/media_play_button.dart';
+import 'package:fladder/screens/shared/media/episode_posters.dart';
+import 'package:fladder/screens/shared/media/expanding_text.dart';
+import 'package:fladder/screens/shared/media/external_urls.dart';
+import 'package:fladder/screens/shared/media/people_row.dart';
+import 'package:fladder/screens/shared/media/poster_row.dart';
+import 'package:fladder/screens/shared/media/season_row.dart';
+import 'package:fladder/screens/shared/media/special_features_row.dart';
+import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
+import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
+import 'package:fladder/util/item_base_model/play_item_helpers.dart';
+import 'package:fladder/util/list_padding.dart';
+import 'package:fladder/util/localization_helper.dart';
+import 'package:fladder/util/router_extension.dart';
+import 'package:fladder/widgets/shared/ensure_visible.dart';
+import 'package:fladder/widgets/shared/item_actions.dart';
+import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
+import 'package:fladder/widgets/shared/selectable_icon_button.dart';
+
+class SeriesDetailScreen extends ConsumerStatefulWidget {
+  final ItemBaseModel item;
+  const SeriesDetailScreen({required this.item, super.key});
+
+  @override
+  ConsumerState<ConsumerStatefulWidget> createState() => _SeriesDetailScreenState();
+}
+
+class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
+  AutoDisposeStateNotifierProvider<SeriesDetailViewNotifier, SeriesModel?> get providerId =>
+      seriesDetailsProvider(widget.item.id);
+
+  @override
+  Widget build(BuildContext context) {
+    final details = ref.watch(providerId);
+    final wrapAlignment =
+        AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
+
+    final selectedEpisode = oxSeriesSelectedEpisode(ref, details);
+    final needsEpisodePicker =
+        OxplayerConfig.isEnabled && oxSeriesNeedsEpisodePick(details) && selectedEpisode == null;
+    final currentEpisode = oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
+
+    return DetailScaffold(
+      label: details?.name ?? "",
+      item: details,
+      actions: (context) => details?.generateActions(
+        context,
+        ref,
+        exclude: {
+          ItemActions.play,
+          ItemActions.playFromStart,
+          ItemActions.details,
+        },
+        onDeleteSuccesFully: (item) {
+          if (context.mounted) {
+            context.router.popBack();
+          }
+        },
+      ),
+      onRefresh: () => ref.read(providerId.notifier).fetchDetails(widget.item),
+      backDrops: details?.images,
+      content: (detailsContext, padding) => details != null
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 64),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OverviewHeader(
+                    name: details.name,
+                    image: details.images,
+                    mainButton: needsEpisodePicker
+                        ? OxSeriesEpisodePickerButton(
+                            series: details,
+                            onEpisodePlayed: () {
+                              if (!mounted) return;
+                              ref.read(providerId.notifier).fetchDetails(widget.item);
+                            },
+                          )
+                        : currentEpisode != null &&
+                                (!OxplayerConfig.isEnabled || currentEpisode.playAble)
+                            ? OxplayerConfig.isEnabled
+                                ? OxSeriesDetailPlayButtons(
+                                    series: details,
+                                    episode: currentEpisode,
+                                    onPlay: (restart) async {
+                                      await currentEpisode.play(
+                                        detailsContext,
+                                        ref,
+                                        startPosition: restart ? Duration.zero : null,
+                                      );
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                    onLongPlay: (restart) async {
+                                      await currentEpisode.play(
+                                        detailsContext,
+                                        ref,
+                                        showPlaybackOption: true,
+                                        startPosition: restart ? Duration.zero : null,
+                                      );
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                    onEpisodePlayed: () {
+                                      if (!mounted) return;
+                                      ref.read(providerId.notifier).fetchDetails(widget.item);
+                                    },
+                                  )
+                                : MediaPlayButton(
+                            item: currentEpisode,
+                            onPressed: (restart) async {
+                              await currentEpisode.play(
+                                detailsContext,
+                                ref,
+                                startPosition: restart ? Duration.zero : null,
+                              );
+                              if (!mounted) return;
+                              ref.read(providerId.notifier).fetchDetails(widget.item);
+                            },
+                            onLongPressed: (restart) async {
+                              await currentEpisode.play(
+                                detailsContext,
+                                ref,
+                                showPlaybackOption: true,
+                                startPosition: restart ? Duration.zero : null,
+                              );
+                              if (!mounted) return;
+                              ref.read(providerId.notifier).fetchDetails(widget.item);
+                            },
+                          )
+                        : null,
+                    centerButtons: OxDetailActionLayout(
+                      alignment: wrapAlignment,
+                      children: [
+                        SelectableIconButton(
+                          onPressed: () async {
+                            await ref
+                                .read(userProvider.notifier)
+                                .setAsFavorite(!details.userData.isFavourite, details.id);
+                          },
+                          selected: details.userData.isFavourite,
+                          selectedIcon: IconsaxPlusBold.heart,
+                          icon: IconsaxPlusLinear.heart,
+                        ),
+                        SelectableIconButton(
+                          onPressed: () async {
+                            await ref.read(userProvider.notifier).markAsPlayed(!details.userData.played, details.id);
+                          },
+                          selected: details.userData.played,
+                          selectedIcon: IconsaxPlusBold.tick_circle,
+                          icon: IconsaxPlusLinear.tick_circle,
+                        ),
+                        if (OxplayerEnv.isEnabled &&
+                            details.overview.seerrUrl?.isNotEmpty == true &&
+                            details.tmdbId != null)
+                          OxSeriesRequestButton(tmdbId: details.tmdbId!),
+                        SelectableIconButton(
+                          onPressed: () {
+                            showBottomSheetPill(
+                              context: detailsContext,
+                              item: details,
+                              content: (context, scrollController) => ListView(
+                                controller: scrollController,
+                                shrinkWrap: true,
+                                children: details.generateActions(detailsContext, ref, exclude: {
+                                  ItemActions.openParent,
+                                  ItemActions.details
+                                }).listTileItems(context, useIcons: true),
+                              ),
+                            );
+                          },
+                          selected: false,
+                          refreshOnEnd: false,
+                          icon: IconsaxPlusLinear.more,
+                        ),
+                      ],
+                    ),
+                    padding: padding,
+                    originalTitle: details.originalTitle,
+                    productionYear: details.overview.yearAired.toString(),
+                    runTime: details.overview.runTime,
+                    studios: details.overview.studios,
+                    officialRating: details.overview.parentalRating,
+                    genres: details.overview.genreItems,
+                    communityRating: details.overview.communityRating,
+                    contentTags: details.overview.tags,
+                    additionalLabels: oxLibraryDetailLabels(
+                      context,
+                      ref,
+                      widget.item.id,
+                      details.overview,
+                    ),
+                    mediaStreamHelper: currentEpisode != null &&
+                            oxplayerShowMediaStreamHelper(currentEpisode.mediaStreams)
+                        ? MediaStreamHelper(
+                            mediaStream: currentEpisode.mediaStreams,
+                            onItemChanged: (changed) {
+                              oxplayerOnUserMediaStreamsChanged(
+                                ref,
+                                changed,
+                                itemId: currentEpisode.id,
+                              );
+                              final updateEpisode = currentEpisode.copyWith(
+                                mediaStreams: changed,
+                              );
+                              ref.read(providerId.notifier).updateEpisodeInfo(updateEpisode);
+                            },
+                          )
+                        : null,
+                  ),
+                  if (details.overview.summary.isNotEmpty)
+                    Padding(
+                      padding: padding,
+                      child: Builder(builder: (context) {
+                        return ExpandingText(
+                          text: details.overview.summary,
+                          onFocusChange: (onFocus) {
+                            if (onFocus) {
+                              context.ensureVisible(alignment: 1);
+                            }
+                          },
+                        );
+                      }),
+                    ),
+                  if (details.availableEpisodes?.isNotEmpty ?? false)
+                    Builder(builder: (context) {
+                      return EpisodePosters(
+                        contentPadding: padding,
+                        selectedEpisode: currentEpisode,
+                        seasons: details.seasons ?? [],
+                        titleActionsPosition:
+                            AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad ? null : VerticalDirection.down,
+                        label: context.localized.episode(details.availableEpisodes?.length ?? 2),
+                        onFocused: (episode) {
+                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
+                          context.ensureVisible(alignment: 0.8);
+                        },
+                        onEpisodeTap: (action, episode) async {
+                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
+                          action();
+                        },
+                        playEpisode: (episode) async {
+                          await episode.play(
+                            context,
+                            ref,
+                          );
+                          if (!mounted) return;
+                          ref.read(providerId.notifier).fetchDetails(widget.item);
+                        },
+                        episodes: details.availableEpisodes ?? [],
+                      );
+                    }),
+                  if (details.seasons?.isNotEmpty ?? false)
+                    SeasonsRow(
+                      contentPadding: padding,
+                      seasons: details.seasons,
+                    ),
+                  if (details.overview.people.isNotEmpty)
+                    OxplayerConfig.isEnabled
+                        ? OxSeerrPeopleRow(
+                            people: details.overview.people,
+                            contentPadding: padding,
+                            useLibraryPersonScreen: true,
+                          )
+                        : PeopleRow(
+                            people: details.overview.people,
+                            contentPadding: padding,
+                          ),
+                  if (details.specialFeatures?.isNotEmpty ?? false)
+                    SpecialFeaturesRow(
+                        contentPadding: padding,
+                        label: detailsContext.localized.specialFeature(details.specialFeatures?.length ?? 2),
+                        specialFeatures: details.specialFeatures ?? []),
+                  if (details.related.isNotEmpty)
+                    PosterRow(
+                      posters: details.related,
+                      contentPadding: padding,
+                      label: detailsContext.localized.related,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
+                    ),
+                  if (details.seerrRecommended.isNotEmpty)
+                    SeerrPosterRow(
+                      posters: details.seerrRecommended,
+                      label:
+                          "${detailsContext.localized.discover} ${detailsContext.localized.recommended.toLowerCase()}",
+                      contentPadding: padding,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
+                    ),
+                  if (details.seerrRelated.isNotEmpty)
+                    SeerrPosterRow(
+                      posters: details.seerrRelated,
+                      label: "${detailsContext.localized.discover} ${detailsContext.localized.related.toLowerCase()}",
+                      contentPadding: padding,
+                      oxDetailBadges: OxplayerConfig.isEnabled,
+                    ),
+                  if (details.overview.externalUrls?.isNotEmpty == true)
+                    Padding(
+                      padding: padding,
+                      child: ExternalUrlsRow(
+                        urls: details.overview.externalUrls,
+                      ),
+                    )
+                ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
+              ),
+            )
+          : OxplayerConfig.isEnabled
+              ? OxDetailLoadingContent(item: widget.item, padding: padding)
+              : Container(),
+    );
+  }
+}
