@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- rice, doc 13 §2 — replaces the icon tool's default pink -->
+  <color name="ic_launcher_background">#DED1C8</color>
+</resources>

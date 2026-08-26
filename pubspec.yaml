@@ -282,19 +282,19 @@ flutter:
         - asset: assets/fonts/vazirmatn/Vazirmatn-Bold.ttf
           weight: 700
 
-# Native splash: temporary flag of Iran (OX). Revert to oxplayer_icon_512 when branding returns.
+# Native splash: Sushi clay roll on rice (doc 13 §2).
 flutter_native_splash:
-  color: "#210000"
-  color_dark: "#210000"
-  image: assets/oxplayer/flags/iran_android.png
-  image_dark: assets/oxplayer/flags/iran_android.png
+  color: "#DED1C8"
+  color_dark: "#DED1C8"
+  image: icons/production/sushi_icon_512.png
+  image_dark: icons/production/sushi_icon_512.png
   android: true
   ios: false
   web: false
   # API 31+ (Android 12, including TV)
   android_12:
-    color: "#210000"
-    color_dark: "#210000"
-    image: assets/oxplayer/flags/iran_android.png
-    image_dark: assets/oxplayer/flags/iran_android.png
+    color: "#DED1C8"
+    color_dark: "#DED1C8"
+    image: icons/production/sushi_icon_512.png
+    image_dark: icons/production/sushi_icon_512.png
 
