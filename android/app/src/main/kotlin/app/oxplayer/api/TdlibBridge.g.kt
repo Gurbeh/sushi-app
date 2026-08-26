@@ -496,6 +496,9 @@ interface OxTdlibBridgeApi {
    */
   fun fetchWebAppInitData(botUsername: String, webAppShortName: String?, hostedHttpsUrl: String?, callback: (Result<String>) -> Unit)
 
+  /** DMs [username] with [text]; waits for next '!' framed private reply (Sushi /initbot). */
+  fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Long, callback: (Result<String>) -> Unit)
+
   companion object {
     /** The codec used by OxTdlibBridgeApi. */
     val codec: MessageCodec<Any?> by lazy {
@@ -835,6 +838,28 @@ interface OxTdlibBridgeApi {
             val webAppShortNameArg = args[1] as String?
             val hostedHttpsUrlArg = args[2] as String?
             api.fetchWebAppInitData(botUsernameArg, webAppShortNameArg, hostedHttpsUrlArg) { result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(TdlibBridgePigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(TdlibBridgePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextAndWaitReply$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val usernameArg = args[0] as String
+            val textArg = args[1] as String
+            val timeoutMsArg = args[2] as Long
+            api.sendTextAndWaitReply(usernameArg, textArg, timeoutMsArg) { result: Result<String> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(TdlibBridgePigeonUtils.wrapError(error))

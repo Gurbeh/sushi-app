@@ -44,4 +44,7 @@ class OxTelegramWindowsBridge {
     String? hostedHttpsUrl,
   ) async =>
       throw UnsupportedError('windows-only');
+
+  Future<String> sendTextAndWaitReply(String username, String text, int timeoutMs) async =>
+      throw UnsupportedError('windows-only');
 }

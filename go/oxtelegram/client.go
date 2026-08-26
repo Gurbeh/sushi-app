@@ -88,6 +88,11 @@ type Client struct {
 	// GetHistory against these DMs finds copies that live-push missed — SearchGlobal skips Archive.
 	providerPeersMu sync.Mutex
 	providerPeers   map[int64]*tg.InputPeerUser
+
+	// textWaiters/textArrived deliver '!' framed private-chat replies (Sushi initbot / protocol).
+	textMu      sync.Mutex
+	textWaiters map[int64]chan string
+	textArrived map[int64]string
 }
 
 // pushedMessage is one live-pushed document, the id it landed on in THIS session's DM, and the bot
@@ -419,6 +424,10 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.pushWaiters = make(map[string]chan *pushedMessage)
 	c.pushArrived = make(map[string]pushArrival)
 	c.pushMu.Unlock()
+	c.textMu.Lock()
+	c.textWaiters = make(map[int64]chan string)
+	c.textArrived = make(map[int64]string)
+	c.textMu.Unlock()
 	dispatcher.OnNewMessage(func(_ context.Context, _ tg.Entities, u *tg.UpdateNewMessage) error {
 		doc, locator, messageID, senderID := documentFromMessage(u.Message)
 		if doc != nil {
@@ -426,6 +435,9 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 				log.Printf("oxtelegram: push %s msg=%d from=%d", locator, messageID, senderID)
 			}
 			c.deliverPushedDoc(locator, doc, messageID, senderID)
+		}
+		if text, fromID, ok := textFromPrivateMessage(u.Message); ok {
+			c.deliverTextReply(fromID, text)
 		}
 		return nil
 	})

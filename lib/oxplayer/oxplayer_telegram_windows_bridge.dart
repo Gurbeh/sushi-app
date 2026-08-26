@@ -286,6 +286,22 @@ class OxTelegramWindowsBridge {
       malloc.free(platform);
     }
   }
+
+  Future<String> sendTextAndWaitReply(String username, String text, int timeoutMs) async {
+    final u = username.toNativeUtf8();
+    final t = text.toNativeUtf8();
+    try {
+      final ptr = _native.sendTextAndWaitReply(u, t, timeoutMs);
+      if (ptr == nullptr) {
+        final msg = _native.readCString(_native.lastError());
+        throw OxTelegramNativeException(msg.isEmpty ? 'sendTextAndWaitReply failed' : msg);
+      }
+      return _native.readCString(ptr);
+    } finally {
+      malloc.free(u);
+      malloc.free(t);
+    }
+  }
 }
 
 /// True when Windows oxtelegram.dll host should be used instead of Android Pigeon.

@@ -909,6 +909,36 @@ class OxTdlibBridgeApi {
       return (pigeonVar_replyList[0] as String?)!;
     }
   }
+
+  /// DMs [username] with [text] and waits for the next private-chat reply starting with `!`
+  /// (Sushi wire framing). Used for `/initbot <corr>` against init-bot. [timeoutMs] ≤ 0 → 30000.
+  Future<String> sendTextAndWaitReply(String username, String text, int timeoutMs) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextAndWaitReply$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[username, text, timeoutMs]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as String?)!;
+    }
+  }
 }
 
 abstract class OxTdlibBridgeEvents {

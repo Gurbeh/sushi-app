@@ -199,6 +199,11 @@ extern __declspec(dllexport) int ox_ensure_provider_bots_ready(char* botsJSON);
 extern __declspec(dllexport) int ox_stop_playback(char* sessionURI);
 extern __declspec(dllexport) char* ox_fetch_webapp_init_data(char* bot, char* shortName, char* hostedURL, char* platform);
 
+// ox_send_text_and_wait_reply DMs username with text and returns the next '!' framed reply.
+// timeoutMs <= 0 defaults to 30000. Caller must ox_free the returned string.
+//
+extern __declspec(dllexport) char* ox_send_text_and_wait_reply(char* username, char* text, int timeoutMs);
+
 // ox_stream_open_fn matches mpv_stream_cb_open_ro_fn's signature exactly
 // (int (*)(void *user_data, char *uri, mpv_stream_cb_info *info)). Pass the address of this
 // function (looked up by symbol name from Dart) as the open_fn argument to

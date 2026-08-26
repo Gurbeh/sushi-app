@@ -532,4 +532,31 @@ func ox_fetch_webapp_init_data(bot *C.char, shortName *C.char, hostedURL *C.char
 	return C.CString(data)
 }
 
+// ox_send_text_and_wait_reply DMs username with text and returns the next '!' framed reply.
+// timeoutMs <= 0 defaults to 30000. Caller must ox_free the returned string.
+//
+//export ox_send_text_and_wait_reply
+func ox_send_text_and_wait_reply(username *C.char, text *C.char, timeoutMs C.int) *C.char {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		setErr(fmt.Errorf("oxtelegram not configured"))
+		return nil
+	}
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	reply, err := c.SendTextAndWaitReply(ctx, C.GoString(username), C.GoString(text))
+	if err != nil {
+		setErr(err)
+		return nil
+	}
+	setErr(nil)
+	return C.CString(reply)
+}
+
 func main() {}

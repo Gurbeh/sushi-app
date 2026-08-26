@@ -54,6 +54,11 @@ final class OxTelegramNative {
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>)>(
           'ox_fetch_webapp_init_data',
+        ),
+        sendTextAndWaitReply = lib.lookupFunction<
+            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
+            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int)>(
+          'ox_send_text_and_wait_reply',
         );
 
   final int Function(
@@ -108,6 +113,7 @@ final class OxTelegramNative {
   /// mpv_stream_cb_open_ro_fn's real C signature (mpv_stream_cb_info* stays opaque here).
   final Pointer<NativeFunction<OxStreamOpenFnNative>> streamOpenFnAddress;
   final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) fetchWebApp;
+  final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int) sendTextAndWaitReply;
 
   static OxTelegramNative? _instance;
 

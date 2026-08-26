@@ -288,6 +288,18 @@ func (c *Client) EnsureProviderBotsReady(botsJSON string) error {
 	return c.inner.EnsureProviderBotsReady(ctx, bots)
 }
 
+// SendTextAndWaitReply DMs [username] with [text] and returns the next '!' framed reply (Sushi
+// /initbot). timeoutMs caps the wait (default 30000 when <= 0).
+func (c *Client) SendTextAndWaitReply(username, text string, timeoutMs int) (string, error) {
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return c.inner.SendTextAndWaitReply(ctx, username, text)
+}
+
 // PlaybackSession is the gomobile-safe handle for one resolved file's progressive download — see
 // oxtelegram.DownloadSession for the real multi-DC/CDN/cancellation logic this wraps.
 type PlaybackSession struct {

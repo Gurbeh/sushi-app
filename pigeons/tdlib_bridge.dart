@@ -251,6 +251,11 @@ abstract class OxTdlibBridgeApi {
   /// at least one working WebApp path must be configured on the bot for this to succeed.
   @async
   String fetchWebAppInitData(String botUsername, String? webAppShortName, String? hostedHttpsUrl);
+
+  /// DMs [username] with [text] and waits for the next private-chat reply starting with `!`
+  /// (Sushi wire framing). Used for `/initbot <corr>` against init-bot. [timeoutMs] ≤ 0 → 30000.
+  @async
+  String sendTextAndWaitReply(String username, String text, int timeoutMs);
 }
 
 @FlutterApi()

@@ -503,6 +503,30 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         }
     }
 
+    override fun sendTextAndWaitReply(
+        username: String,
+        text: String,
+        timeoutMs: Long,
+        callback: (Result<String>) -> Unit,
+    ) {
+        Log.i("OXPLAY_TDLIB", "sendTextAndWaitReply username=$username timeoutMs=$timeoutMs")
+        scope.launch {
+            runCatching {
+                val oxClient = client ?: notConfigured()
+                oxClient.sendTextAndWaitReply(username, text, timeoutMs.toInt())
+            }.fold(
+                onSuccess = { reply ->
+                    Log.i("OXPLAY_TDLIB", "sendTextAndWaitReply OK len=${reply.length}")
+                    replyOnMain(callback, Result.success(reply))
+                },
+                onFailure = { error ->
+                    Log.e("OXPLAY_TDLIB", "sendTextAndWaitReply FAILED", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
+            )
+        }
+    }
+
     private fun onAuthStateChanged(state: TdlibAuthState) {
         val mapped = state.toPigeon()
         lastAuthState = mapped

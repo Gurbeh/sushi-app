@@ -112,6 +112,10 @@ class OxTelegramClient(
         native.fetchWebAppInitData(botUsername, webAppShortName, hostedHttpsUrl, platform)
     }
 
+    /** DMs [username] with [text]; returns next '!' framed reply (Sushi /initbot). */
+    suspend fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Int): String =
+        withContext(Dispatchers.IO) { native.sendTextAndWaitReply(username, text, timeoutMs) }
+
     /** Fire-and-forget from the caller's perspective — mirrors TdlibClient.close(). */
     fun close() {
         runCatching { native.close() }

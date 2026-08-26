@@ -1018,6 +1018,22 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     );
   }
 
+  /// DMs [username] with [text]; waits for next `!` framed reply (Sushi /initbot).
+  Future<String> sendTextAndWaitReply({
+    required String username,
+    required String text,
+    int timeoutMs = 30000,
+  }) async {
+    await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+    if (_state.kind != OxTdlibAuthStateKind.ready) {
+      throw OxplayerTdlibBridgeException('Telegram session not ready for sendTextAndWaitReply');
+    }
+    if (_useWindows) {
+      return _windows!.sendTextAndWaitReply(username, text, timeoutMs);
+    }
+    return _api.sendTextAndWaitReply(username, text, timeoutMs);
+  }
+
   /// Full sign-in sequence: fetch a signed initData payload from TDLib, then exchange it with the
   /// backend for OX session tokens. Callers apply the result via
   /// oxplayerAuthenticateFromLoginAttemptPoll(ref, result) (same response shape as the
