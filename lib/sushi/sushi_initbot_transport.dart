@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_assignment_pb.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 
-/// Assignment envelope from init-bot (docs/02 §1, docs/03).
+/// Assignment from init-bot (docs/02 §1, docs/03, proto `sushi.v1.Assignment`).
 class SushiAssignment {
   const SushiAssignment({
     required this.apiBotUsername,
@@ -24,24 +25,36 @@ class SushiAssignment {
     this.isError = false,
   });
 
+  /// Proto field 1 `api_bot_username`.
   final String apiBotUsername;
+
+  /// Proto field 2 `pool`.
   final List<String> pool;
-  final String providerId;
+
+  /// Proto field 3 `provider_id` (int32).
+  final int providerId;
+
+  /// Proto field 4 `binding_token` as base64url (no pad).
   final String bindingToken;
+
+  /// Proto field 5 `epoch` (uint32).
   final int epoch;
 
-  /// True when `/initbot` could not complete (bridge missing / timeout / ERR).
+  /// True when `/initbot` could not complete (bridge missing / timeout / ERR / bad payload).
   final bool pending;
 
   /// Envelope `type` varint (15 = ASSIGNMENT, 14 = ERR).
   final int msgType;
   final int corr;
   final String rawReply;
+
+  /// Raw protobuf payload (debug / round-trip). Optional.
   final String payloadBase64;
   final bool isError;
 
   static const int msgTypeErr = 14;
   static const int msgTypeAssignment = 15;
+  static const int flagCompressed = 1 << 0;
 
   Map<String, dynamic> toJson() => {
         'apiBotUsername': apiBotUsername,
@@ -58,10 +71,14 @@ class SushiAssignment {
       };
 
   factory SushiAssignment.fromJson(Map<String, dynamic> json) {
+    final rawProvider = json['providerId'];
+    final providerId = rawProvider is int
+        ? rawProvider
+        : int.tryParse('$rawProvider') ?? 0;
     return SushiAssignment(
       apiBotUsername: (json['apiBotUsername'] as String?) ?? '',
-      pool: (json['pool'] as List?)?.cast<String>() ?? const [],
-      providerId: (json['providerId'] as String?) ?? '',
+      pool: (json['pool'] as List?)?.map((e) => '$e').toList() ?? const [],
+      providerId: providerId,
       bindingToken: (json['bindingToken'] as String?) ?? '',
       epoch: (json['epoch'] as num?)?.toInt() ?? 0,
       pending: json['pending'] == true,
@@ -76,7 +93,7 @@ class SushiAssignment {
   factory SushiAssignment.stubPending({String reason = ''}) => SushiAssignment(
         apiBotUsername: '',
         pool: const [],
-        providerId: '',
+        providerId: 0,
         bindingToken: '',
         epoch: 0,
         pending: true,
@@ -112,7 +129,7 @@ abstract final class SushiAssignmentStore {
 /// After TDLib Ready: do **not** POST `/auth/telegram`.
 ///
 /// Sends `/initbot <corr>` to @[SushiConfig.initBotUsername], waits for `!` + base64url envelope,
-/// classifies ASSIGNMENT (15) vs ERR (14), persists result.
+/// decodes Assignment protobuf when type=15, persists result.
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   assert(SushiConfig.isEnabled);
   final corr = _newCorrBase36();
@@ -130,7 +147,8 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
     await SushiAssignmentStore.save(assignment);
     debugPrint(
       '[sushi] initbot ok pending=${assignment.pending} type=${assignment.msgType} '
-      'err=${assignment.isError} payloadLen=${assignment.payloadBase64.length}',
+      'apiBot=${assignment.apiBotUsername} epoch=${assignment.epoch} '
+      'pool=${assignment.pool.length}',
     );
     return assignment;
   } catch (e, st) {
@@ -141,7 +159,7 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   }
 }
 
-/// Parse `!` + base64url(envelope). Stores raw payload for later protobuf decode.
+/// Parse `!` + base64url(envelope); decode Assignment protobuf when type == 15.
 SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36}) {
   final trimmed = reply.trim();
   if (trimmed.isEmpty || !trimmed.startsWith('!')) {
@@ -168,23 +186,64 @@ SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36
   offset = typeR.next;
   final flagsR = _readVarint(bytes, offset);
   offset = flagsR.next;
-  final payload = bytes.sublist(offset);
+  var payload = bytes.sublist(offset);
   final msgType = typeR.value;
+  final flags = flagsR.value;
   final isErr = msgType == SushiAssignment.msgTypeErr;
   final isAssign = msgType == SushiAssignment.msgTypeAssignment;
-  return SushiAssignment(
-    apiBotUsername: '',
-    pool: const [],
-    providerId: '',
-    bindingToken: '',
-    epoch: 0,
-    pending: !isAssign,
-    msgType: msgType,
-    corr: corrR.value,
-    rawReply: trimmed,
-    payloadBase64: base64Url.encode(payload),
-    isError: isErr,
-  );
+  final payloadB64 = base64Url.encode(payload);
+
+  if (!isAssign) {
+    return SushiAssignment(
+      apiBotUsername: '',
+      pool: const [],
+      providerId: 0,
+      bindingToken: '',
+      epoch: 0,
+      pending: true,
+      msgType: msgType,
+      corr: corrR.value,
+      rawReply: trimmed,
+      payloadBase64: payloadB64,
+      isError: isErr,
+    );
+  }
+
+  if ((flags & SushiAssignment.flagCompressed) != 0) {
+    // Assignment payloads are tiny; compression unexpected. No zstd in client yet.
+    return SushiAssignment.stubPending(reason: 'compressed Assignment payload unsupported');
+  }
+
+  try {
+    final pb = SushiAssignmentPb.decode(payload);
+    return SushiAssignment(
+      apiBotUsername: pb.apiBotUsername,
+      pool: pb.pool,
+      providerId: pb.providerId,
+      bindingToken: pb.bindingTokenBase64Url,
+      epoch: pb.epoch,
+      pending: pb.apiBotUsername.isEmpty,
+      msgType: msgType,
+      corr: corrR.value,
+      rawReply: trimmed,
+      payloadBase64: payloadB64,
+      isError: false,
+    );
+  } catch (e) {
+    return SushiAssignment(
+      apiBotUsername: '',
+      pool: const [],
+      providerId: 0,
+      bindingToken: '',
+      epoch: 0,
+      pending: true,
+      msgType: msgType,
+      corr: corrR.value,
+      rawReply: 'Assignment protobuf decode failed: $e',
+      payloadBase64: payloadB64,
+      isError: false,
+    );
+  }
 }
 
 String _newCorrBase36() {
