@@ -300,6 +300,19 @@ func (c *Client) SendTextAndWaitReply(username, text string, timeoutMs int) (str
 	return c.inner.SendTextAndWaitReply(ctx, username, text)
 }
 
+// EnsureMainBotOnboarded clicks a session account through main-bot's onboarding conversation (see
+// oxtelegram.Client.EnsureMainBotOnboarded) so /initbot has a binding to read. timeoutMs bounds the
+// whole multi-step conversation, not one round trip (default 90000 when <= 0).
+func (c *Client) EnsureMainBotOnboarded(username string, timeoutMs int) error {
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 90 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return c.inner.EnsureMainBotOnboarded(ctx, username)
+}
+
 // PlaybackSession is the gomobile-safe handle for one resolved file's progressive download — see
 // oxtelegram.DownloadSession for the real multi-DC/CDN/cancellation logic this wraps.
 type PlaybackSession struct {

@@ -559,4 +559,27 @@ func ox_send_text_and_wait_reply(username *C.char, text *C.char, timeoutMs C.int
 	return C.CString(reply)
 }
 
+//export ox_ensure_main_bot_onboarded
+func ox_ensure_main_bot_onboarded(username *C.char, timeoutMs C.int) C.int {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil {
+		setErr(fmt.Errorf("oxtelegram not configured"))
+		return 1
+	}
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 90 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := c.EnsureMainBotOnboarded(ctx, C.GoString(username)); err != nil {
+		setErr(err)
+		return 1
+	}
+	setErr(nil)
+	return 0
+}
+
 func main() {}

@@ -20,6 +20,7 @@ import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
 import 'package:fladder/oxplayer/oxplayer_swr_http_client.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 part 'api_provider.g.dart';
@@ -123,6 +124,15 @@ class JellyRequest implements Interceptor {
 
   @override
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) async {
+    // Sushi has no HTTP API at all (R-API-4) — "sushi://local" is a placeholder credential URL,
+    // not a real server. Fail immediately rather than actually dialing it: letting it fall
+    // through to the retry loop below wastes ~1.2s per call and, on the final failed attempt,
+    // explicitly flips connectivityStatusProvider to offline as a side effect — which is wrong
+    // here (the device has a real connection; there is just no Jellyfin server to ask).
+    if (SushiConfig.isEnabled) {
+      throw const HttpException('Sushi has no HTTP API');
+    }
+
     final connectivityNotifier = ref.read(connectivityStatusProvider.notifier);
     final serverUrl = ref.read(serverUrlProvider);
 

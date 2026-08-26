@@ -22,6 +22,16 @@ void main() {
     expect(pb.providerId, 7);
     expect(pb.bindingToken, token);
     expect(pb.epoch, 3);
+    expect(pb.deliveryBots, isEmpty);
+  });
+
+  test('SushiAssignmentPb round-trips field 6 delivery_bots', () {
+    final encoded = SushiAssignmentPb.encode(
+      apiBotUsername: 'OXStreamer31bot',
+      deliveryBots: const ['OXStreamer36bot', 'OXStreamer35bot', 'OXStreamer33bot'],
+    );
+    final pb = SushiAssignmentPb.decode(encoded);
+    expect(pb.deliveryBots, ['OXStreamer36bot', 'OXStreamer35bot', 'OXStreamer33bot']);
   });
 
   test('sushiParseInitbotReply decodes Assignment protobuf', () {

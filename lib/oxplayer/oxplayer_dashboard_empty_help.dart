@@ -9,6 +9,7 @@ import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
 import 'package:fladder/oxplayer/oxplayer_help_content.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation_seerr.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/localization_helper.dart';
@@ -48,7 +49,10 @@ class OxplayerDashboardEmptyHelpSliver extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!OxplayerConfig.isEnabled) {
+    // Sushi has no main-bot/Seerr/server-connect onboarding — this whole flow assumes OXPlayer's
+    // HTTP account. Sushi's rails live in sushiHomeRailsProvider, not dashboard/views, so this
+    // widget's own "library empty" check doesn't see them anyway.
+    if (!OxplayerConfig.isEnabled || SushiConfig.isEnabled) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
 

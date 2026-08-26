@@ -1034,6 +1034,20 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     return _api.sendTextAndWaitReply(username, text, timeoutMs);
   }
 
+  /// Clicks a session account through main-bot's onboarding conversation (Sushi /initbot).
+  /// Android/mobile only for now — the Windows FFI bridge does not export this yet.
+  Future<void> ensureMainBotOnboarded({
+    required String username,
+    int timeoutMs = 90000,
+  }) async {
+    await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+    if (_state.kind != OxTdlibAuthStateKind.ready) {
+      throw OxplayerTdlibBridgeException('Telegram session not ready for ensureMainBotOnboarded');
+    }
+    if (_useWindows) return;
+    return _api.ensureMainBotOnboarded(username, timeoutMs);
+  }
+
   /// Full sign-in sequence: fetch a signed initData payload from TDLib, then exchange it with the
   /// backend for OX session tokens. Callers apply the result via
   /// oxplayerAuthenticateFromLoginAttemptPoll(ref, result) (same response shape as the

@@ -939,6 +939,34 @@ class OxTdlibBridgeApi {
       return (pigeonVar_replyList[0] as String?)!;
     }
   }
+
+  /// Clicks a session account through main-bot's onboarding conversation (language, quality,
+  /// audio, then login) by pressing the first inline button offered at each step, so `/initbot`
+  /// has a binding to read afterward without a human tapping through Telegram by hand. No-op for
+  /// a bot-token login (no dialog list, no onboarding conversation to have). [timeoutMs] bounds
+  /// the whole multi-step conversation, not one round trip; ≤ 0 → 90000.
+  Future<void> ensureMainBotOnboarded(String username, int timeoutMs) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.ensureMainBotOnboarded$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[username, timeoutMs]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
 }
 
 abstract class OxTdlibBridgeEvents {

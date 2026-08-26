@@ -114,7 +114,11 @@ class OxTelegramClient(
 
     /** DMs [username] with [text]; returns next '!' framed reply (Sushi /initbot). */
     suspend fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Int): String =
-        withContext(Dispatchers.IO) { native.sendTextAndWaitReply(username, text, timeoutMs) }
+        withContext(Dispatchers.IO) { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
+
+    /** Clicks a session account through main-bot's onboarding conversation (Sushi /initbot). */
+    suspend fun ensureMainBotOnboarded(username: String, timeoutMs: Int) =
+        withContext(Dispatchers.IO) { native.ensureMainBotOnboarded(username, timeoutMs.toLong()) }
 
     /** Fire-and-forget from the caller's perspective — mirrors TdlibClient.close(). */
     fun close() {

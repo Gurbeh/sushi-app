@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/oxplayer/oxplayer_brand.dart';
 import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
@@ -792,7 +793,7 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
           ),
           const SizedBox(height: 6),
           Text(
-            'Log into your Telegram account to use OXPlayer.',
+            'Log into your Telegram account to use ${OxplayerBrand.appName}.',
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),

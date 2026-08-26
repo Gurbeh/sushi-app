@@ -256,6 +256,14 @@ abstract class OxTdlibBridgeApi {
   /// (Sushi wire framing). Used for `/initbot <corr>` against init-bot. [timeoutMs] ≤ 0 → 30000.
   @async
   String sendTextAndWaitReply(String username, String text, int timeoutMs);
+
+  /// Clicks a session account through main-bot's onboarding conversation (language, quality,
+  /// audio, then login) by pressing the first inline button offered at each step, so `/initbot`
+  /// has a binding to read afterward without a human tapping through Telegram by hand. No-op for
+  /// a bot-token login (no dialog list, no onboarding conversation to have). [timeoutMs] bounds
+  /// the whole multi-step conversation, not one round trip; ≤ 0 → 90000.
+  @async
+  void ensureMainBotOnboarded(String username, int timeoutMs);
 }
 
 @FlutterApi()

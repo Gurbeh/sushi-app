@@ -1,17 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:libcompress/libcompress.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/sushi/sushi_assignment_pb.dart';
+import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_config.dart';
-
-/// Match sushi `wire.MaxPayload` (8 MiB) so malicious frames cannot OOM.
-final _zstd = ZstdCodec(maxDecompressedSize: 8 << 20);
+import 'package:fladder/sushi/sushi_wire.dart';
 
 /// Assignment from init-bot (docs/02 §1, docs/03, proto `sushi.v1.Assignment`).
 class SushiAssignment {
@@ -21,6 +18,7 @@ class SushiAssignment {
     required this.providerId,
     required this.bindingToken,
     required this.epoch,
+    this.deliveryBots = const [],
     this.pending = false,
     this.msgType = 0,
     this.corr = 0,
@@ -44,6 +42,10 @@ class SushiAssignment {
   /// Proto field 5 `epoch` (uint32).
   final int epoch;
 
+  /// Proto field 6 `delivery_bots` — the pool deliveryd round-robins across (docs/05 §6),
+  /// pre-started alongside the API bot so a first play doesn't fail `400 chat not found`.
+  final List<String> deliveryBots;
+
   /// True when `/initbot` could not complete (bridge missing / timeout / ERR / bad payload).
   final bool pending;
 
@@ -66,6 +68,7 @@ class SushiAssignment {
         'providerId': providerId,
         'bindingToken': bindingToken,
         'epoch': epoch,
+        'deliveryBots': deliveryBots,
         'pending': pending,
         'msgType': msgType,
         'corr': corr,
@@ -85,6 +88,7 @@ class SushiAssignment {
       providerId: providerId,
       bindingToken: (json['bindingToken'] as String?) ?? '',
       epoch: (json['epoch'] as num?)?.toInt() ?? 0,
+      deliveryBots: (json['deliveryBots'] as List?)?.map((e) => '$e').toList() ?? const [],
       pending: json['pending'] == true,
       msgType: (json['msgType'] as num?)?.toInt() ?? 0,
       corr: (json['corr'] as num?)?.toInt() ?? 0,
@@ -133,16 +137,41 @@ abstract final class SushiAssignmentStore {
 /// After TDLib Ready: do **not** POST `/auth/telegram`.
 ///
 /// Sends `/initbot <corr>` to @[SushiConfig.initBotUsername], waits for `!` + base64url envelope,
-/// decodes Assignment protobuf when type=15, persists result.
+/// decodes Assignment protobuf when type=15, persists result. Also clicks through main-bot's
+/// onboarding first, since /initbot never creates a binding itself (docs/02 §1) — for a session
+/// account, only that conversation does. Use this at login time; a bound session refreshing its
+/// already-current Assignment should call [sushiRefreshInitbot] instead, which skips onboarding.
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   assert(SushiConfig.isEnabled);
-  final corr = _newCorrBase36();
+
+  // Click through main-bot's onboarding now (no-op for a bot-token login) so a fresh identity has
+  // something for /initbot to read, instead of asking the person to go find and message main-bot
+  // by hand in Telegram.
+  try {
+    await sushiEnsureMainBotOnboarded(
+      username: SushiConfig.mainBotUsername,
+      timeoutMs: 90000,
+    );
+  } catch (e) {
+    debugPrint('[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
+  }
+
+  return sushiRefreshInitbot();
+}
+
+/// Re-runs `/initbot` for an already-bound session, without touching main-bot: /initbot is
+/// idempotent (docs/02 §1), so this just re-syncs the Assignment — the API bot pool and delivery
+/// bot list it carries can both change server-side after the client last asked (docs/02 §7, docs/10
+/// Q3). Called once per cold start and whenever a bound API bot stops answering (docs/02 §6-7), so
+/// it deliberately never touches the human-visible main-bot chat the way a fresh login does.
+Future<SushiAssignment> sushiRefreshInitbot() async {
+  assert(SushiConfig.isEnabled);
+  final corr = sushiNewCorrBase36();
   final cmd = '/initbot $corr';
   final bot = SushiConfig.initBotUsername;
 
   try {
-    final controller = OxplayerTdlibBridgeController.instance();
-    final reply = await controller.sendTextAndWaitReply(
+    final reply = await sushiSendTextAndWaitReply(
       username: bot,
       text: cmd,
       timeoutMs: 30000,
@@ -154,6 +183,23 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
       'apiBot=${assignment.apiBotUsername} epoch=${assignment.epoch} '
       'pool=${assignment.pool.length}',
     );
+
+    // Keep every Sushi bot except main-bot out of the visible chat list — same start+mute+archive
+    // treatment oxplayer already gives its delivery senders (OxplayerProviderBotsBootstrap).
+    // main-bot is deliberately excluded: it's the one bot a person may actually want to open.
+    //
+    // Delivery bots ride along here too (docs/05 §6, docs/10 Q3): an API bot is sticky per user
+    // and this warms it once for good, but deliveryd picks a delivery bot per copy — without this,
+    // whichever one it happens to pick has never seen this chat, and the very first play fails
+    // `400 chat not found`.
+    if (!assignment.pending && assignment.apiBotUsername.isNotEmpty) {
+      unawaited(sushiEnsureProviderBotsReady([
+        OxTdlibProviderBot(id: 0, username: SushiConfig.initBotUsername),
+        OxTdlibProviderBot(id: 0, username: assignment.apiBotUsername),
+        for (final username in assignment.deliveryBots) OxTdlibProviderBot(id: 0, username: username),
+      ]));
+    }
+
     return assignment;
   } catch (e, st) {
     debugPrint('[sushi] initbot failed: $e\n$st');
@@ -163,39 +209,35 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   }
 }
 
+bool _sushiColdStartInitbotDone = false;
+
+/// Fire-and-forget refresh, once per process: paints whatever is already cached immediately, then
+/// quietly re-syncs in the background (docs/02 §7's cold-start half of bot rotation). Also arms the
+/// reactive half here, once: after enough consecutive failures talking to the assigned API bot,
+/// the bridge queue calls back into [sushiRefreshInitbot] on its own (docs/02 §6-7 — a bound bot
+/// that has stopped answering).
+void sushiRefreshInitbotOnColdStart() {
+  if (_sushiColdStartInitbotDone) return;
+  _sushiColdStartInitbotDone = true;
+  onRepeatedSendFailure = () {
+    debugPrint('[sushi] repeated send failures — refreshing /initbot');
+    unawaited(sushiRefreshInitbot());
+  };
+  unawaited(sushiRefreshInitbot());
+}
+
 /// Parse `!` + base64url(envelope); decode Assignment protobuf when type == 15.
 SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36}) {
-  final trimmed = reply.trim();
-  if (trimmed.isEmpty || !trimmed.startsWith('!')) {
-    return SushiAssignment.stubPending(reason: 'reply missing ! marker');
-  }
-  final b64 = trimmed.substring(1);
-  late final Uint8List bytes;
+  final SushiEnvelope env;
   try {
-    bytes = Uint8List.fromList(base64Url.decode(_padBase64Url(b64)));
+    env = SushiEnvelope.decode(reply);
   } catch (e) {
-    return SushiAssignment.stubPending(reason: 'base64url decode failed: $e');
+    return SushiAssignment.stubPending(reason: 'envelope decode failed: $e');
   }
-  if (bytes.isEmpty) {
-    return SushiAssignment.stubPending(reason: 'empty envelope');
-  }
-  final ver = bytes[0];
-  if (ver != 1) {
-    return SushiAssignment.stubPending(reason: 'unsupported envelope version $ver');
-  }
-  var offset = 1;
-  final corrR = _readVarint(bytes, offset);
-  offset = corrR.next;
-  final typeR = _readVarint(bytes, offset);
-  offset = typeR.next;
-  final flagsR = _readVarint(bytes, offset);
-  offset = flagsR.next;
-  var payload = bytes.sublist(offset);
-  final msgType = typeR.value;
-  final flags = flagsR.value;
-  final isErr = msgType == SushiAssignment.msgTypeErr;
-  final isAssign = msgType == SushiAssignment.msgTypeAssignment;
-  final payloadB64 = base64Url.encode(payload);
+
+  final isErr = env.type == SushiEnvelope.msgTypeErr;
+  final isAssign = env.type == SushiEnvelope.msgTypeAssignment;
+  final payloadB64 = base64Url.encode(env.payload);
 
   if (!isAssign) {
     return SushiAssignment(
@@ -205,34 +247,27 @@ SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36
       bindingToken: '',
       epoch: 0,
       pending: true,
-      msgType: msgType,
-      corr: corrR.value,
-      rawReply: trimmed,
+      msgType: env.type,
+      corr: env.corr,
+      rawReply: reply.trim(),
       payloadBase64: payloadB64,
       isError: isErr,
     );
   }
 
-  if ((flags & SushiAssignment.flagCompressed) != 0) {
-    try {
-      payload = _zstd.decompress(payload);
-    } catch (e) {
-      return SushiAssignment.stubPending(reason: 'zstd decompress failed: $e');
-    }
-  }
-
   try {
-    final pb = SushiAssignmentPb.decode(payload);
+    final pb = SushiAssignmentPb.decode(env.payload);
     return SushiAssignment(
       apiBotUsername: pb.apiBotUsername,
       pool: pb.pool,
       providerId: pb.providerId,
       bindingToken: pb.bindingTokenBase64Url,
       epoch: pb.epoch,
+      deliveryBots: pb.deliveryBots,
       pending: pb.apiBotUsername.isEmpty,
-      msgType: msgType,
-      corr: corrR.value,
-      rawReply: trimmed,
+      msgType: env.type,
+      corr: env.corr,
+      rawReply: reply.trim(),
       payloadBase64: payloadB64,
       isError: false,
     );
@@ -244,40 +279,11 @@ SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36
       bindingToken: '',
       epoch: 0,
       pending: true,
-      msgType: msgType,
-      corr: corrR.value,
+      msgType: env.type,
+      corr: env.corr,
       rawReply: 'Assignment protobuf decode failed: $e',
       payloadBase64: payloadB64,
       isError: false,
     );
   }
-}
-
-String _newCorrBase36() {
-  final n = Random.secure().nextInt(0x3fffffff) + 1;
-  return n.toRadixString(36);
-}
-
-String _padBase64Url(String s) {
-  final mod = s.length % 4;
-  if (mod == 0) return s;
-  return s.padRight(s.length + (4 - mod), '=');
-}
-
-({int value, int next}) _readVarint(Uint8List bytes, int offset) {
-  var result = 0;
-  var shift = 0;
-  var i = offset;
-  while (i < bytes.length) {
-    final b = bytes[i++];
-    result |= (b & 0x7f) << shift;
-    if ((b & 0x80) == 0) {
-      return (value: result, next: i);
-    }
-    shift += 7;
-    if (shift > 63) {
-      throw FormatException('varint too long');
-    }
-  }
-  throw FormatException('truncated varint');
 }

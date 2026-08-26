@@ -32,6 +32,8 @@ import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_play_default.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
 import 'package:fladder/providers/items/book_details_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -628,6 +630,34 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     if (itemModel == null) return;
     final playContext = _playbackRootContext(context);
     final read = _playbackRead(playContext);
+
+    if (SushiConfig.isEnabled) {
+      final op = CancelableOperation.fromFuture(sushiBuildPlaybackModel(itemModel));
+      _showLoadingIndicator(playContext, itemModel, op);
+      final model = await op.valueOrCancellation(null);
+      if (op.isCanceled || model == null) {
+        if (!op.isCanceled) {
+          unawaited(OxplayerPlaybackTelemetry.reportFailure(
+            stage: 'playback_model',
+            reason: 'sushi_play_resolve_failed',
+            itemId: itemModel.id,
+          ));
+          _dismissPlaybackLoadingDialog(playContext);
+          if (!showPlaybackOption) {
+            FladderSnack.show(playContext.localized.unableToPlayMedia, context: playContext);
+          }
+        }
+        return;
+      }
+      await _playVideo(
+        playContext,
+        startPosition: startPosition,
+        current: model,
+        read: read,
+        cancelOperation: op,
+      );
+      return;
+    }
 
     if (OxplayerEnv.isEnabled) {
       OxplayerPlaybackPrefetch.scheduleForItem(

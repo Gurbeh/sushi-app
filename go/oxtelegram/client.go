@@ -93,6 +93,12 @@ type Client struct {
 	textMu      sync.Mutex
 	textWaiters map[int64]chan string
 	textArrived map[int64]string
+
+	// msgWaiters deliver the next raw message (any content) from a peer, keyed by that peer's user
+	// id — used by EnsureMainBotOnboarded to watch main-bot's plain conversational replies, which
+	// carry no '!' framing and so cannot use textWaiters/deliverTextReply.
+	msgMu      sync.Mutex
+	msgWaiters map[int64]chan *tg.Message
 }
 
 // pushedMessage is one live-pushed document, the id it landed on in THIS session's DM, and the bot
@@ -428,6 +434,9 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.textWaiters = make(map[int64]chan string)
 	c.textArrived = make(map[int64]string)
 	c.textMu.Unlock()
+	c.msgMu.Lock()
+	c.msgWaiters = make(map[int64]chan *tg.Message)
+	c.msgMu.Unlock()
 	dispatcher.OnNewMessage(func(_ context.Context, _ tg.Entities, u *tg.UpdateNewMessage) error {
 		doc, locator, messageID, senderID := documentFromMessage(u.Message)
 		if doc != nil {
@@ -438,6 +447,19 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 		}
 		if text, fromID, ok := textFromPrivateMessage(u.Message); ok {
 			c.deliverTextReply(fromID, text)
+		}
+		if m, fromID, ok := privateMessage(u.Message); ok {
+			c.deliverAnyMessage(fromID, m)
+		}
+		return nil
+	})
+	dispatcher.OnEditMessage(func(_ context.Context, _ tg.Entities, u *tg.UpdateEditMessage) error {
+		// main-bot answers a callback press by EDITING its existing message in place (flow.go's
+		// show() does this deliberately, "so the chat does not fill up with dead menus") rather than
+		// sending a new one, so EnsureMainBotOnboarded's step-by-step click-through must watch edits
+		// too, not just OnNewMessage.
+		if m, fromID, ok := privateMessage(u.Message); ok {
+			c.deliverAnyMessage(fromID, m)
 		}
 		return nil
 	})

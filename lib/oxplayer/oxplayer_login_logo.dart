@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 
 /// Login header: brand icon + name. Uses the full-color SVG (no theme ShaderMask).
 class OxplayerLoginLogo extends StatelessWidget {
@@ -17,11 +18,17 @@ class OxplayerLoginLogo extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SvgPicture.asset(
-            'icons/oxplayer_icon.svg',
-            width: _iconSize,
-            height: _iconSize,
-          ),
+          SushiConfig.isEnabled
+              ? Image.asset(
+                  'icons/sushi_logo_round.png',
+                  width: _iconSize,
+                  height: _iconSize,
+                )
+              : SvgPicture.asset(
+                  'icons/oxplayer_icon.svg',
+                  width: _iconSize,
+                  height: _iconSize,
+                ),
           const SizedBox(width: 16),
           Text(
             OxplayerBrand.appName,

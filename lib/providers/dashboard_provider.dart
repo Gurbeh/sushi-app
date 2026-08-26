@@ -12,7 +12,11 @@ import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
+import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_home_transport.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 final dashboardProvider = StateNotifierProvider<DashboardNotifier, HomeModel>((ref) {
   return DashboardNotifier(ref);
@@ -27,6 +31,11 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
 
   Future<void> fetchNextUpAndResume() async {
     if (SushiConfig.isEnabled) {
+      // Each call is a real Telegram bot round-trip, not a cheap HTTP GET — never let two
+      // overlap (e.g. pull-to-refresh landing while an initial fetch is still in flight).
+      if (state.loading) return;
+      state = state.copyWith(loading: true);
+      await _fetchSushiHome();
       state = state.copyWith(loading: false, loaded: true);
       return;
     }
@@ -149,6 +158,23 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     );
 
     return response.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? const [];
+  }
+
+  /// Sushi: fetch the movies-tab home rails from the API bot and adapt them into the models the
+  /// dashboard's `PosterRow`s already render (docs/12 §2). Failure just leaves the rails empty —
+  /// `sushiFetchHome` never throws.
+  Future<void> _fetchSushiHome() async {
+    final res = await sushiFetchHome(tab: sushiHomeTabMovies);
+    if (res == null) return;
+
+    oxApplySushiHomeRailsRef(
+      ref,
+      SushiHomeRailsData(
+        slider: res.rowsFor(SushiRailKind.slider).map(sushiRowToItemBaseModel).toList(),
+        mostWatched: res.rowsFor(SushiRailKind.mostWatched).map(sushiRowToItemBaseModel).toList(),
+        trending: res.rowsFor(SushiRailKind.trending).map(sushiRowToItemBaseModel).toList(),
+      ),
+    );
   }
 
   void applyOxHomeFeed(OxHomeFeedDashboard feed) {

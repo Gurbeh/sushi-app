@@ -20,6 +20,7 @@ import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/providers/arguments_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/screens/login/login_screen_credentials.dart';
@@ -67,17 +68,20 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     });
 
     await OxplayerDotenv.ensureLoaded();
-    final media = OxplayerEnv.effectiveMediaServerUrl;
-    if (media == null) {
-      if (!mounted) return;
-      setState(() {
-        _bootstrapping = false;
-        _bootstrapError = context.localized.oxplayerLoginBootstrapEnvError;
-      });
-      return;
-    }
+    // Sushi has no HTTP API at all (R-API-4) — it never has a media server URL to require here.
+    if (!SushiConfig.isEnabled) {
+      final media = OxplayerEnv.effectiveMediaServerUrl;
+      if (media == null) {
+        if (!mounted) return;
+        setState(() {
+          _bootstrapping = false;
+          _bootstrapError = context.localized.oxplayerLoginBootstrapEnvError;
+        });
+        return;
+      }
 
-    FladderConfig.baseUrl = media;
+      FladderConfig.baseUrl = media;
+    }
 
     try {
       await ref.read(authProvider.notifier).initModel();

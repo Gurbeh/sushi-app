@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:fladder/sushi/sushi_wire.dart';
+
 /// Hand-decode of `sushi.v1.Assignment` (proto/sushi/v1/bind.proto).
 ///
 /// ```
@@ -9,6 +11,7 @@ import 'dart:typed_data';
 /// int32 provider_id = 3;
 /// bytes binding_token = 4;
 /// uint32 epoch = 5;
+/// repeated string delivery_bots = 6;
 /// ```
 class SushiAssignmentPb {
   const SushiAssignmentPb({
@@ -17,6 +20,7 @@ class SushiAssignmentPb {
     required this.providerId,
     required this.bindingToken,
     required this.epoch,
+    this.deliveryBots = const [],
   });
 
   final String apiBotUsername;
@@ -24,6 +28,11 @@ class SushiAssignmentPb {
   final int providerId;
   final Uint8List bindingToken;
   final int epoch;
+
+  /// Every delivery bot deliveryd round-robins across (docs/05 §6) — pre-started the same way
+  /// [apiBotUsername] is, so a reader's first play doesn't fail `400 chat not found` against
+  /// whichever one the copy job happens to land on.
+  final List<String> deliveryBots;
 
   /// Base64url (no pad) of [bindingToken] for prefs / JSON.
   String get bindingTokenBase64Url =>
@@ -36,10 +45,11 @@ class SushiAssignmentPb {
     var providerId = 0;
     var bindingToken = Uint8List(0);
     var epoch = 0;
+    final deliveryBots = <String>[];
 
     var i = 0;
     while (i < bytes.length) {
-      final tagR = _readVarint(bytes, i);
+      final tagR = sushiReadVarint(bytes, i);
       i = tagR.next;
       final tag = tagR.value;
       final field = tag >> 3;
@@ -48,34 +58,40 @@ class SushiAssignmentPb {
       switch (field) {
         case 1: // api_bot_username
           if (wire != 2) throw FormatException('field 1 wire $wire');
-          final lenR = _readVarint(bytes, i);
+          final lenR = sushiReadVarint(bytes, i);
           i = lenR.next;
           apiBotUsername = utf8.decode(bytes.sublist(i, i + lenR.value));
           i += lenR.value;
         case 2: // pool (repeated)
           if (wire != 2) throw FormatException('field 2 wire $wire');
-          final lenR = _readVarint(bytes, i);
+          final lenR = sushiReadVarint(bytes, i);
           i = lenR.next;
           pool.add(utf8.decode(bytes.sublist(i, i + lenR.value)));
           i += lenR.value;
         case 3: // provider_id
           if (wire != 0) throw FormatException('field 3 wire $wire');
-          final v = _readVarint(bytes, i);
+          final v = sushiReadVarint(bytes, i);
           i = v.next;
           providerId = v.value;
         case 4: // binding_token
           if (wire != 2) throw FormatException('field 4 wire $wire');
-          final lenR = _readVarint(bytes, i);
+          final lenR = sushiReadVarint(bytes, i);
           i = lenR.next;
           bindingToken = Uint8List.fromList(bytes.sublist(i, i + lenR.value));
           i += lenR.value;
         case 5: // epoch
           if (wire != 0) throw FormatException('field 5 wire $wire');
-          final v = _readVarint(bytes, i);
+          final v = sushiReadVarint(bytes, i);
           i = v.next;
           epoch = v.value;
+        case 6: // delivery_bots (repeated)
+          if (wire != 2) throw FormatException('field 6 wire $wire');
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          deliveryBots.add(utf8.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
         default:
-          i = _skipField(bytes, i, wire);
+          i = sushiSkipField(bytes, i, wire);
       }
     }
 
@@ -85,6 +101,7 @@ class SushiAssignmentPb {
       providerId: providerId,
       bindingToken: bindingToken,
       epoch: epoch,
+      deliveryBots: List.unmodifiable(deliveryBots),
     );
   }
 
@@ -95,11 +112,12 @@ class SushiAssignmentPb {
     int providerId = 0,
     List<int> bindingToken = const [],
     int epoch = 0,
+    List<String> deliveryBots = const [],
   }) {
     final out = BytesBuilder();
-    void writeTag(int field, int wire) => out.add(_uvarint((field << 3) | wire));
+    void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
     void writeBytes(List<int> b) {
-      out.add(_uvarint(b.length));
+      out.add(sushiUvarint(b.length));
       out.add(b);
     }
 
@@ -113,7 +131,7 @@ class SushiAssignmentPb {
     }
     if (providerId != 0) {
       writeTag(3, 0);
-      out.add(_uvarint(providerId));
+      out.add(sushiUvarint(providerId));
     }
     if (bindingToken.isNotEmpty) {
       writeTag(4, 2);
@@ -121,53 +139,12 @@ class SushiAssignmentPb {
     }
     if (epoch != 0) {
       writeTag(5, 0);
-      out.add(_uvarint(epoch));
+      out.add(sushiUvarint(epoch));
+    }
+    for (final b in deliveryBots) {
+      writeTag(6, 2);
+      writeBytes(utf8.encode(b));
     }
     return out.toBytes();
-  }
-}
-
-List<int> _uvarint(int n) {
-  final out = <int>[];
-  var x = n;
-  while (x >= 0x80) {
-    out.add((x & 0x7f) | 0x80);
-    x >>= 7;
-  }
-  out.add(x);
-  return out;
-}
-
-({int value, int next}) _readVarint(Uint8List bytes, int offset) {
-  var result = 0;
-  var shift = 0;
-  var i = offset;
-  while (i < bytes.length) {
-    final b = bytes[i++];
-    result |= (b & 0x7f) << shift;
-    if ((b & 0x80) == 0) {
-      return (value: result, next: i);
-    }
-    shift += 7;
-    if (shift > 63) {
-      throw FormatException('varint too long');
-    }
-  }
-  throw FormatException('truncated varint');
-}
-
-int _skipField(Uint8List bytes, int i, int wire) {
-  switch (wire) {
-    case 0:
-      return _readVarint(bytes, i).next;
-    case 1:
-      return i + 8;
-    case 2:
-      final lenR = _readVarint(bytes, i);
-      return lenR.next + lenR.value;
-    case 5:
-      return i + 4;
-    default:
-      throw FormatException('unsupported wire type $wire');
   }
 }

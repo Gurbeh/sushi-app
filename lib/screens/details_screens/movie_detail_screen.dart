@@ -17,6 +17,7 @@ import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -106,6 +107,10 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 startPosition: restart ? Duration.zero : null,
                               );
                               if (!mounted) return;
+                              // Sushi has no watch-progress endpoint yet (docs/11's local DB is
+                              // deferred), so refetching /item+/files here would just be another
+                              // bot round-trip for data that hasn't changed.
+                              if (SushiConfig.isEnabled) return;
                               ref
                                   .read(providerInstance.notifier)
                                   .fetchDetails(widget.item);
@@ -117,6 +122,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 startPosition: restart ? Duration.zero : null,
                               );
                               if (!mounted) return;
+                              if (SushiConfig.isEnabled) return;
                               ref
                                   .read(providerInstance.notifier)
                                   .fetchDetails(widget.item);

@@ -18,6 +18,7 @@ import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/util/duration_extensions.dart';
 
 /// Warms PlaybackInfo (public-provider copy) and caches the playable t.me link in-memory.
@@ -61,7 +62,11 @@ abstract final class OxplayerPlaybackPrefetch {
     String? mediaSourceId,
     bool once = false,
   }) {
-    if (!OxplayerConfig.isEnabled || itemId.isEmpty || kIsWeb) return;
+    // Sushi has its own /play delivery (docs/05), reached only from sushi_play_default.dart —
+    // this whole prefetch pipeline is Jellyfin PlaybackInfo/oxplayer-be delivery-API specific and
+    // would just waste a blocked HTTP call (api_provider.dart's JellyRequest guard) on every
+    // detail open for Sushi builds.
+    if (!OxplayerConfig.isEnabled || SushiConfig.isEnabled || itemId.isEmpty || kIsWeb) return;
     if (once && !_homeOnceItems.add(itemId)) return;
     if (_inFlightByItem.containsKey(itemId)) return;
 

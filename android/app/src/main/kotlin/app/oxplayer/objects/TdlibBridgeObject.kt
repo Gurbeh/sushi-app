@@ -527,6 +527,29 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         }
     }
 
+    override fun ensureMainBotOnboarded(
+        username: String,
+        timeoutMs: Long,
+        callback: (Result<Unit>) -> Unit,
+    ) {
+        Log.i("OXPLAY_TDLIB", "ensureMainBotOnboarded username=$username timeoutMs=$timeoutMs")
+        scope.launch {
+            runCatching {
+                val oxClient = client ?: notConfigured()
+                oxClient.ensureMainBotOnboarded(username, timeoutMs.toInt())
+            }.fold(
+                onSuccess = {
+                    Log.i("OXPLAY_TDLIB", "ensureMainBotOnboarded OK")
+                    replyOnMain(callback, Result.success(Unit))
+                },
+                onFailure = { error ->
+                    Log.e("OXPLAY_TDLIB", "ensureMainBotOnboarded FAILED", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
+            )
+        }
+    }
+
     private fun onAuthStateChanged(state: TdlibAuthState) {
         val mapped = state.toPigeon()
         lastAuthState = mapped

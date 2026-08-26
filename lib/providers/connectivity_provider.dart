@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 
@@ -38,6 +39,15 @@ class ConnectivityStatus extends _$ConnectivityStatus {
     });
     Connectivity().onConnectivityChanged.listen(onStateChange);
     checkConnectivity();
+
+    // `checkConnectivity()` above is a single point-in-time read, taken very early during app
+    // startup — a real network can still report `none` for a split second while Android's
+    // connectivity manager is settling. With no periodic re-check, a single unlucky read here
+    // means "Offline" sticks forever, since nothing fires `onConnectivityChanged` again unless the
+    // network actually changes afterward. This safety-net re-check self-corrects that.
+    final recheckTimer = Timer.periodic(const Duration(seconds: 15), (_) => checkConnectivity());
+    ref.onDispose(recheckTimer.cancel);
+
     return ConnectionState.mobile;
   }
 

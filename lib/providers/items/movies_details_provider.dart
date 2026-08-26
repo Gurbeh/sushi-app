@@ -16,6 +16,10 @@ import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
 part 'movies_details_provider.g.dart';
@@ -40,6 +44,22 @@ class MovieDetails extends _$MovieDetails {
 
         if (item is MovieModel) {
           apply(state ?? item);
+        }
+
+        if (SushiConfig.isEnabled) {
+          if (item is! MovieModel) return null;
+          final tmdbId = sushiTmdbIdFromItemId(item.id);
+          if (tmdbId == null) return null;
+
+          final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 1);
+          if (itemRes == null || loadGen != _loadGeneration) return null;
+
+          final episodeId = itemRes.episodes.firstOrNull?.episodeId;
+          final filesRes = episodeId == null ? null : await sushiFetchFiles(episodeId: episodeId);
+          if (loadGen != _loadGeneration) return null;
+
+          apply(sushiEnrichMovieModel(item, itemRes, filesRes?.files ?? const []));
+          return null;
         }
 
         if (OxplayerConfig.isEnabled) {

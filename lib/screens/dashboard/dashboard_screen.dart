@@ -33,6 +33,9 @@ import 'package:fladder/screens/home_screen.dart';
 import 'package:fladder/screens/shared/media/poster_row.dart';
 import 'package:fladder/screens/shared/nested_scaffold.dart';
 import 'package:fladder/screens/shared/nested_sliver_appbar.dart';
+import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_initbot_transport.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/list_padding.dart';
@@ -64,6 +67,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    if (SushiConfig.isEnabled) {
+      // Cold-start half of bot rotation (docs/02 §7): re-syncs the Assignment's API/delivery bot
+      // lists in the background, in case they changed since this session last asked. No-op past
+      // the first call in a process (dashboard can rebuild/remount many times).
+      sushiRefreshInitbotOnColdStart();
+    }
     if (!OxplayerConfig.isEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -75,7 +84,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       });
     }
     // OX leanback: skip 120s SWR refresh — keeps decoded posters warm and OOM-kills TV.
-    final leanBack = OxplayerConfig.isEnabled && ref.read(argumentsStateProvider).leanBackMode;
+    // Sushi: skip it too — unlike a Jellyfin GET, each refresh is a real Telegram bot round-trip,
+    // and DashboardScreen stays mounted under any pushed detail/player screen, so this timer would
+    // otherwise keep messaging the bot every 2 minutes for the entire session regardless of what's
+    // on screen.
+    final leanBack = SushiConfig.isEnabled ||
+        (OxplayerConfig.isEnabled && ref.read(argumentsStateProvider).leanBackMode);
     if (!leanBack) {
       _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
         _refreshIndicatorKey.currentState?.show();
@@ -91,6 +105,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _refreshHome() async {
     if (!mounted) return;
+    // Sushi has no HTTP API — updateInformation()/OxplayerHomeRefresh both assume a Jellyfin-style
+    // server and would throw (no host to resolve). Its own home fetch is enough.
+    if (SushiConfig.isEnabled) {
+      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
+      return;
+    }
     if (OxplayerConfig.isEnabled) {
       await OxplayerHomeRefresh.refresh(ref);
       return;
@@ -118,6 +138,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final resumeAudio = dashboardData.resumeAudio;
     final resumeBooks = dashboardData.resumeBooks;
     final tvChannels = dashboardData.activePrograms;
+    final sushiRails = SushiConfig.isEnabled ? ref.watch(sushiHomeRailsProvider) : SushiHomeRailsData.empty;
 
     final allResume = [...resumeVideo, ...resumeAudio, ...resumeBooks].toList();
 
@@ -291,6 +312,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       contentPadding: padding,
                       label: context.localized.dashboardContinue,
                       posters: [...allResume, ...dashboardData.nextUp],
+                    ),
+                  if (sushiRails.slider.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: 'New',
+                      posters: sushiRails.slider,
+                    ),
+                  if (sushiRails.mostWatched.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: 'Most watched',
+                      posters: sushiRails.mostWatched,
+                    ),
+                  if (sushiRails.trending.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: 'Trending',
+                      posters: sushiRails.trending,
                     ),
                   ...oxplayerDashboardRecentlyAddedRows(
                     context: context,

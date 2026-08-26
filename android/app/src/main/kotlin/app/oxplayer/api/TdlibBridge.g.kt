@@ -495,9 +495,19 @@ interface OxTdlibBridgeApi {
    * at least one working WebApp path must be configured on the bot for this to succeed.
    */
   fun fetchWebAppInitData(botUsername: String, webAppShortName: String?, hostedHttpsUrl: String?, callback: (Result<String>) -> Unit)
-
-  /** DMs [username] with [text]; waits for next '!' framed private reply (Sushi /initbot). */
+  /**
+   * DMs [username] with [text] and waits for the next private-chat reply starting with `!`
+   * (Sushi wire framing). Used for `/initbot <corr>` against init-bot. [timeoutMs] ≤ 0 → 30000.
+   */
   fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Long, callback: (Result<String>) -> Unit)
+  /**
+   * Clicks a session account through main-bot's onboarding conversation (language, quality,
+   * audio, then login) by pressing the first inline button offered at each step, so `/initbot`
+   * has a binding to read afterward without a human tapping through Telegram by hand. No-op for
+   * a bot-token login (no dialog list, no onboarding conversation to have). [timeoutMs] bounds
+   * the whole multi-step conversation, not one round trip; ≤ 0 → 90000.
+   */
+  fun ensureMainBotOnboarded(username: String, timeoutMs: Long, callback: (Result<Unit>) -> Unit)
 
   companion object {
     /** The codec used by OxTdlibBridgeApi. */
@@ -866,6 +876,26 @@ interface OxTdlibBridgeApi {
               } else {
                 val data = result.getOrNull()
                 reply.reply(TdlibBridgePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.ensureMainBotOnboarded$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val usernameArg = args[0] as String
+            val timeoutMsArg = args[1] as Long
+            api.ensureMainBotOnboarded(usernameArg, timeoutMsArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(TdlibBridgePigeonUtils.wrapError(error))
+              } else {
+                reply.reply(TdlibBridgePigeonUtils.wrapResult(null))
               }
             }
           }

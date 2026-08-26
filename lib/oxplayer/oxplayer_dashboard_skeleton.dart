@@ -8,6 +8,7 @@ import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/views_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_skeleton_box.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/theme.dart';
@@ -59,6 +60,9 @@ bool oxHomeDashboardFullyReady({
   required HomeModel dashboard,
 }) {
   if (!oxHomeDashboardDataReady(views: views, dashboard: dashboard)) return false;
+  // Sushi never populates oxWatchlistFeedHandledProvider (that's the HTTP Home/Feed's watchlist
+  // section) — its own data being loaded is the only readiness signal it has.
+  if (SushiConfig.isEnabled) return true;
   if (!OxplayerConfig.isEnabled) return true;
   return ref.watch(oxWatchlistFeedHandledProvider);
 }
