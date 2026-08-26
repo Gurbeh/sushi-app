@@ -1,4 +1,4 @@
-name: fladder
+﻿name: fladder
 description: Sushi - Telegram-native media (Fladder-based)
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -154,6 +154,7 @@ dependencies:
   device_info_plus: ^11.3.0
   firebase_core: 3.15.2
   firebase_crashlytics: 4.3.10
+  libcompress: ^1.2.1
 
 dependency_overrides:
   # Upstream includes web subtitle fix (oncuechange .toJS); DonutWare fork still broken on web.

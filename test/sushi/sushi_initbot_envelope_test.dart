@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:libcompress/libcompress.dart';
 import 'package:fladder/sushi/sushi_assignment_pb.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
 
@@ -64,6 +65,34 @@ void main() {
     expect(a.isError, isTrue);
     expect(a.pending, isTrue);
     expect(a.apiBotUsername, isEmpty);
+  });
+
+  test('sushiParseInitbotReply decompresses FlagCompressed Assignment', () {
+    final bigPool = List.generate(40, (i) => 'pool-bot-$i-${'x' * 8}');
+    final fatPlain = SushiAssignmentPb.encode(
+      apiBotUsername: 'compressedBot',
+      pool: bigPool,
+      providerId: 1,
+      bindingToken: utf8.encode('tok'),
+      epoch: 2,
+    );
+    final compressed = ZstdCodec(level: 3).compress(fatPlain);
+    expect(compressed.length, lessThan(fatPlain.length));
+
+    final envelope = BytesBuilder()
+      ..addByte(1)
+      ..add(_uvarint(1))
+      ..add(_uvarint(15))
+      ..add(_uvarint(SushiAssignment.flagCompressed))
+      ..add(compressed);
+    final reply = '!${base64Url.encode(envelope.toBytes()).replaceAll('=', '')}';
+
+    final a = sushiParseInitbotReply(reply);
+    expect(a.pending, isFalse);
+    expect(a.apiBotUsername, 'compressedBot');
+    expect(a.pool.length, 40);
+    expect(a.providerId, 1);
+    expect(a.epoch, 2);
   });
 }
 

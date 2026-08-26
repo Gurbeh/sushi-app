@@ -3,11 +3,15 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:libcompress/libcompress.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_assignment_pb.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+
+/// Match sushi `wire.MaxPayload` (8 MiB) so malicious frames cannot OOM.
+final _zstd = ZstdCodec(maxDecompressedSize: 8 << 20);
 
 /// Assignment from init-bot (docs/02 §1, docs/03, proto `sushi.v1.Assignment`).
 class SushiAssignment {
@@ -210,8 +214,11 @@ SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36
   }
 
   if ((flags & SushiAssignment.flagCompressed) != 0) {
-    // Assignment payloads are tiny; compression unexpected. No zstd in client yet.
-    return SushiAssignment.stubPending(reason: 'compressed Assignment payload unsupported');
+    try {
+      payload = _zstd.decompress(payload);
+    } catch (e) {
+      return SushiAssignment.stubPending(reason: 'zstd decompress failed: $e');
+    }
   }
 
   try {
