@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
@@ -26,6 +27,7 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   DashboardNotifier(this.ref) : super(HomeModel());
 
   final Ref ref;
+  bool _sushiHomeQueued = false;
 
   late final JellyService api = ref.read(jellyApiProvider);
 
@@ -33,10 +35,21 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     if (SushiConfig.isEnabled) {
       // Each call is a real Telegram bot round-trip, not a cheap HTTP GET — never let two
       // overlap (e.g. pull-to-refresh landing while an initial fetch is still in flight).
-      if (state.loading) return;
+      // Queue a follow-up instead of dropping: refreshOnStart often races /initbot, and dropping
+      // the second call leaves rails empty until the user pulls again.
+      if (state.loading) {
+        _sushiHomeQueued = true;
+        return;
+      }
       state = state.copyWith(loading: true);
-      await _fetchSushiHome();
-      state = state.copyWith(loading: false, loaded: true);
+      try {
+        do {
+          _sushiHomeQueued = false;
+          await _fetchSushiHome();
+        } while (_sushiHomeQueued);
+      } finally {
+        state = state.copyWith(loading: false, loaded: true);
+      }
       return;
     }
     if (OxplayerConfig.isEnabled && state.loaded) return;
@@ -167,14 +180,18 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     final res = await sushiFetchHome(tab: sushiHomeTabMovies);
     if (res == null) return;
 
+    final slider = res.rowsFor(SushiRailKind.slider).map(sushiRowToItemBaseModel).toList();
+    final mostWatched = res.rowsFor(SushiRailKind.mostWatched).map(sushiRowToItemBaseModel).toList();
+    final trending = res.rowsFor(SushiRailKind.trending).map(sushiRowToItemBaseModel).toList();
+    debugPrint(
+      '[sushi] home rails slider=${slider.length} mostWatched=${mostWatched.length} trending=${trending.length}',
+    );
     oxApplySushiHomeRailsRef(
       ref,
-      SushiHomeRailsData(
-        slider: res.rowsFor(SushiRailKind.slider).map(sushiRowToItemBaseModel).toList(),
-        mostWatched: res.rowsFor(SushiRailKind.mostWatched).map(sushiRowToItemBaseModel).toList(),
-        trending: res.rowsFor(SushiRailKind.trending).map(sushiRowToItemBaseModel).toList(),
-      ),
+      SushiHomeRailsData(slider: slider, mostWatched: mostWatched, trending: trending),
     );
+    // Hero banner reads HomeModel.nextUp; Sushi has no Jellyfin Next Up, so the slider is that rail.
+    state = state.copyWith(nextUp: slider);
   }
 
   void applyOxHomeFeed(OxHomeFeedDashboard feed) {

@@ -71,7 +71,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       // Cold-start half of bot rotation (docs/02 §7): re-syncs the Assignment's API/delivery bot
       // lists in the background, in case they changed since this session last asked. No-op past
       // the first call in a process (dashboard can rebuild/remount many times).
-      sushiRefreshInitbotOnColdStart();
+      sushiRefreshInitbotOnColdStart(onReady: () {
+        if (!mounted) return;
+        unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
+      });
     }
     if (!OxplayerConfig.isEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,12 +161,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
     final homeCached = oxHomeDashboardHasCachedContent(dashboardData, views);
     final sliderCached = oxHomeHasCachedSliderData(dashboardData);
-    final homeFullyReady = !OxplayerConfig.isEnabled ||
-        oxHomeDashboardFullyReady(ref: ref, views: views, dashboard: dashboardData);
-    final homeShowContent = oxHomeDashboardShowContent(
-      homeFullyReady: homeFullyReady,
-      homeCached: homeCached,
-    );
+    final sushiHasRails = sushiRails.slider.isNotEmpty ||
+        sushiRails.mostWatched.isNotEmpty ||
+        sushiRails.trending.isNotEmpty;
+    final homeFullyReady = SushiConfig.isEnabled
+        ? (dashboardData.loaded && !dashboardData.loading) || sushiHasRails
+        : !OxplayerConfig.isEnabled ||
+            oxHomeDashboardFullyReady(ref: ref, views: views, dashboard: dashboardData);
+    final homeShowContent = SushiConfig.isEnabled
+        ? homeFullyReady
+        : oxHomeDashboardShowContent(
+            homeFullyReady: homeFullyReady,
+            homeCached: homeCached,
+          );
     final showBannerSkeleton = oxShowHomeBannerSkeleton(
       homeBanner: homeBanner,
       dashboardLoading: dashboardData.loading,
@@ -177,10 +187,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         homeShowContent &&
         (sliderCached || (dashboardData.loaded && !dashboardData.loading)) &&
         homeCarouselItems.isNotEmpty;
-    final showListSkeleton = oxShowHomeListSkeleton(
-      homeFullyReady: homeFullyReady,
-      homeCached: homeCached,
-    );
+    final showListSkeleton = SushiConfig.isEnabled
+        ? !sushiHasRails && (!dashboardData.loaded || dashboardData.loading)
+        : oxShowHomeListSkeleton(
+            homeFullyReady: homeFullyReady,
+            homeCached: homeCached,
+          );
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(
@@ -203,7 +215,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: PullToRefresh(
         refreshKey: _refreshIndicatorKey,
         displacement: 80 + MediaQuery.of(context).viewPadding.top,
-        refreshOnStart: OxplayerConfig.isEnabled ? (!homeCached || (homeBanner && !sliderCached)) : true,
+        refreshOnStart: SushiConfig.isEnabled
+            ? false
+            : OxplayerConfig.isEnabled
+                ? (!homeCached || (homeBanner && !sliderCached))
+                : true,
         onRefresh: () async => await _refreshHome(),
         child: (context) => PinchPosterZoom(
           scaleDifference: (difference) => ref.read(clientSettingsProvider.notifier).addPosterSize(difference),

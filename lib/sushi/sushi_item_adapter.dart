@@ -1,8 +1,15 @@
 import 'package:collection/collection.dart';
 
+import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/images_models.dart';
+import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
+import 'package:fladder/models/items/overview_model.dart';
+import 'package:fladder/models/items/person_model.dart';
+import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 const _sushiFileIdPrefix = 'sushi_file_';
 
@@ -100,12 +107,118 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
 /// [MovieModel] — called after the home-rail placeholder is on screen, same "paint first, enrich
 /// after" shape `movies_details_provider.dart` already uses for OXPlayer.
 MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiFile> files) {
+  final genreNames = item.genres
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  final people = [
+    for (var i = 0; i < item.people.length; i++)
+      Person(
+        id: 'sushi_person_${item.row.tmdbId}_$i',
+        name: item.people[i].name,
+        role: item.people[i].role,
+        image: sushiTmdbImage(item.people[i].profile, key: 'sushi_person_${item.row.tmdbId}_$i', size: 'w185'),
+      ),
+  ];
+  final related = item.related.map(sushiRowToItemBaseModel).toList();
+  sushiRememberCollection(base.id, item.collectionName, item.collection.map(sushiRowToItemBaseModel).toList());
+
   return base.copyWith(
+    images: ImagesData(
+      primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
+      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', extension: 'png') ?? base.images?.logo,
+      backDrop: item.backdrop.isEmpty
+          ? base.images?.backDrop
+          : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
+    ),
     overview: base.overview.copyWith(
       summary: item.overview,
       yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
+      runTime: item.runtimeS > 0 ? Duration(seconds: item.runtimeS) : base.overview.runTime,
+      genres: genreNames.isEmpty ? base.overview.genres : genreNames,
+      genreItems: genreNames.isEmpty
+          ? base.overview.genreItems
+          : [
+              for (final name in genreNames) GenreItems(id: name, name: name),
+            ],
+      people: people.isEmpty ? base.overview.people : people,
     ),
     mediaStreams: sushiBuildMediaStreams(files),
+    related: related,
+  );
+}
+
+SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
+  final genreNames = item.genres
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  final people = [
+    for (var i = 0; i < item.people.length; i++)
+      Person(
+        id: 'sushi_person_${item.row.tmdbId}_$i',
+        name: item.people[i].name,
+        role: item.people[i].role,
+        image: sushiTmdbImage(item.people[i].profile, key: 'sushi_person_${item.row.tmdbId}_$i', size: 'w185'),
+      ),
+  ];
+  final related = item.related.map(sushiRowToItemBaseModel).toList();
+  sushiRememberCollection(base.id, item.collectionName, item.collection.map(sushiRowToItemBaseModel).toList());
+
+  return base.copyWith(
+    images: ImagesData(
+      primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
+      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', extension: 'png') ?? base.images?.logo,
+      backDrop: item.backdrop.isEmpty
+          ? base.images?.backDrop
+          : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
+    ),
+    overview: base.overview.copyWith(
+      summary: item.overview,
+      yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
+      runTime: item.runtimeS > 0 ? Duration(seconds: item.runtimeS) : base.overview.runTime,
+      genres: genreNames.isEmpty ? base.overview.genres : genreNames,
+      genreItems: genreNames.isEmpty
+          ? base.overview.genreItems
+          : [
+              for (final name in genreNames) GenreItems(id: name, name: name),
+            ],
+      people: people.isEmpty ? base.overview.people : people,
+    ),
+    related: related,
+  );
+}
+
+final Map<String, ({String name, List<ItemBaseModel> items})> _sushiCollections = {};
+
+void sushiRememberCollection(String itemId, String name, List<ItemBaseModel> items) {
+  if (items.isEmpty) {
+    _sushiCollections.remove(itemId);
+    return;
+  }
+  _sushiCollections[itemId] = (name: name, items: items);
+}
+
+({String name, List<ItemBaseModel> items})? sushiCollectionFor(String itemId) =>
+    _sushiCollections[itemId];
+
+/// Cast tap has no Jellyfin person id — paint name/photo/role from the title page.
+PersonModel sushiPersonModel(Person person) {
+  return PersonModel(
+    name: person.name,
+    id: person.id,
+    birthPlace: const [],
+    movies: const [],
+    series: const [],
+    overview: OverviewModel(summary: person.role),
+    parentId: null,
+    playlistId: null,
+    images: ImagesData(primary: person.image),
+    childCount: 0,
+    primaryRatio: 0.667,
+    userData: const UserData(),
   );
 }
 

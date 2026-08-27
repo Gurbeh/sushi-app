@@ -8,6 +8,7 @@ import 'package:fladder/oxplayer/ox_person_tmdb_id.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/oxplayer/screens/ox_seerr_person_screen.dart';
 import 'package:fladder/screens/details_screens/person_detail_screen.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -34,6 +35,14 @@ class OxSeerrPeopleRow extends ConsumerWidget {
   });
 
   void _openPerson(BuildContext context, Person person) {
+    if (SushiConfig.isEnabled) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => PersonDetailScreen(person: person),
+        ),
+      );
+      return;
+    }
     final tmdbPersonId = oxTmdbPersonIdFromRawId(person.id);
     if (tmdbPersonId == null || tmdbPersonId <= 0) return;
 
@@ -90,7 +99,7 @@ class OxSeerrPeopleRow extends ConsumerWidget {
       items: people,
       itemBuilder: (context, index) {
         final person = people[index];
-        final canOpen = oxPersonHasNavigableTmdbId(person.id);
+        final canOpen = SushiConfig.isEnabled || oxPersonHasNavigableTmdbId(person.id);
         void open() => _openPerson(context, person);
 
         return AspectRatio(

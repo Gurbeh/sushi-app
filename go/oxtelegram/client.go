@@ -89,10 +89,12 @@ type Client struct {
 	providerPeersMu sync.Mutex
 	providerPeers   map[int64]*tg.InputPeerUser
 
-	// textWaiters/textArrived deliver '!' framed private-chat replies (Sushi initbot / protocol).
+	// textWaiters/textArrived deliver '!' framed private-chat replies (Sushi initbot / protocol),
+	// keyed by (peer user id, request corr) -- see send_text.go's textWaiterKey doc for why corr
+	// has to be part of the key.
 	textMu      sync.Mutex
-	textWaiters map[int64]chan string
-	textArrived map[int64]string
+	textWaiters map[textWaiterKey]chan string
+	textArrived map[textWaiterKey]string
 
 	// msgWaiters deliver the next raw message (any content) from a peer, keyed by that peer's user
 	// id — used by EnsureMainBotOnboarded to watch main-bot's plain conversational replies, which
@@ -431,8 +433,8 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.pushArrived = make(map[string]pushArrival)
 	c.pushMu.Unlock()
 	c.textMu.Lock()
-	c.textWaiters = make(map[int64]chan string)
-	c.textArrived = make(map[int64]string)
+	c.textWaiters = make(map[textWaiterKey]chan string)
+	c.textArrived = make(map[textWaiterKey]string)
 	c.textMu.Unlock()
 	c.msgMu.Lock()
 	c.msgWaiters = make(map[int64]chan *tg.Message)

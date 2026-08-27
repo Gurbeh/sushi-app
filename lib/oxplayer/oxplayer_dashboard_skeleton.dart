@@ -59,10 +59,10 @@ bool oxHomeDashboardFullyReady({
   required ViewsModel views,
   required HomeModel dashboard,
 }) {
+  if (SushiConfig.isEnabled) {
+    return dashboard.loaded && !dashboard.loading;
+  }
   if (!oxHomeDashboardDataReady(views: views, dashboard: dashboard)) return false;
-  // Sushi never populates oxWatchlistFeedHandledProvider (that's the HTTP Home/Feed's watchlist
-  // section) — its own data being loaded is the only readiness signal it has.
-  if (SushiConfig.isEnabled) return true;
   if (!OxplayerConfig.isEnabled) return true;
   return ref.watch(oxWatchlistFeedHandledProvider);
 }

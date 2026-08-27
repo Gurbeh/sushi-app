@@ -18,6 +18,7 @@ import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -222,7 +223,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       },
                     ),
                   if (details.overview.people.isNotEmpty)
-                    OxplayerConfig.isEnabled
+                    (OxplayerConfig.isEnabled && !SushiConfig.isEnabled)
                         ? OxSeerrPeopleRow(
                             people: details.overview.people,
                             contentPadding: padding,
@@ -245,7 +246,18 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       label: detailsContext.localized.related,
                       oxDetailBadges: OxplayerConfig.isEnabled,
                     ),
-                  if (OxplayerConfig.isEnabled)
+                  if (SushiConfig.isEnabled &&
+                      (sushiCollectionFor(details.id)?.items.isNotEmpty ?? false))
+                    PosterRow(
+                      posters: sushiCollectionFor(details.id)!.items,
+                      contentPadding: padding,
+                      label: () {
+                        final name = sushiCollectionFor(details.id)!.name;
+                        return name.isEmpty ? 'Collection' : name;
+                      }(),
+                      oxDetailBadges: false,
+                    ),
+                  if (OxplayerConfig.isEnabled && !SushiConfig.isEnabled)
                     OxMovieBoxSetRow(
                       itemId: widget.item.id,
                       contentPadding: padding,

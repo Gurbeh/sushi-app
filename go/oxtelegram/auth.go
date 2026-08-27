@@ -66,6 +66,9 @@ type AuthController struct {
 	// decide whether it's safe to resolve a public channel directly (session accounts) or must
 	// instead wait for the server's live-forwarded push (bot accounts — see Client.pushedDocs).
 	botMode bool
+	// botToken is the BotFather token for this session, kept only in memory for Bot API fallback
+	// when MTProto messages.sendMessage returns USER_IS_BOT (bot-to-bot). Never logged.
+	botToken string
 }
 
 // IsBotMode reports whether this session logged in via SubmitBotToken rather than
@@ -74,6 +77,14 @@ func (a *AuthController) IsBotMode() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.botMode
+}
+
+// BotToken is the in-memory BotFather token after SubmitBotToken. Empty on a session restored
+// from disk without a fresh submit.
+func (a *AuthController) BotToken() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.botToken
 }
 
 func newAuthController(
@@ -143,6 +154,15 @@ func (a *AuthController) checkInitialStatus(ctx context.Context) {
 // spike before this was wired in. Goes straight from uninitialized/waitingForPhoneNumber to
 // ready — there is no code/2FA step for bot login.
 func (a *AuthController) SubmitBotToken(ctx context.Context, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		err := fmt.Errorf("empty bot token")
+		a.emit(AuthFailed, "", "", err.Error())
+		return err
+	}
+	if a.hydrateBotTokenIfAuthorized(ctx, token) {
+		return nil
+	}
 	_, err := a.tg.Auth().Bot(ctx, token)
 	if err != nil {
 		a.emit(AuthFailed, "", "", err.Error())
@@ -150,9 +170,29 @@ func (a *AuthController) SubmitBotToken(ctx context.Context, token string) error
 	}
 	a.mu.Lock()
 	a.botMode = true
+	a.botToken = token
 	a.mu.Unlock()
 	a.emit(AuthReady, "", "", "")
 	return nil
+}
+
+// hydrateBotTokenIfAuthorized stores the BotFather token on an already-restored bot session
+// so Bot API sendMessage works. Auth().Bot on a live bot session is unnecessary and can fail.
+func (a *AuthController) hydrateBotTokenIfAuthorized(ctx context.Context, token string) bool {
+	status, err := a.tg.Auth().Status(ctx)
+	if err != nil || !status.Authorized {
+		return false
+	}
+	self, err := a.tg.Self(ctx)
+	if err != nil || self == nil || !self.Bot {
+		return false
+	}
+	a.mu.Lock()
+	a.botMode = true
+	a.botToken = token
+	a.mu.Unlock()
+	a.emit(AuthReady, "", "", "")
+	return true
 }
 
 // SubmitPhoneNumber starts the phone/code flow (step 1 of 2-3).
@@ -446,6 +486,10 @@ func isUnexpectedLoginTokenMigrate(err error) bool {
 // storage afterward (mirrors TdlibBridgeObject.logOut's close-then-wipe ordering).
 // DeadlineExceeded/Canceled are treated as success so OX UI logout does not hang ~30s.
 func (a *AuthController) LogOut(ctx context.Context) error {
+	a.mu.Lock()
+	a.botToken = ""
+	a.botMode = false
+	a.mu.Unlock()
 	a.emit(AuthLoggingOut, "", "", "")
 	_, err := a.tg.API().AuthLogOut(ctx)
 	a.emit(AuthClosed, "", "", "")

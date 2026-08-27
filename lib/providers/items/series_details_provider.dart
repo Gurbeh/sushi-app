@@ -12,6 +12,10 @@ import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
@@ -40,6 +44,16 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
 
         if (seriesModel is SeriesModel) {
           apply(state ?? seriesModel);
+        }
+
+        if (SushiConfig.isEnabled) {
+          if (seriesModel is! SeriesModel) return null;
+          final tmdbId = sushiTmdbIdFromItemId(seriesModel.id);
+          if (tmdbId == null) return null;
+          final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 2);
+          if (itemRes == null || loadGen != _loadGeneration) return null;
+          apply(sushiEnrichSeriesModel(seriesModel, itemRes));
+          return null;
         }
 
         if (OxplayerConfig.isEnabled) {

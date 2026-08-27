@@ -14,6 +14,8 @@ import 'package:fladder/providers/seerr_service_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
 
 final personDetailsProvider =
     StateNotifierProvider.autoDispose.family<PersonDetailsNotifier, PersonModel?, String>((ref, id) {
@@ -32,6 +34,11 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
   late final SeerrService seerrApi = ref.read(seerrApiProvider);
 
   Future<Response?> fetchPerson(Person person) async {
+    if (SushiConfig.isEnabled) {
+      if (_disposed) return null;
+      state = sushiPersonModel(person);
+      return null;
+    }
     final response = await api.usersUserIdItemsItemIdGet(itemId: person.id);
     if (_disposed) return response;
 
@@ -44,6 +51,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
   }
 
   Future<void> toggleFavorite() async {
+    if (SushiConfig.isEnabled) return;
     final current = state;
     if (current == null || _disposed) return;
     final next = !current.userData.isFavourite;
@@ -108,7 +116,7 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
 
   Future<void> fetchSeerrCredits() async {
     if (_disposed || state == null) return;
-    if (OxplayerEnv.isEnabled) {
+    if (SushiConfig.isEnabled || OxplayerEnv.isEnabled) {
       state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
       return;
     }

@@ -1,7 +1,6 @@
 package app.oxplayer.tdlibbridge.media
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import app.oxplayer.tdlibbridge.session.GomobileCallGate
 import mobile.PlaybackSession
 
 /**
@@ -28,6 +27,13 @@ data class OxFileInfo(
  * wraps exactly one gotd/td PlaybackSession, matching this module's one-playback-session-at-a-
  * time scope (see TdlibBridgeObject) — the fileId parameters below are accepted (so call sites
  * don't need to change) but not consulted against [session].
+ *
+ * Every [session] call below goes through [GomobileCallGate] — confirmed live that [close] racing
+ * an unrelated Sushi protocol call (itself a [app.oxplayer.tdlibbridge.session.OxTelegramClient]
+ * call) crashes the whole process with `fatal error: bulkBarrierPreWrite: unaligned arguments`,
+ * since both cross into the same gomobile-bound oxtelegram.aar runtime. [awaitBytesAvailable] and
+ * [cancelDownload] are included too: TdlibBridgeObject's own doc notes a new session's start and
+ * the previous one's teardown are explicitly not ordered, so the same overlap is possible here.
  */
 class OxTelegramFileFetcher(private val session: PlaybackSession) {
 
@@ -41,18 +47,17 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
     suspend fun requestDownload(fileId: Int, offset: Long, limit: Long = 0, priority: Int = 32) {
     }
 
-    suspend fun awaitBytesAvailable(fileId: Int, offset: Long, minBytesAvailable: Long): OxFileInfo {
-        withContext(Dispatchers.IO) {
+    suspend fun awaitBytesAvailable(fileId: Int, offset: Long, minBytesAvailable: Long): OxFileInfo =
+        GomobileCallGate.enter {
             session.ensureAvailable(offset, minBytesAvailable)
+            OxFileInfo(
+                localPath = session.localPath(),
+                size = session.size(),
+                windowStart = session.availableFrom(),
+                windowEnd = session.availableUpTo(),
+                isDownloadingCompleted = session.isComplete(),
+            )
         }
-        return OxFileInfo(
-            localPath = session.localPath(),
-            size = session.size(),
-            windowStart = session.availableFrom(),
-            windowEnd = session.availableUpTo(),
-            isDownloadingCompleted = session.isComplete(),
-        )
-    }
 
     /**
      * Cancels whatever chunk fetch is currently in flight for this session — call on every
@@ -63,9 +68,7 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
      */
     @Suppress("UNUSED_PARAMETER")
     suspend fun cancelDownload(fileId: Int) {
-        withContext(Dispatchers.IO) {
-            session.cancelCurrentRead()
-        }
+        GomobileCallGate.enter { session.cancelCurrentRead() }
     }
 
     /**
@@ -78,8 +81,6 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
      * was already downloaded instead of refetching from byte zero.
      */
     suspend fun close() {
-        withContext(Dispatchers.IO) {
-            session.close()
-        }
+        GomobileCallGate.enter { session.close() }
     }
 }

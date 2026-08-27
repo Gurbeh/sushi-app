@@ -160,6 +160,47 @@ class SushiFile {
   }
 }
 
+class SushiPerson {
+  const SushiPerson({required this.name, required this.role, required this.profile});
+
+  final String name;
+  final String role;
+  final String profile;
+
+  static SushiPerson decode(Uint8List bytes) {
+    var name = '';
+    var role = '';
+    var profile = '';
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final field = tagR.value >> 3;
+      final wire = tagR.value & 0x7;
+      switch (field) {
+        case 1:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          name = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 2:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          role = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 3:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          profile = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
+      }
+    }
+    return SushiPerson(name: name, role: role, profile: profile);
+  }
+}
+
 /// Decoded `sushi.v1.ItemRes` — the title page (docs/12 §4).
 class SushiItemRes {
   const SushiItemRes({
@@ -167,18 +208,42 @@ class SushiItemRes {
     required this.overview,
     required this.releasedOn,
     required this.episodes,
+    this.logo = '',
+    this.backdrop = '',
+    this.genres = '',
+    this.runtimeS = 0,
+    this.people = const [],
+    this.related = const [],
+    this.collectionName = '',
+    this.collection = const [],
   });
 
   final SushiRow row;
   final String overview;
   final int releasedOn;
   final List<SushiEpisode> episodes;
+  final String logo;
+  final String backdrop;
+  final String genres;
+  final int runtimeS;
+  final List<SushiPerson> people;
+  final List<SushiRow> related;
+  final String collectionName;
+  final List<SushiRow> collection;
 
   static SushiItemRes decode(Uint8List bytes) {
     SushiRow row = const SushiRow(tmdbId: 0, kind: SushiKind.unspecified, title: '', year: 0, rating: 0, poster: '');
     var overview = '';
     var releasedOn = 0;
     final episodes = <SushiEpisode>[];
+    var logo = '';
+    var backdrop = '';
+    var genres = '';
+    var runtimeS = 0;
+    final people = <SushiPerson>[];
+    final related = <SushiRow>[];
+    var collectionName = '';
+    final collection = <SushiRow>[];
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -205,11 +270,63 @@ class SushiItemRes {
           i = lenR.next;
           episodes.add(SushiEpisode.decode(bytes.sublist(i, i + lenR.value)));
           i += lenR.value;
+        case 5:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          logo = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 6:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          backdrop = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 7:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          genres = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 8:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          runtimeS = v.value;
+        case 9:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          people.add(SushiPerson.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        case 10:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          related.add(SushiRow.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        case 11:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          collectionName = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 12:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          collection.add(SushiRow.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiItemRes(row: row, overview: overview, releasedOn: releasedOn, episodes: List.unmodifiable(episodes));
+    return SushiItemRes(
+      row: row,
+      overview: overview,
+      releasedOn: releasedOn,
+      episodes: List.unmodifiable(episodes),
+      logo: logo,
+      backdrop: backdrop,
+      genres: genres,
+      runtimeS: runtimeS,
+      people: List.unmodifiable(people),
+      related: List.unmodifiable(related),
+      collectionName: collectionName,
+      collection: List.unmodifiable(collection),
+    );
   }
 }
 

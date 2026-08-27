@@ -99,7 +99,12 @@ void main() {
   test('SushiItemRes decodes row, overview, releasedOn and episodes', () {
     final rowBytes = _encodeRow(tmdbId: 603, kind: 1, title: 'The Matrix', year: 1999, rating: 87, poster: 'abc');
     final ep1 = _encodeEpisode(episodeId: 100, seasonNo: 0, episodeNo: 0, title: 'Movie');
-    final itemBytes = _encodeItemRes(row: rowBytes, overview: 'A hacker discovers reality is a simulation.', releasedOn: 915148800, episodes: [ep1]);
+    final itemBytes = _encodeItemRes(
+      row: rowBytes,
+      overview: 'A hacker discovers reality is a simulation.',
+      releasedOn: 915148800,
+      episodes: [ep1],
+    );
 
     final res = SushiItemRes.decode(itemBytes);
     expect(res.row.tmdbId, 603);
@@ -121,6 +126,28 @@ void main() {
     expect(res.episodes[0].seasonNo, 1);
     expect(res.episodes[1].episodeNo, 2);
     expect(res.episodes[1].title, 'Episode Two');
+  });
+
+  test('SushiItemRes decodes logo, people, related and collection', () {
+    final rowBytes = _encodeRow(tmdbId: 603, kind: 1, title: 'The Matrix', year: 1999, rating: 87, poster: 'abc');
+    final related = _encodeRow(tmdbId: 604, kind: 1, title: 'Reloaded', year: 2003, rating: 70, poster: 'rel');
+    final person = BytesBuilder()
+      ..add(_lenDelim(1, utf8.encode('Keanu Reeves')))
+      ..add(_lenDelim(2, utf8.encode('Neo')));
+    final out = BytesBuilder()
+      ..add(_lenDelim(1, rowBytes))
+      ..add(_lenDelim(5, utf8.encode('wordmark')))
+      ..add(_lenDelim(9, person.toBytes()))
+      ..add(_lenDelim(10, related))
+      ..add(_lenDelim(11, utf8.encode('The Matrix Collection')))
+      ..add(_lenDelim(12, related));
+    final res = SushiItemRes.decode(out.toBytes());
+    expect(res.logo, 'wordmark');
+    expect(res.people.single.name, 'Keanu Reeves');
+    expect(res.people.single.role, 'Neo');
+    expect(res.related.single.tmdbId, 604);
+    expect(res.collectionName, 'The Matrix Collection');
+    expect(res.collection.single.title, 'Reloaded');
   });
 
   test('SushiFilesRes decodes multiple files with correct state mapping', () {

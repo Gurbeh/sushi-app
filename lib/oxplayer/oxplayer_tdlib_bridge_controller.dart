@@ -383,13 +383,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// unless state is waitingForPhoneNumber (fresh/unauthenticated) and a bot token is cached —
   /// see submitBotToken's caching and ensureBotSessionFromCacheIfNeeded's fuller doc comment.
   Future<void> _restoreBotSessionIfNeededLocked() async {
-    if (_suppressBotSessionRestore) {
+    if (_suppressBotSessionRestore && _state.kind != OxTdlibAuthStateKind.ready) {
       _log('restoreBotSession: skipped (login-screen auth)');
       return;
     }
-    if (_state.kind != OxTdlibAuthStateKind.ready) {
-      await ensureBotSessionFromCacheIfNeeded();
-    }
+    await ensureBotSessionFromCacheIfNeeded();
   }
 
   /// Blocks until past WaitTdlibParameters (phone/QR/code/password/ready/failed).
@@ -590,17 +588,29 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
     if (trimmed.isEmpty) {
       throw OxplayerTdlibBridgeException('Enter your bot token');
     }
-    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber) {
+    // Restored bot sessions are already `ready` but Auth.BotToken() is empty, so MTProto
+    // sendMessage returns USER_IS_BOT. Native SubmitBotToken hydrates the in-memory token.
+    final hydrateReadyBot = _state.kind == OxTdlibAuthStateKind.ready &&
+        await isNativeSessionActuallyBot();
+    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber && !hydrateReadyBot) {
       throw OxplayerTdlibBridgeException(
         'Telegram is not ready for bot-token login yet (state=${_state.kind.name})',
       );
     }
-    await _awaitAuthRpc(
-      _useWindows ? _windows!.submitBotToken(trimmed) : _api.submitBotToken(trimmed),
-      until: (kind) => kind == OxTdlibAuthStateKind.ready,
-      timeoutMessage:
-          'Could not reach Telegram (timed out). Check internet / VPN and try again.',
-    );
+    if (hydrateReadyBot) {
+      if (_useWindows) {
+        await _windows!.submitBotToken(trimmed);
+      } else {
+        await _api.submitBotToken(trimmed);
+      }
+    } else {
+      await _awaitAuthRpc(
+        _useWindows ? _windows!.submitBotToken(trimmed) : _api.submitBotToken(trimmed),
+        until: (kind) => kind == OxTdlibAuthStateKind.ready,
+        timeoutMessage:
+            'Could not reach Telegram (timed out). Check internet / VPN and try again.',
+      );
+    }
     _activeBotToken = trimmed;
     // Cached so a later app start (or a fresh install's first playback attempt) can silently
     // re-apply it via ensureBotSessionFromCacheIfNeeded, without needing the OX session/access
@@ -695,8 +705,11 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
   /// reconfigure, so the app got permanently stuck reporting "bot isn't connected" despite a
   /// perfectly valid cached token, on every single playback attempt, with no retry path at all.
   Future<void> ensureBotSessionFromCacheIfNeeded() async {
-    if (_state.kind == OxTdlibAuthStateKind.ready) return;
-    if (_state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber &&
+    if (_state.kind == OxTdlibAuthStateKind.ready && !await isNativeSessionActuallyBot()) {
+      return;
+    }
+    if (_state.kind != OxTdlibAuthStateKind.ready &&
+        _state.kind != OxTdlibAuthStateKind.waitingForPhoneNumber &&
         _state.kind != OxTdlibAuthStateKind.failed) {
       return;
     }
@@ -1032,6 +1045,22 @@ class OxplayerTdlibBridgeController extends ChangeNotifier implements OxTdlibBri
       return _windows!.sendTextAndWaitReply(username, text, timeoutMs);
     }
     return _api.sendTextAndWaitReply(username, text, timeoutMs);
+  }
+
+  /// DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress
+  /// reports) — see the Pigeon spec for why this must never be used for a call whose reply the
+  /// caller actually needs. Android/mobile only for now — the Windows FFI bridge does not export
+  /// this yet.
+  Future<void> sendTextFireAndForget({
+    required String username,
+    required String text,
+  }) async {
+    await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+    if (_state.kind != OxTdlibAuthStateKind.ready) {
+      throw OxplayerTdlibBridgeException('Telegram session not ready for sendTextFireAndForget');
+    }
+    if (_useWindows) return;
+    return _api.sendTextFireAndForget(username, text);
   }
 
   /// Clicks a session account through main-bot's onboarding conversation (Sushi /initbot).

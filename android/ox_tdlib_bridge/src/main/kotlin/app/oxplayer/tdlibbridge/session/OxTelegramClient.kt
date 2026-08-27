@@ -1,7 +1,6 @@
 package app.oxplayer.tdlibbridge.session
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import mobile.AuthEventSink
 import mobile.Client
 import mobile.ConnectionSink
@@ -12,8 +11,13 @@ import mobile.SessionStorage
  * Coroutine-friendly wrapper around the gomobile-bound mobile.Client (github.com/gotd/td facade,
  * go/oxtelegram) — the replacement for TdlibClient. Every mobile.Client method is already a
  * plain blocking JNI call (gotd/td's auth API is call/response, not TDLib's async
- * request/response protocol needing a CompletableDeferred bridge), so this just moves each call
- * onto Dispatchers.IO so it doesn't block the calling coroutine's thread.
+ * request/response protocol needing a CompletableDeferred bridge).
+ *
+ * [GomobileCallGate] serializes every method that actually crosses into gomobile's generated JNI
+ * bridge against [app.oxplayer.tdlibbridge.media.OxTelegramFileFetcher] and
+ * [app.oxplayer.tdlibbridge.player.OxTelegramStreamBridge] — see GomobileCallGate's doc. Cheap
+ * in-memory reads (connectionHealth, isBotMode, armDeliveryWaiter, locator lookups) stay off the
+ * gate so a 30s protocol call cannot stall a sync Pigeon poll.
  */
 class OxTelegramClient(
     apiId: Long,
@@ -22,14 +26,15 @@ class OxTelegramClient(
 ) {
     val native: Client = Client(apiId, apiHash, storage)
 
-    suspend fun configure(sink: AuthEventSink) = withContext(Dispatchers.IO) { native.configure(sink) }
+    suspend fun configure(sink: AuthEventSink) =
+        GomobileCallGate.enter { native.configure(sink) }
 
     /**
      * Rebuilds the connection if its run loop died; no-op when healthy. See mobile.Client's doc for
      * why "already configured" must never be assumed from the presence of a client object alone.
      */
     suspend fun ensureConnected(sink: AuthEventSink) =
-        withContext(Dispatchers.IO) { native.ensureConnected(sink) }
+        GomobileCallGate.enter { native.ensureConnected(sink) }
 
     /** Registers the connection-health listener. Reconnection happens with or without one. */
     fun setConnectionSink(sink: ConnectionSink?) = native.setConnectionSink(sink)
@@ -47,18 +52,22 @@ class OxTelegramClient(
      */
     fun isBotMode(): Boolean = native.isBotMode()
 
-    suspend fun submitPhoneNumber(phone: String) = withContext(Dispatchers.IO) { native.submitPhoneNumber(phone) }
+    suspend fun submitPhoneNumber(phone: String) =
+        GomobileCallGate.enter { native.submitPhoneNumber(phone) }
 
-    suspend fun submitBotToken(token: String) = withContext(Dispatchers.IO) { native.submitBotToken(token) }
+    suspend fun submitBotToken(token: String) =
+        GomobileCallGate.enter { native.submitBotToken(token) }
 
-    suspend fun submitCode(code: String) = withContext(Dispatchers.IO) { native.submitCode(code) }
+    suspend fun submitCode(code: String) =
+        GomobileCallGate.enter { native.submitCode(code) }
 
     suspend fun submitTwoFactorPassword(password: String) =
-        withContext(Dispatchers.IO) { native.submitTwoFactorPassword(password) }
+        GomobileCallGate.enter { native.submitTwoFactorPassword(password) }
 
-    suspend fun requestQrLogin() = withContext(Dispatchers.IO) { native.requestQrLogin() }
+    suspend fun requestQrLogin() =
+        GomobileCallGate.enter { native.requestQrLogin() }
 
-    suspend fun logOut() = withContext(Dispatchers.IO) { native.logOut() }
+    suspend fun logOut() = GomobileCallGate.enter { native.logOut() }
 
     suspend fun startPlaybackSession(
         providerBotId: Long,
@@ -66,7 +75,7 @@ class OxTelegramClient(
         cacheDir: String,
         locator: String,
     ): PlaybackSession =
-        withContext(Dispatchers.IO) {
+        GomobileCallGate.enter {
             native.startPlaybackSession(providerBotId, messageId, cacheDir, locator)
         }
 
@@ -75,9 +84,7 @@ class OxTelegramClient(
      * path. Still a real MTProto call, so it belongs on Dispatchers.IO.
      */
     suspend fun warmDelivery(providerBotId: Long, messageId: Long, locator: String) =
-        withContext(Dispatchers.IO) {
-            native.warmDelivery(providerBotId, messageId, locator)
-        }
+        GomobileCallGate.enter { native.warmDelivery(providerBotId, messageId, locator) }
 
     /**
      * Starts, mutes and archives every delivery sender. [botsJson] is
@@ -85,7 +92,7 @@ class OxTelegramClient(
      * crosses the JNI boundary as JSON.
      */
     suspend fun ensureProviderBotsReady(botsJson: String) =
-        withContext(Dispatchers.IO) { native.ensureProviderBotsReady(botsJson) }
+        GomobileCallGate.enter { native.ensureProviderBotsReady(botsJson) }
 
     /**
      * Registers interest in [locator] before the delivery is requested. Touches an in-memory map on
@@ -108,20 +115,25 @@ class OxTelegramClient(
         webAppShortName: String,
         hostedHttpsUrl: String,
         platform: String = "android",
-    ): String = withContext(Dispatchers.IO) {
+    ): String = GomobileCallGate.enter {
         native.fetchWebAppInitData(botUsername, webAppShortName, hostedHttpsUrl, platform)
     }
 
     /** DMs [username] with [text]; returns next '!' framed reply (Sushi /initbot). */
     suspend fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Int): String =
-        withContext(Dispatchers.IO) { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
+        GomobileCallGate.enter { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
+
+    /** DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress
+     *  reports) — see mobile.Client.SendTextFireAndForget. */
+    suspend fun sendTextFireAndForget(username: String, text: String) =
+        GomobileCallGate.enter { native.sendTextFireAndForget(username, text) }
 
     /** Clicks a session account through main-bot's onboarding conversation (Sushi /initbot). */
     suspend fun ensureMainBotOnboarded(username: String, timeoutMs: Int) =
-        withContext(Dispatchers.IO) { native.ensureMainBotOnboarded(username, timeoutMs.toLong()) }
+        GomobileCallGate.enter { native.ensureMainBotOnboarded(username, timeoutMs.toLong()) }
 
     /** Fire-and-forget from the caller's perspective — mirrors TdlibClient.close(). */
     fun close() {
-        runCatching { native.close() }
+        runCatching { runBlocking { GomobileCallGate.enter { native.close() } } }
     }
 }

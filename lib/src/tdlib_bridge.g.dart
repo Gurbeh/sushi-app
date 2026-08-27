@@ -940,6 +940,34 @@ class OxTdlibBridgeApi {
     }
   }
 
+  /// DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
+  /// wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
+  /// best-effort watch-progress report). Returns once the message is sent; unlike
+  /// [sendTextAndWaitReply] it never blocks on a server reply, so it cannot stall the caller
+  /// waiting on one that is never coming.
+  Future<void> sendTextFireAndForget(String username, String text) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextFireAndForget$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[username, text]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
+
   /// Clicks a session account through main-bot's onboarding conversation (language, quality,
   /// audio, then login) by pressing the first inline button offered at each step, so `/initbot`
   /// has a binding to read afterward without a human tapping through Telegram by hand. No-op for

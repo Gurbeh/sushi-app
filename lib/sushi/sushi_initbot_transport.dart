@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/sushi/sushi_assignment_pb.dart';
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
@@ -144,16 +145,16 @@ abstract final class SushiAssignmentStore {
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   assert(SushiConfig.isEnabled);
 
-  // Click through main-bot's onboarding now (no-op for a bot-token login) so a fresh identity has
-  // something for /initbot to read, instead of asking the person to go find and message main-bot
-  // by hand in Telegram.
-  try {
-    await sushiEnsureMainBotOnboarded(
-      username: SushiConfig.mainBotUsername,
-      timeoutMs: 90000,
-    );
-  } catch (e) {
-    debugPrint('[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
+  final botSession = await OxplayerTdlibBridgeController.instance().isNativeSessionActuallyBot();
+  if (!botSession) {
+    try {
+      await sushiEnsureMainBotOnboarded(
+        username: SushiConfig.mainBotUsername,
+        timeoutMs: 90000,
+      );
+    } catch (e) {
+      debugPrint('[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
+    }
   }
 
   return sushiRefreshInitbot();
@@ -203,6 +204,12 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
     return assignment;
   } catch (e, st) {
     debugPrint('[sushi] initbot failed: $e\n$st');
+    // Keep a working assignment. USER_IS_BOT (bot session DMing an API bot) used to overwrite
+    // it with stubPending, after which home skipped fetch entirely ("no assignment yet").
+    final previous = await SushiAssignmentStore.load();
+    if (previous != null && !previous.pending && previous.apiBotUsername.isNotEmpty) {
+      return previous;
+    }
     final pending = SushiAssignment.stubPending(reason: e.toString());
     await SushiAssignmentStore.save(pending);
     return pending;
@@ -216,14 +223,17 @@ bool _sushiColdStartInitbotDone = false;
 /// reactive half here, once: after enough consecutive failures talking to the assigned API bot,
 /// the bridge queue calls back into [sushiRefreshInitbot] on its own (docs/02 §6-7 — a bound bot
 /// that has stopped answering).
-void sushiRefreshInitbotOnColdStart() {
-  if (_sushiColdStartInitbotDone) return;
+void sushiRefreshInitbotOnColdStart({void Function()? onReady}) {
+  if (_sushiColdStartInitbotDone) {
+    onReady?.call();
+    return;
+  }
   _sushiColdStartInitbotDone = true;
   onRepeatedSendFailure = () {
     debugPrint('[sushi] repeated send failures — refreshing /initbot');
     unawaited(sushiRefreshInitbot());
   };
-  unawaited(sushiRefreshInitbot());
+  unawaited(sushiRefreshInitbot().then((_) => onReady?.call()));
 }
 
 /// Parse `!` + base64url(envelope); decode Assignment protobuf when type == 15.

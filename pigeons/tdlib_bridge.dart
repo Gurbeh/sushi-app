@@ -257,6 +257,14 @@ abstract class OxTdlibBridgeApi {
   @async
   String sendTextAndWaitReply(String username, String text, int timeoutMs);
 
+  /// DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
+  /// wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
+  /// best-effort watch-progress report). Returns once the message is sent; unlike
+  /// [sendTextAndWaitReply] it never blocks on a server reply, so it cannot stall the caller
+  /// waiting on one that is never coming.
+  @async
+  void sendTextFireAndForget(String username, String text);
+
   /// Clicks a session account through main-bot's onboarding conversation (language, quality,
   /// audio, then login) by pressing the first inline button offered at each step, so `/initbot`
   /// has a binding to read afterward without a human tapping through Telegram by hand. No-op for

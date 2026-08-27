@@ -18,12 +18,14 @@ import app.oxplayer.tdlibbridge.auth.TdlibAuthState
 import app.oxplayer.tdlibbridge.media.OxTelegramFileFetcher
 import app.oxplayer.tdlibbridge.player.OxTelegramStreamBridge
 import app.oxplayer.tdlibbridge.player.TdlibHttpBridgeServer
+import app.oxplayer.tdlibbridge.session.GomobileCallGate
 import app.oxplayer.tdlibbridge.session.OxTelegramClient
 import app.oxplayer.tdlibbridge.session.OxTelegramSessionStorage
 import io.flutter.plugin.common.BinaryMessenger
 import mobile.ConnectionSink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -102,6 +104,11 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
      *  through an explicit id instead. */
     @Volatile
     private var currentPlaybackFileId: Int? = null
+
+    /** Last closeAfterPlayback job — protocol calls join this so sendText cannot enter JNI while
+     *  PlaybackSession.close is still in flight after ExoPlayer.release. */
+    @Volatile
+    private var playbackTeardown: Job? = null
 
     /** mpv/mdk path (see TdlibHttpBridgeServer doc) — created once, outlives individual
      *  OxTelegramClient instances; always reads whichever session is live at request time. */
@@ -311,6 +318,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         scope.launch {
             Log.i("OXPLAY_TDLIB", "startPlaybackSession coroutine started")
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 // Revive a dead run loop before asking it for bytes. Without this the download
                 // fails deep inside gotd with "waitSession: connection dead", which surfaces as an
@@ -331,7 +339,10 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
                 val fileId = playbackIdCounter.incrementAndGet()
                 fetchers[fileId] = OxTelegramFileFetcher(session)
                 currentPlaybackFileId = fileId
-                Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=$fileId size=${session.size()} mime=${session.mimeType()}")
+                val (size, mime) = GomobileCallGate.enter {
+                    session.size() to session.mimeType()
+                }
+                Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=$fileId size=$size mime=$mime")
                 when {
                     !source.preferHttpBridge -> "tdlib-file://${fileId}"
                     OX_TELEGRAM_STREAM_CB_ENABLED -> {
@@ -382,6 +393,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     override fun warmDelivery(source: OxTdlibPlaybackSource, callback: (Result<Unit>) -> Unit) {
         scope.launch {
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 oxClient.warmDelivery(source.providerBotId, source.messageId, source.locator)
             }.fold(
@@ -403,6 +415,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
     ) {
         scope.launch {
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 val json = bots.joinToString(prefix = "[", postfix = "]") { bot ->
                     """{"id":${bot.id},"username":${JSONObject.quote(bot.username)}}"""
@@ -454,6 +467,10 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         closeAfterPlayback(fileId)
     }
 
+    private suspend fun awaitPlaybackTeardown() {
+        playbackTeardown?.join()
+    }
+
     /**
      * Release one finished playback session, keeping the MTProto client alive (see this object's
      * doc for why that split matters).
@@ -471,7 +488,11 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
             Log.i("OXPLAY_TDLIB", "closeAfterPlayback fileId=$fileId — already released, no-op")
             return
         }
-        scope.launch { runCatching { fetcher.close() } }
+        val previous = playbackTeardown
+        playbackTeardown = scope.launch {
+            previous?.join()
+            runCatching { fetcher.close() }
+        }
         Log.i(
             "OXPLAY_TDLIB",
             "closeAfterPlayback fileId=$fileId — session closed, client kept alive " +
@@ -488,6 +509,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         Log.i("OXPLAY_TDLIB", "fetchWebAppInitData botUsername=$botUsername webAppShortName=$webAppShortName hostedHttpsUrl=$hostedHttpsUrl")
         scope.launch {
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 oxClient.fetchWebAppInitData(botUsername, webAppShortName ?: "", hostedHttpsUrl ?: "")
             }.fold(
@@ -512,6 +534,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         Log.i("OXPLAY_TDLIB", "sendTextAndWaitReply username=$username timeoutMs=$timeoutMs")
         scope.launch {
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 oxClient.sendTextAndWaitReply(username, text, timeoutMs.toInt())
             }.fold(
@@ -527,6 +550,30 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         }
     }
 
+    override fun sendTextFireAndForget(
+        username: String,
+        text: String,
+        callback: (Result<Unit>) -> Unit,
+    ) {
+        Log.i("OXPLAY_TDLIB", "sendTextFireAndForget username=$username")
+        scope.launch {
+            runCatching {
+                awaitPlaybackTeardown()
+                val oxClient = client ?: notConfigured()
+                oxClient.sendTextFireAndForget(username, text)
+            }.fold(
+                onSuccess = {
+                    Log.i("OXPLAY_TDLIB", "sendTextFireAndForget OK")
+                    replyOnMain(callback, Result.success(Unit))
+                },
+                onFailure = { error ->
+                    Log.e("OXPLAY_TDLIB", "sendTextFireAndForget FAILED", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
+            )
+        }
+    }
+
     override fun ensureMainBotOnboarded(
         username: String,
         timeoutMs: Long,
@@ -535,6 +582,7 @@ object TdlibBridgeObject : OxTdlibBridgeApi {
         Log.i("OXPLAY_TDLIB", "ensureMainBotOnboarded username=$username timeoutMs=$timeoutMs")
         scope.launch {
             runCatching {
+                awaitPlaybackTeardown()
                 val oxClient = client ?: notConfigured()
                 oxClient.ensureMainBotOnboarded(username, timeoutMs.toInt())
             }.fold(

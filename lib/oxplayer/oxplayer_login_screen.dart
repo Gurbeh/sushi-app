@@ -433,7 +433,9 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                                   child: TextButton(
                                                     onPressed: () => setState(() => _useMainBot = true),
                                                     child: Text(
-                                                      "Don't want to link your Telegram account? Sign in with @${OxplayerEnv.botUsername ?? 'main-bot'} instead",
+                                                      SushiConfig.isEnabled
+                                                          ? "Don't want to link your Telegram account? Sign in with a personal bot instead"
+                                                          : "Don't want to link your Telegram account? Sign in with @${OxplayerEnv.botUsername ?? 'main-bot'} instead",
                                                       textAlign: TextAlign.center,
                                                     ),
                                                   ),

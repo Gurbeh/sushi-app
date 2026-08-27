@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
@@ -33,12 +35,21 @@ void Function()? onRepeatedSendFailure;
 const _repeatedFailureThreshold = 2;
 int _consecutiveSendFailures = 0;
 
+/// Total [sushiSendTextAndWaitReply] calls since launch (or the last [sushiResetRequestCounter]) —
+/// every Sushi wire command funnels through this one function, so this is a single, reliable place
+/// to catch "over-requesting our bots" regressions without adding logging at every call site. Read
+/// by the Sushi e2e suite (integration_test/sushi_e2e_test.dart); harmless in production.
+int sushiRequestCount = 0;
+
+void sushiResetRequestCounter() => sushiRequestCount = 0;
+
 Future<String> sushiSendTextAndWaitReply({
   required String username,
   required String text,
   required int timeoutMs,
 }) async {
   final controller = OxplayerTdlibBridgeController.instance();
+  sushiRequestCount++;
   try {
     final reply = await _enqueue(
       () => controller.sendTextAndWaitReply(username: username, text: text, timeoutMs: timeoutMs),
@@ -46,6 +57,13 @@ Future<String> sushiSendTextAndWaitReply({
     _consecutiveSendFailures = 0;
     return reply;
   } catch (e) {
+    final msg = e.toString();
+    // Bot-to-bot is a session-identity problem, not a dead API bot. Refreshing /initbot here
+    // wiped a good assignment and left home empty.
+    if (msg.contains('USER_IS_BOT')) {
+      debugPrint('[sushi] send failed USER_IS_BOT — session is a bot; need phone/QR user login');
+      rethrow;
+    }
     _consecutiveSendFailures++;
     if (_consecutiveSendFailures >= _repeatedFailureThreshold) {
       _consecutiveSendFailures = 0;
@@ -53,6 +71,17 @@ Future<String> sushiSendTextAndWaitReply({
     }
     rethrow;
   }
+}
+
+/// Sends [text] to [username] without waiting for a reply (Sushi `/ack`, future watch-progress
+/// reports). Still routed through the same queue as every other Sushi call — the underlying native
+/// call crosses into the same gomobile client, so it must stay serialized against them — but it
+/// resolves as soon as the send completes, never blocking on a reply that is not coming. Counted in
+/// [sushiRequestCount] like every other wire call.
+Future<void> sushiSendTextFireAndForget({required String username, required String text}) {
+  final controller = OxplayerTdlibBridgeController.instance();
+  sushiRequestCount++;
+  return _enqueue(() => controller.sendTextFireAndForget(username: username, text: text));
 }
 
 Future<void> sushiEnsureMainBotOnboarded({required String username, required int timeoutMs}) {

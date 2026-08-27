@@ -4,8 +4,11 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/providers/items/person_details_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
@@ -30,14 +33,31 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   late final providerID = personDetailsProvider(widget.person.id);
 
   @override
+  void initState() {
+    super.initState();
+    if (SushiConfig.isEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(providerID.notifier).fetchPerson(widget.person);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final details = ref.watch(providerID);
+    final details = SushiConfig.isEnabled
+        ? (ref.watch(providerID) ?? sushiPersonModel(widget.person))
+        : ref.watch(providerID);
+    final face = details?.images?.primary ?? widget.person.image;
     return DetailScaffold(
-      label: details?.name ?? "",
+      label: (details?.name.isNotEmpty ?? false) ? details!.name : widget.person.name,
+      item: details,
       onRefresh: () async {
         await ref.read(providerID.notifier).fetchPerson(widget.person);
       },
-      backDrops: [...?details?.movies, ...?details?.series].random().firstOrNull?.images,
+      backDrops: SushiConfig.isEnabled && face != null
+          ? ImagesData(primary: face, backDrop: [face])
+          : [...?details?.movies, ...?details?.series].random().firstOrNull?.images,
       content: (context, padding) => Column(
         mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,8 +84,9 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     aspectRatio: 0.70,
                     child: FladderImage(
                       fit: BoxFit.cover,
-                      placeHolder: placeHolder(details?.name ?? ""),
-                      image: details?.images?.primary,
+                      placeHolder: placeHolder(
+                          (details?.name.isNotEmpty ?? false) ? details!.name : widget.person.name),
+                      image: details?.images?.primary ?? widget.person.image,
                     ),
                   ),
                 ),
@@ -76,17 +97,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Flexible(child: Text(details?.name ?? "", style: Theme.of(context).textTheme.displaySmall)),
-                          const SizedBox(width: 15),
-                          SelectableIconButton(
-                            onPressed: () => ref.read(providerID.notifier).toggleFavorite(),
-                            selected: (details?.userData.isFavourite ?? false),
-                            selectedIcon: Icons.favorite_rounded,
-                            icon: Icons.favorite_border_rounded,
-                          ),
+                          Flexible(
+                              child: Text(
+                            (details?.name.isNotEmpty ?? false) ? details!.name : widget.person.name,
+                            style: Theme.of(context).textTheme.displaySmall,
+                          )),
+                          if (!SushiConfig.isEnabled) ...[
+                            const SizedBox(width: 15),
+                            SelectableIconButton(
+                              onPressed: () => ref.read(providerID.notifier).toggleFavorite(),
+                              selected: (details?.userData.isFavourite ?? false),
+                              selectedIcon: Icons.favorite_rounded,
+                              icon: Icons.favorite_border_rounded,
+                            ),
+                          ],
                         ],
                       ),
                     ),
+                    if (SushiConfig.isEnabled && (details?.overview.summary.isNotEmpty ?? false))
+                      Text(details!.overview.summary),
                     if (details?.dateOfBirth != null)
                       Text(context.localized.personBirthday(
                           DateFormat.yMEd(context.localized.localeName).format(details!.dateOfBirth!).toString())),

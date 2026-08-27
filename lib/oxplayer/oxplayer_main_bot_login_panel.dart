@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
+import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart';
@@ -14,19 +17,17 @@ import 'package:fladder/oxplayer/oxplayer_main_bot_login_api.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
+import 'package:fladder/sushi/sushi_bot_login_code.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_initbot_transport.dart';
+import 'package:fladder/sushi/sushi_local_account.dart';
 import 'package:fladder/theme.dart';
 
-/// Sign-in via @main-bot instead of TDLib phone/QR — for users who don't want to give OXPlayer
-/// access to their personal Telegram account. The user approves a login attempt in Telegram
-/// (tapping the deep-link/QR opens the bot with a Yes/No prompt, or they type the code shown
-/// here into the bot); once approved, this polls the same way the TDLib flow polls
-/// /auth/telegram — see oxplayer-be apps/api/internal/server/auth_login_attempt.go.
+/// Sign-in without a personal Telegram user session.
 ///
-/// This does NOT log the native Telegram bridge into the user's own account at all. Right after
-/// the OX session is established, it separately tries to fetch+apply a personal bot token (set
-/// via /connectbot in Telegram) so native playback works — if that isn't set up yet, sign-in
-/// still succeeds; playback will just prompt the user to finish /connectbot when they try to
-/// play something (see apps/api's forwardPublicPlaybackToUserBot error message).
+/// OXPlayer: approve a login-attempt in @main-bot, poll `/auth/login-attempt`.
+/// Sushi: open main-bot (`?start=ac_<nonce>`). BotFather walkthrough is ForceReply in Telegram;
+/// then a monospace `s1.` code — paste that here, never the raw token.
 class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
   const OxplayerMainBotLoginPanel({required this.onSuccess, this.onBack, super.key});
 
@@ -39,22 +40,100 @@ class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
 
 class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLoginPanel> {
   final _api = OxplayerMainBotLoginApi();
+  final _tokenController = TextEditingController();
   OxplayerLoginAttemptStart? _attempt;
   String? _error;
-  bool _starting = true;
+  bool _starting = !SushiConfig.isEnabled;
   bool _finishing = false;
   int _pollGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_start());
+    _tokenController.addListener(_onSushiCodeChanged);
+    if (!SushiConfig.isEnabled) {
+      unawaited(_start());
+    }
   }
 
   @override
   void dispose() {
-    _pollGeneration++; // stop any in-flight poll loop from acting after unmount
+    _pollGeneration++;
+    _tokenController.removeListener(_onSushiCodeChanged);
+    _tokenController.dispose();
     super.dispose();
+  }
+
+  void _onSushiCodeChanged() {
+    if (!SushiConfig.isEnabled || _finishing) return;
+    final token = sushiTryParseBotLoginCode(_tokenController.text);
+    if (token == null) return;
+    unawaited(_submitSushiBotToken(token));
+  }
+
+  Future<void> _pasteSushiCode() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isEmpty) {
+      final fa = Localizations.localeOf(context).languageCode == 'fa';
+      setState(() => _error = fa ? 'کلیپ‌بورد خالیه' : 'Clipboard is empty');
+      return;
+    }
+    _tokenController.text = text;
+    if (sushiTryParseBotLoginCode(text) == null) {
+      final fa = Localizations.localeOf(context).languageCode == 'fa';
+      setState(() => _error = fa
+          ? 'این کد اپ نیست. کادر تلگرام رو کپی کن، نه توکن BotFather.'
+          : 'That is not an app code. Copy the boxed code from Telegram, not the BotFather token.');
+    }
+  }
+
+  String _sushiInitbotNotReady(SushiAssignment assignment) {
+    final fa = Localizations.localeOf(context).languageCode == 'fa';
+    final blob = assignment.rawReply.toLowerCase();
+    if (blob.contains('user_is_bot') || blob.contains("can't send messages to other bots")) {
+      return fa
+          ? 'باتت هنوز نمی‌تونه به بات سوشی پیام بده. تو @BotFather روی همون بات، Bot to Bot Communication Mode رو روشن کن، بعد از تلگرام کد جدید بگیر.'
+          : 'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then copy a fresh code from Telegram.';
+    }
+    return fa
+        ? 'هنوز آماده نیست. تو تلگرام راهنما رو تموم کن، کد رو کپی کن، دوباره بچسبون.'
+        : 'Not ready yet. Finish setup in Telegram, copy the code, then try again.';
+  }
+
+  Future<void> _submitSushiBotToken(String token) async {
+    if (_finishing) return;
+    setState(() {
+      _finishing = true;
+      _error = null;
+    });
+    try {
+      await OxplayerTdlibBridgeController.instance().ensureBotTokenSession(token);
+      final assignment = await sushiRunInitbotAfterTdlibReady();
+      if (assignment.pending || assignment.apiBotUsername.isEmpty) {
+        throw StateError(_sushiInitbotNotReady(assignment));
+      }
+      final account = await sushiEnsureLocalAccount(ref);
+      await OxplayerOxLoginKindStore.save(accountId: account.id, kind: OxplayerOxLoginKind.bot);
+      await widget.onSuccess();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _finishing = false;
+        if (e is StateError) {
+          _error = e.message;
+        } else if (e is OxplayerLoginAttemptException) {
+          _error = e.message;
+        } else {
+          _error = oxTdlibAuthUserMessage(e);
+        }
+      });
+    }
+  }
+
+  Future<void> _openMainBotForAppCode() async {
+    await OxplayerDotenv.ensureLoaded();
+    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl()), mode: LaunchMode.externalApplication);
   }
 
   /// [silent]: background auto-refresh (see _pollLoop) — swap in a fresh code/QR without
@@ -78,10 +157,6 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
       if (!mounted) return;
       setState(() {
         _starting = false;
-        // Clear rather than leave a stale QR/code on screen next to the error — this only
-        // reaches the user after createAttempt itself repeatedly failed (see _pollLoop), so any
-        // previously-shown attempt is either already spent or about to be, and re-showing it
-        // would invite tapping "Open Telegram to approve" on something dead.
         _attempt = null;
         _error = e is OxplayerLoginAttemptException ? e.message : 'Could not start sign-in';
       });
@@ -97,8 +172,6 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
     var consecutiveFailures = 0;
     while (mounted && generation == _pollGeneration) {
       if (deadline.difference(DateTime.now()) <= _refreshMargin) {
-        // Like a QR code on a device-linking screen, mint a fresh one before this one goes
-        // stale rather than making the user notice it expired and tap Retry themselves.
         unawaited(_start(silent: true));
         return;
       }
@@ -106,21 +179,11 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
         final result = await _api.poll(attemptId: attempt.attemptId, deviceId: deviceId);
         if (!mounted || generation != _pollGeneration) return;
         consecutiveFailures = 0;
-        if (result.isPending) continue; // server itself long-polled ~55s already
+        if (result.isPending) continue;
         await _finish(result);
         return;
       } catch (e) {
         if (!mounted || generation != _pollGeneration) return;
-        // The user is normally mid-flow here — off in Telegram approving, then off in
-        // BotFather creating a bot, which easily takes minutes and regularly causes the app to
-        // be backgrounded (a transient network/socket error on resume, not a real failure) —
-        // and if they take long enough, the attempt itself can go stale server-side
-        // (expired/not-found/already-used, surfaced as OxplayerLoginAttemptException). Both are
-        // expected here, not user error: retry a few times with backoff, then fall back to
-        // silently minting a fresh attempt (same as the pre-emptive refresh above) instead of
-        // ever dead-ending on a "Retry" button showing a now-possibly-stale QR/code — reported
-        // as a real bug (approve link said "expired" after the round trip, with no way back
-        // except noticing a small text link).
         consecutiveFailures++;
         if (consecutiveFailures <= 6) {
           await Future<void>.delayed(Duration(seconds: consecutiveFailures.clamp(1, 5)));
@@ -147,10 +210,6 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
       await _applyBotTokenIfConnected(account.credentials.token);
       await widget.onSuccess();
     } catch (e) {
-      // The server already consumed this attempt (that's how we got a completed `result` to
-      // apply) — it can't be retried, so the only real recovery is a whole new attempt. Restart
-      // automatically rather than leaving the user stuck on a dead QR/code they'd have to
-      // notice needs a manual Retry tap.
       if (mounted) {
         setState(() => _finishing = false);
         unawaited(_start());
@@ -164,9 +223,7 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
     if (accessToken == null || accessToken.isEmpty) return;
     try {
       await oxplayerEnsureTdlibMatchesOxUser(accessToken);
-    } catch (_) {
-      // Non-fatal — play path re-checks and surfaces /connectbot if still missing.
-    }
+    } catch (_) {}
   }
 
   Future<void> _openBot() async {
@@ -182,12 +239,121 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
     final theme = Theme.of(context);
 
     if (_finishing || _starting) {
-      // Both states are the same underlying wait from the user's perspective: _starting is
-      // before an attempt link can even be requested, _finishing is applying the bot token
-      // after approval — see the widget's doc for why this needs to be more than a spinner.
       return const OxplayerTdlibConnectingExperience();
     }
 
+    if (SushiConfig.isEnabled) {
+      return _buildSushi(theme);
+    }
+    return _buildOx(theme);
+  }
+
+  static const _sushiSalmon = Color(0xFFE37A42);
+
+  ButtonStyle get _sushiFill => FilledButton.styleFrom(
+        backgroundColor: _sushiSalmon,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: _sushiSalmon.withValues(alpha: 0.4),
+        disabledForegroundColor: Colors.white70,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        minimumSize: const Size.fromHeight(52),
+      );
+
+  Widget _buildSushi(ThemeData theme) {
+    final fa = Localizations.localeOf(context).languageCode == 'fa';
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          fa ? 'ورود با بات خودت' : 'Sign in with a bot you own',
+          style: theme.textTheme.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        _sushiStep(theme, fa ? '۱' : '1', fa
+            ? 'دکمهٔ نارنجی رو بزن تا تلگرام باز بشه.'
+            : 'Tap the salmon button to open Telegram.'),
+        _sushiStep(theme, fa ? '۲' : '2', fa
+            ? 'تو BotFather بات بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن — تو اپ نچسبون.'
+            : 'In BotFather: create a bot, turn on Bot-to-Bot, reply with the token there — never paste it in the app.'),
+        _sushiStep(theme, fa ? '۳' : '3', fa
+            ? 'کادر کد (s1.) رو کپی کن و اینجا بچسبون. اپ خودش وارد می‌شه.'
+            : 'Copy the boxed code (s1.) and paste it here. Sushi signs in on a valid code.'),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          autofocus: true,
+          style: _sushiFill,
+          onPressed: () => unawaited(_openMainBotForAppCode()),
+          icon: const Icon(IconsaxPlusLinear.send_2),
+          label: Text(fa ? 'باز کردن تلگرام' : 'Open Telegram'),
+        ),
+        const SizedBox(height: 16),
+        OxplayerDpadTextField(
+          controller: _tokenController,
+          label: fa ? 'کد اپ' : 'App code',
+          hint: 's1.…',
+          textInputAction: TextInputAction.done,
+        ),
+        const SizedBox(height: 10),
+        FilledButton.icon(
+          style: _sushiFill,
+          onPressed: () => unawaited(_pasteSushiCode()),
+          icon: const Icon(IconsaxPlusLinear.copy),
+          label: Text(fa ? 'چسباندن کد' : 'Paste code'),
+        ),
+        if (widget.onBack != null) ...[
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: widget.onBack,
+            icon: const Icon(IconsaxPlusLinear.arrow_left_2, size: 18),
+            label: Text(fa ? 'با اکانت تلگرام وارد شو' : 'Use my Telegram account instead'),
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+            style: muted?.copyWith(color: theme.colorScheme.error) ??
+                TextStyle(color: theme.colorScheme.error),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _sushiStep(ThemeData theme, String n, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: _sushiSalmon, shape: BoxShape.circle),
+            child: Text(
+              n,
+              style: theme.textTheme.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(text, style: theme.textTheme.bodyMedium),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOx(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

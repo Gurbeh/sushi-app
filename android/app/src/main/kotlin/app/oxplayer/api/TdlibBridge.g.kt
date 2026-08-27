@@ -501,6 +501,14 @@ interface OxTdlibBridgeApi {
    */
   fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Long, callback: (Result<String>) -> Unit)
   /**
+   * DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
+   * wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
+   * best-effort watch-progress report). Returns once the message is sent; unlike
+   * [sendTextAndWaitReply] it never blocks on a server reply, so it cannot stall the caller
+   * waiting on one that is never coming.
+   */
+  fun sendTextFireAndForget(username: String, text: String, callback: (Result<Unit>) -> Unit)
+  /**
    * Clicks a session account through main-bot's onboarding conversation (language, quality,
    * audio, then login) by pressing the first inline button offered at each step, so `/initbot`
    * has a binding to read afterward without a human tapping through Telegram by hand. No-op for
@@ -876,6 +884,26 @@ interface OxTdlibBridgeApi {
               } else {
                 val data = result.getOrNull()
                 reply.reply(TdlibBridgePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextFireAndForget$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val usernameArg = args[0] as String
+            val textArg = args[1] as String
+            api.sendTextFireAndForget(usernameArg, textArg) { result: Result<Unit> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(TdlibBridgePigeonUtils.wrapError(error))
+              } else {
+                reply.reply(TdlibBridgePigeonUtils.wrapResult(null))
               }
             }
           }

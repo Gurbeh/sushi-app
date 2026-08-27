@@ -10,6 +10,14 @@ import 'package:fladder/sushi/sushi_home_pb.dart';
 
 const _sushiTmdbIdPrefix = 'sushi_tmdb_';
 
+ImageData? sushiTmdbImage(String strippedPath, {required String key, String size = 'w500', String extension = 'jpg'}) {
+  if (strippedPath.isEmpty) return null;
+  return ImageData(
+    path: 'https://image.tmdb.org/t/p/$size/$strippedPath.$extension',
+    key: key,
+  );
+}
+
 /// Recovers the TMDB id from an id built by [sushiRowToItemBaseModel], or null if [itemId] isn't
 /// one of ours — the reverse of that function's `'sushi_tmdb_$tmdbId'`, needed wherever a screen
 /// only has the model's id and must ask `/item` for the rest (e.g. movies_details_provider.dart).

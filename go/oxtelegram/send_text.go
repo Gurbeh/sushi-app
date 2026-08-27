@@ -2,8 +2,11 @@ package oxtelegram
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,16 +22,22 @@ func (c *Client) SendTextToUsername(ctx context.Context, username, text string) 
 	return err
 }
 
-// SendTextAndWaitReply sends [text] to @[username] and waits for the next text reply from that
-// peer whose body starts with '!' (Sushi wire framing, docs/03). Used for `/initbot <corr>`.
-//
-// Starts the bot DM when empty (messages.startBot) so Telegram allows the bot to answer.
+// SendTextAndWaitReply sends [text] to @[username] and waits for the reply whose envelope corr
+// matches the corr embedded in [text] (docs/02 §3's `/<cmd> <corr>[ <args>]`, docs/03's wire
+// framing). Matching by corr, not merely "the next '!' message from this peer", matters because
+// every Sushi command (home/item/files/play/ack/...) goes through the same one assigned API bot:
+// without it, a reply that arrives after its own request has already timed out client-side gets
+// handed to whichever *different* request is waiting on that bot next -- confirmed live, request
+// content crossing between an in-flight /home and /files call. A request whose text carries no
+// parseable corr (SendTextToUsername's callers, or a malformed text) falls back to the old
+// peer-only match.
 func (c *Client) SendTextAndWaitReply(ctx context.Context, username, text string) (string, error) {
 	username = strings.TrimPrefix(strings.TrimSpace(username), "@")
 	text = strings.TrimSpace(text)
 	if username == "" || text == "" {
 		return "", fmt.Errorf("username and text required")
 	}
+	corr, _ := parseOutgoingCorr(text)
 
 	peer, userID, err := c.resolveInputPeerUser(ctx, username)
 	if err != nil {
@@ -39,19 +48,11 @@ func (c *Client) SendTextAndWaitReply(ctx context.Context, username, text string
 		log.Printf("oxtelegram: ensureBotDialog @%s: %v (continuing send)", username, err)
 	}
 
-	waitCh := c.registerTextWaiter(userID)
-	defer c.unregisterTextWaiter(userID, waitCh)
+	waitCh := c.registerTextWaiter(userID, corr)
+	defer c.unregisterTextWaiter(userID, corr, waitCh)
 
-	api := c.API()
-	if api == nil {
-		return "", fmt.Errorf("client not configured")
-	}
-	if _, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-		Peer:     peer,
-		Message:  text,
-		RandomID: cryptoRandomID(),
-	}); err != nil {
-		return "", fmt.Errorf("MessagesSendMessage: %w", err)
+	if err := c.dispatchTextSend(ctx, peer, username, text); err != nil {
+		return "", err
 	}
 
 	timeout := textReplyWaitTimeout
@@ -86,16 +87,8 @@ func (c *Client) sendTextToUsername(ctx context.Context, username, text string) 
 	if err != nil {
 		return nil, err
 	}
-	api := c.API()
-	if api == nil {
-		return nil, fmt.Errorf("client not configured")
-	}
-	if _, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
-		Peer:     peer,
-		Message:  text,
-		RandomID: cryptoRandomID(),
-	}); err != nil {
-		return nil, fmt.Errorf("MessagesSendMessage: %w", err)
+	if err := c.dispatchTextSend(ctx, peer, username, text); err != nil {
+		return nil, err
 	}
 	return peer, nil
 }
@@ -127,6 +120,9 @@ func (c *Client) resolveInputPeerUser(ctx context.Context, username string) (*tg
 }
 
 func (c *Client) ensureBotDialog(ctx context.Context, peer *tg.InputPeerUser, userID int64, username string) error {
+	if c.Auth != nil && c.Auth.IsBotMode() {
+		return nil
+	}
 	api := c.API()
 	if api == nil {
 		return fmt.Errorf("client not configured")
@@ -151,53 +147,75 @@ func (c *Client) ensureBotDialog(ctx context.Context, peer *tg.InputPeerUser, us
 	return nil
 }
 
-// --- text reply waiters (keyed by peer user id) ---
+// --- text reply waiters (keyed by peer user id + the request's own corr) ---
+//
+// corr disambiguates which in-flight request a reply belongs to when several go to the same bot
+// (every Sushi command shares the one assigned API bot) — see SendTextAndWaitReply's doc for the
+// cross-talk this fixes. A zero corr is a real, valid key (docs/03's push corr, and any caller that
+// could not parse one) — waiters are still matched exactly, just among themselves.
+
+type textWaiterKey struct {
+	peerID int64
+	corr   int64
+}
 
 func (c *Client) ensureTextWaiterMaps() {
 	if c.textWaiters == nil {
-		c.textWaiters = make(map[int64]chan string)
+		c.textWaiters = make(map[textWaiterKey]chan string)
 	}
 	if c.textArrived == nil {
-		c.textArrived = make(map[int64]string)
+		c.textArrived = make(map[textWaiterKey]string)
 	}
 }
 
-func (c *Client) registerTextWaiter(peerID int64) chan string {
+func (c *Client) registerTextWaiter(peerID, corr int64) chan string {
+	key := textWaiterKey{peerID, corr}
 	ch := make(chan string, 1)
 	c.textMu.Lock()
 	defer c.textMu.Unlock()
 	c.ensureTextWaiterMaps()
-	if early, ok := c.textArrived[peerID]; ok {
-		delete(c.textArrived, peerID)
+	if early, ok := c.textArrived[key]; ok {
+		delete(c.textArrived, key)
 		ch <- early
 		return ch
 	}
-	if existing, ok := c.textWaiters[peerID]; ok {
+	if existing, ok := c.textWaiters[key]; ok {
 		return existing
 	}
-	c.textWaiters[peerID] = ch
+	c.textWaiters[key] = ch
 	return ch
 }
 
-func (c *Client) unregisterTextWaiter(peerID int64, ch chan string) {
+func (c *Client) unregisterTextWaiter(peerID, corr int64, ch chan string) {
+	key := textWaiterKey{peerID, corr}
 	c.textMu.Lock()
 	defer c.textMu.Unlock()
-	if cur, ok := c.textWaiters[peerID]; ok && cur == ch {
-		delete(c.textWaiters, peerID)
+	if cur, ok := c.textWaiters[key]; ok && cur == ch {
+		delete(c.textWaiters, key)
 	}
 }
 
-// deliverTextReply routes an incoming '!' framed reply to a waiter, or buffers one early arrival.
+// deliverTextReply routes an incoming '!' framed reply to the waiter whose corr it carries, or
+// buffers one early arrival. A reply whose corr cannot be decoded (malformed envelope) or that
+// matches no current waiter (already timed out, or a push nobody is watching for) is dropped
+// rather than guessed at -- silently discarding an occasional unmatched reply is far cheaper than
+// handing one request's answer to another's caller.
 func (c *Client) deliverTextReply(fromUserID int64, text string) {
 	text = strings.TrimSpace(text)
 	if fromUserID == 0 || text == "" || text[0] != '!' {
 		return
 	}
+	corr, ok := parseReplyCorr(text)
+	if !ok {
+		return
+	}
+	key := textWaiterKey{fromUserID, corr}
+
 	c.textMu.Lock()
 	defer c.textMu.Unlock()
 	c.ensureTextWaiterMaps()
-	if ch, ok := c.textWaiters[fromUserID]; ok {
-		delete(c.textWaiters, fromUserID)
+	if ch, ok := c.textWaiters[key]; ok {
+		delete(c.textWaiters, key)
 		select {
 		case ch <- text:
 		default:
@@ -205,7 +223,37 @@ func (c *Client) deliverTextReply(fromUserID int64, text string) {
 		return
 	}
 	// Buffer one early arrival (send raced ahead of register — unlikely but safe).
-	c.textArrived[fromUserID] = text
+	c.textArrived[key] = text
+}
+
+// parseOutgoingCorr reads the base36 corr out of a request line: "/<cmd> <corr>[ <args>]"
+// (docs/02 §3). ok is false for text that is not shaped like a Sushi request (e.g. a plain DM
+// sent through SendTextToUsername), in which case callers fall back to corr 0.
+func parseOutgoingCorr(text string) (int64, bool) {
+	fields := strings.Fields(text)
+	if len(fields) < 2 {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(fields[1], 36, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// parseReplyCorr reads the corr varint out of a reply envelope: "!" + base64url(no padding) of
+// (ver:u8, corr:varint, type:varint, flags:varint, payload) — docs/03-wire-format.md. Only the
+// header up to corr needs decoding here; type/flags/payload are the caller's concern.
+func parseReplyCorr(text string) (int64, bool) {
+	decoded, err := base64.RawURLEncoding.DecodeString(text[1:])
+	if err != nil || len(decoded) < 2 {
+		return 0, false
+	}
+	corr, n := binary.Uvarint(decoded[1:])
+	if n <= 0 {
+		return 0, false
+	}
+	return int64(corr), true
 }
 
 func textFromPrivateMessage(msg tg.MessageClass) (text string, fromUserID int64, ok bool) {

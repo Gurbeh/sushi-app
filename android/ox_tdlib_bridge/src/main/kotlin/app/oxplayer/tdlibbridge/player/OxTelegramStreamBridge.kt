@@ -1,6 +1,7 @@
 package app.oxplayer.tdlibbridge.player
 
 import android.util.Log
+import app.oxplayer.tdlibbridge.session.GomobileCallGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,6 +45,11 @@ private const val TAG = "OXPLAY_TDLIB"
  * on a fresh coroutine thread avoids the nesting: that thread only ever touches the gomobile
  * runtime, never liboxtelegramstream.so's. Every PlaybackSession call reachable from native must
  * go through this pattern — there is no safe direct call from native into PlaybackSession, ever.
+ *
+ * Those dispatched PlaybackSession calls also go through [GomobileCallGate]: ExoPlayer back +
+ * Sushi sendTextAndWaitReply reproduced `bulkBarrierPreWrite: unaligned arguments` when a stream
+ * JNI entry overlapped a protocol JNI entry. nativeOn*Complete stays *outside* the gate so the
+ * other Go runtime is never entered while the gomobile mutex is held.
  */
 object OxTelegramStreamBridge {
     init {
@@ -64,7 +70,7 @@ object OxTelegramStreamBridge {
      *  to keep in sync. Mirrors TdlibHttpBridgeServer.Register(fileId, source)'s exact shape. */
     fun registerSession(id: Int, session: PlaybackSession) {
         sessions[id] = session
-        Log.i(TAG, "OxTelegramStreamBridge.registerSession id=$id size=${runCatching { session.size() }.getOrNull()}")
+        Log.i(TAG, "OxTelegramStreamBridge.registerSession id=$id")
     }
 
     fun unregisterSession(id: Int) {
@@ -84,8 +90,9 @@ object OxTelegramStreamBridge {
         }
         scope.launch {
             try {
-                val path = session.localPath()
-                val size = session.size()
+                val (path, size) = GomobileCallGate.enter {
+                    session.localPath() to session.size()
+                }
                 nativeOnOpenSessionComplete(requestId, true, path, size)
             } catch (e: Exception) {
                 Log.w(TAG, "OxTelegramStreamBridge.openSessionAsync failed id=$id: ${e.message}")
@@ -108,7 +115,7 @@ object OxTelegramStreamBridge {
         }
         scope.launch {
             val success = try {
-                session.ensureAvailable(offset, length)
+                GomobileCallGate.enter { session.ensureAvailable(offset, length) }
                 true
             } catch (e: Exception) {
                 Log.w(TAG, "OxTelegramStreamBridge.ensureAvailableAsync failed id=$id offset=$offset length=$length: ${e.message}")
@@ -124,7 +131,7 @@ object OxTelegramStreamBridge {
     @JvmStatic
     fun cancelCurrentRead(id: Int) {
         val session = sessions[id] ?: return
-        scope.launch { runCatching { session.cancelCurrentRead() } }
+        scope.launch { runCatching { GomobileCallGate.enter { session.cancelCurrentRead() } } }
     }
 
     /** Implemented natively (go/oxtelegram/cshared_android/jni_bridge.go, registered via

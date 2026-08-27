@@ -300,6 +300,18 @@ func (c *Client) SendTextAndWaitReply(username, text string, timeoutMs int) (str
 	return c.inner.SendTextAndWaitReply(ctx, username, text)
 }
 
+// sendTextFireAndForgetTimeout bounds the send itself (peer resolve + startBot-if-needed +
+// sendMessage) — not a reply wait, since this call never waits for one.
+const sendTextFireAndForgetTimeout = 15 * time.Second
+
+// SendTextFireAndForget DMs [username] with [text] and returns once the message is sent, without
+// waiting for any reply — see oxtelegram.Client.SendTextToUsername.
+func (c *Client) SendTextFireAndForget(username, text string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTextFireAndForgetTimeout)
+	defer cancel()
+	return c.inner.SendTextToUsername(ctx, username, text)
+}
+
 // EnsureMainBotOnboarded clicks a session account through main-bot's onboarding conversation (see
 // oxtelegram.Client.EnsureMainBotOnboarded) so /initbot has a binding to read. timeoutMs bounds the
 // whole multi-step conversation, not one round trip (default 90000 when <= 0).

@@ -6,7 +6,6 @@ import 'package:fladder/sushi/sushi_play_pb.dart';
 import 'package:fladder/sushi/sushi_wire.dart';
 
 const _msgTypePlayRes = 10;
-const _msgTypeAckRes = 21;
 
 /// Sends `/play` for one file (docs/05 §3-4). Idempotent — an existing delivery row is returned
 /// as-is by the server, so calling this more than once for the same [fileId] is cheap and safe.
@@ -45,9 +44,10 @@ Future<SushiPlayRes?> sushiPlay({required int fileId, bool force = false, int mo
   }
 }
 
-/// Sends `/ack` reporting the message id the client actually saw (docs/05 §4, "does not wait for
-/// the server to acknowledge the ack" — callers should not await this before starting playback).
-/// Best-effort: a failure here only costs one redundant copy on a future play, never a broken one.
+/// Sends `/ack` reporting the message id the client actually saw (docs/05 §4). The server never
+/// replies to this command (nothing for the client to learn from its own report), so this is
+/// fire-and-forget — callers should not await this before starting playback. Best-effort: a
+/// failure here only costs one redundant copy on a future play, never a broken one.
 Future<void> sushiAck({required int fileId, required int messageId}) async {
   final assignment = await SushiAssignmentStore.load();
   if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) return;
@@ -56,15 +56,7 @@ Future<void> sushiAck({required int fileId, required int messageId}) async {
   final requestText = sushiEncodeRequestText('ack', corr, sushiEncodeAckReq(fileId: fileId, messageId: messageId));
 
   try {
-    final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
-      text: requestText,
-      timeoutMs: 15000,
-    );
-    final env = SushiEnvelope.decode(reply);
-    if (env.type != _msgTypeAckRes && env.type != SushiEnvelope.msgTypeErr) {
-      debugPrint('[sushi] ack: unexpected msgType=${env.type} (corr=${env.corr})');
-    }
+    await sushiSendTextFireAndForget(username: assignment.apiBotUsername, text: requestText);
   } catch (e) {
     debugPrint('[sushi] ack failed (non-fatal): $e');
   }
