@@ -161,16 +161,18 @@ class SushiFile {
 }
 
 class SushiPerson {
-  const SushiPerson({required this.name, required this.role, required this.profile});
+  const SushiPerson({required this.name, required this.role, required this.profile, this.tmdbId = 0});
 
   final String name;
   final String role;
   final String profile;
+  final int tmdbId;
 
   static SushiPerson decode(Uint8List bytes) {
     var name = '';
     var role = '';
     var profile = '';
+    var tmdbId = 0;
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -193,12 +195,101 @@ class SushiPerson {
           i = lenR.next;
           profile = utf8.decode(bytes.sublist(i, i + lenR.value));
           i += lenR.value;
+        case 4:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          tmdbId = v.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiPerson(name: name, role: role, profile: profile);
+    return SushiPerson(name: name, role: role, profile: profile, tmdbId: tmdbId);
   }
+}
+
+/// Decoded `sushi.v1.PersonRes`.
+class SushiPersonRes {
+  const SushiPersonRes({
+    required this.tmdbId,
+    required this.name,
+    required this.profile,
+    required this.biography,
+    required this.movies,
+    required this.series,
+  });
+
+  final int tmdbId;
+  final String name;
+  final String profile;
+  final String biography;
+  final List<SushiRow> movies;
+  final List<SushiRow> series;
+
+  static SushiPersonRes decode(Uint8List bytes) {
+    var tmdbId = 0;
+    var name = '';
+    var profile = '';
+    var biography = '';
+    final movies = <SushiRow>[];
+    final series = <SushiRow>[];
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final field = tagR.value >> 3;
+      final wire = tagR.value & 0x7;
+      switch (field) {
+        case 1:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          tmdbId = v.value;
+        case 2:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          name = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 3:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          profile = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 4:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          biography = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 5:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          movies.add(SushiRow.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        case 6:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          series.add(SushiRow.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
+      }
+    }
+    return SushiPersonRes(
+      tmdbId: tmdbId,
+      name: name,
+      profile: profile,
+      biography: biography,
+      movies: List.unmodifiable(movies),
+      series: List.unmodifiable(series),
+    );
+  }
+}
+
+Uint8List sushiEncodePersonReq({required int tmdbId}) {
+  final out = BytesBuilder();
+  if (tmdbId != 0) {
+    out.add(sushiUvarint((1 << 3) | 0));
+    out.add(sushiUvarint(tmdbId));
+  }
+  return out.toBytes();
 }
 
 /// Decoded `sushi.v1.ItemRes` — the title page (docs/12 §4).

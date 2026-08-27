@@ -23,6 +23,8 @@ import 'package:fladder/oxplayer/oxplayer_share_action.dart';
 import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/collections/add_to_collection.dart';
 import 'package:fladder/screens/metadata/edit_item.dart';
@@ -299,21 +301,38 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       ],
       if (!exclude.contains(ItemActions.setFavorite))
         ItemActionButton(
-          icon: Icon(oxFavorite ? IconsaxPlusLinear.heart_remove : IconsaxPlusLinear.heart_add),
+          icon: Icon(
+            (SushiConfig.isEnabled
+                    ? (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
+                    : oxFavorite)
+                ? IconsaxPlusLinear.heart_remove
+                : IconsaxPlusLinear.heart_add,
+          ),
           action: () async {
             try {
-              final newData = await ref.read(userProvider.notifier).setAsFavorite(!oxFavorite, id);
-              onUserDataChanged?.call(newData?.bodyOrThrow);
+              if (SushiConfig.isEnabled) {
+                final on = !(ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false);
+                await ref.read(sushiItemFlagsProvider.notifier).setFavorite(this, on);
+              } else {
+                final newData = await ref.read(userProvider.notifier).setAsFavorite(!oxFavorite, id);
+                onUserDataChanged?.call(newData?.bodyOrThrow);
+              }
             } finally {
               context.refreshData();
             }
           },
-          label: Text(oxFavorite ? context.localized.removeAsFavorite : context.localized.addAsFavorite),
+          label: Text(
+            (SushiConfig.isEnabled
+                    ? (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
+                    : oxFavorite)
+                ? context.localized.removeAsFavorite
+                : context.localized.addAsFavorite,
+          ),
         ),
-      ...(OxplayerConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled ? oxplayerWatchlistActions(context, ref, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled ? oxplayerMediaIssueActions(context, ref, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerWatchlistActions(context, ref, this) : const <ItemAction>[]),
+      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerMediaIssueActions(context, ref, this) : const <ItemAction>[]),
       ...otherActions,
       ItemActionDivider(),
       if (!exclude.contains(ItemActions.editMetaData) && isAdmin && !OxplayerConfig.isEnabled)

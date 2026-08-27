@@ -31,14 +31,16 @@ class PersonDetailScreen extends ConsumerStatefulWidget {
 
 class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
   late final providerID = personDetailsProvider(widget.person.id);
+  var _sushiFetchDone = false;
 
   @override
   void initState() {
     super.initState();
     if (SushiConfig.isEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        ref.read(providerID.notifier).fetchPerson(widget.person);
+        await ref.read(providerID.notifier).fetchPerson(widget.person);
+        if (mounted) setState(() => _sushiFetchDone = true);
       });
     }
   }
@@ -54,6 +56,7 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
       item: details,
       onRefresh: () async {
         await ref.read(providerID.notifier).fetchPerson(widget.person);
+        if (mounted && SushiConfig.isEnabled) setState(() => _sushiFetchDone = true);
       },
       backDrops: SushiConfig.isEnabled && face != null
           ? ImagesData(primary: face, backDrop: [face])
@@ -128,6 +131,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
             ),
           ),
           const SizedBox(height: 32),
+          if (SushiConfig.isEnabled &&
+              _sushiFetchDone &&
+              (details?.movies.isEmpty ?? true) &&
+              (details?.series.isEmpty ?? true))
+            Padding(
+              padding: padding,
+              child: Text(context.localized.noOverviewAvailable),
+            ),
           if (details?.movies.isNotEmpty ?? false)
             PosterRow(
               contentPadding: padding,

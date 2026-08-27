@@ -19,6 +19,7 @@ import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -138,15 +139,33 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     centerButtons: OxDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
-                        SelectableIconButton(
-                          onPressed: () async {
-                            await ref.read(userProvider.notifier).setAsFavorite(
-                                !details.userData.isFavourite, details.id);
-                          },
-                          selected: details.userData.isFavourite,
-                          selectedIcon: IconsaxPlusBold.heart,
-                          icon: IconsaxPlusLinear.heart,
-                        ),
+                        if (SushiConfig.isEnabled)
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                                  const SushiItemFlags();
+                              return SelectableIconButton(
+                                onPressed: () async {
+                                  await ref
+                                      .read(sushiItemFlagsProvider.notifier)
+                                      .setWatchLater(details, !flags.watchLater);
+                                },
+                                selected: flags.watchLater,
+                                selectedIcon: IconsaxPlusBold.clock,
+                                icon: IconsaxPlusLinear.clock,
+                              );
+                            },
+                          )
+                        else
+                          SelectableIconButton(
+                            onPressed: () async {
+                              await ref.read(userProvider.notifier).setAsFavorite(
+                                  !details.userData.isFavourite, details.id);
+                            },
+                            selected: details.userData.isFavourite,
+                            selectedIcon: IconsaxPlusBold.heart,
+                            icon: IconsaxPlusLinear.heart,
+                          ),
                         SelectableIconButton(
                           onPressed: () async {
                             await ref.read(userProvider.notifier).markAsPlayed(

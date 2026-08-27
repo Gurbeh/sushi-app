@@ -115,10 +115,18 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
   final people = [
     for (var i = 0; i < item.people.length; i++)
       Person(
-        id: 'sushi_person_${item.row.tmdbId}_$i',
+        id: item.people[i].tmdbId > 0
+            ? 'sushi_person_${item.people[i].tmdbId}'
+            : 'sushi_person_${item.row.tmdbId}_$i',
         name: item.people[i].name,
         role: item.people[i].role,
-        image: sushiTmdbImage(item.people[i].profile, key: 'sushi_person_${item.row.tmdbId}_$i', size: 'w185'),
+        image: sushiTmdbImage(
+          item.people[i].profile,
+          key: item.people[i].tmdbId > 0
+              ? 'sushi_person_${item.people[i].tmdbId}'
+              : 'sushi_person_${item.row.tmdbId}_$i',
+          size: 'w185',
+        ),
       ),
   ];
   final related = item.related.map(sushiRowToItemBaseModel).toList();
@@ -127,7 +135,9 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
   return base.copyWith(
     images: ImagesData(
       primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
-      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', extension: 'png') ?? base.images?.logo,
+      // Title logos are wide PNGs; w500 crops poorly in MediaHeader — use original.
+      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', size: 'original', extension: 'png') ??
+          base.images?.logo,
       backDrop: item.backdrop.isEmpty
           ? base.images?.backDrop
           : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
@@ -158,10 +168,18 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
   final people = [
     for (var i = 0; i < item.people.length; i++)
       Person(
-        id: 'sushi_person_${item.row.tmdbId}_$i',
+        id: item.people[i].tmdbId > 0
+            ? 'sushi_person_${item.people[i].tmdbId}'
+            : 'sushi_person_${item.row.tmdbId}_$i',
         name: item.people[i].name,
         role: item.people[i].role,
-        image: sushiTmdbImage(item.people[i].profile, key: 'sushi_person_${item.row.tmdbId}_$i', size: 'w185'),
+        image: sushiTmdbImage(
+          item.people[i].profile,
+          key: item.people[i].tmdbId > 0
+              ? 'sushi_person_${item.people[i].tmdbId}'
+              : 'sushi_person_${item.row.tmdbId}_$i',
+          size: 'w185',
+        ),
       ),
   ];
   final related = item.related.map(sushiRowToItemBaseModel).toList();
@@ -170,7 +188,8 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
   return base.copyWith(
     images: ImagesData(
       primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
-      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', extension: 'png') ?? base.images?.logo,
+      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', size: 'original', extension: 'png') ??
+          base.images?.logo,
       backDrop: item.backdrop.isEmpty
           ? base.images?.backDrop
           : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
@@ -204,22 +223,38 @@ void sushiRememberCollection(String itemId, String name, List<ItemBaseModel> ite
 ({String name, List<ItemBaseModel> items})? sushiCollectionFor(String itemId) =>
     _sushiCollections[itemId];
 
-/// Cast tap has no Jellyfin person id — paint name/photo/role from the title page.
-PersonModel sushiPersonModel(Person person) {
+/// Cast tap uses TMDB person id when present (`sushi_person_{tmdbId}`).
+PersonModel sushiPersonModel(Person person, {SushiPersonRes? page}) {
+  final movies = page?.movies.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
+  final series = page?.series.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
   return PersonModel(
-    name: person.name,
+    name: page?.name.isNotEmpty == true ? page!.name : person.name,
     id: person.id,
     birthPlace: const [],
-    movies: const [],
-    series: const [],
-    overview: OverviewModel(summary: person.role),
+    movies: movies.whereType<MovieModel>().toList(),
+    series: series.whereType<SeriesModel>().toList(),
+    overview: OverviewModel(
+      summary: page?.biography.isNotEmpty == true ? page!.biography : person.role,
+    ),
     parentId: null,
     playlistId: null,
-    images: ImagesData(primary: person.image),
-    childCount: 0,
+    images: ImagesData(
+      primary: page != null && page.profile.isNotEmpty
+          ? sushiTmdbImage(page.profile, key: person.id, size: 'w185')
+          : person.image,
+    ),
+    childCount: movies.length + series.length,
     primaryRatio: 0.667,
     userData: const UserData(),
   );
+}
+
+int? sushiPersonTmdbIdFromId(String id) {
+  const prefix = 'sushi_person_';
+  if (!id.startsWith(prefix)) return null;
+  final rest = id.substring(prefix.length);
+  if (rest.contains('_')) return null; // legacy index-based id
+  return int.tryParse(rest);
 }
 
 int _yearFromUnixSeconds(int unixSeconds) =>

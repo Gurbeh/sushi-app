@@ -1,4 +1,5 @@
 import 'package:chopper/chopper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
@@ -16,6 +17,7 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_list_transport.dart';
 
 final personDetailsProvider =
     StateNotifierProvider.autoDispose.family<PersonDetailsNotifier, PersonModel?, String>((ref, id) {
@@ -37,6 +39,18 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
     if (SushiConfig.isEnabled) {
       if (_disposed) return null;
       state = sushiPersonModel(person);
+      final tmdbId = sushiPersonTmdbIdFromId(person.id);
+      if (tmdbId == null) {
+        debugPrint('[sushi] person: missing tmdb_id id=${person.id}');
+        return null;
+      }
+      final page = await sushiFetchPerson(tmdbId: tmdbId);
+      if (_disposed) return null;
+      if (page == null) {
+        debugPrint('[sushi] person: fetch returned null tmdbId=$tmdbId');
+        return null;
+      }
+      state = sushiPersonModel(person, page: page);
       return null;
     }
     final response = await api.usersUserIdItemsItemIdGet(itemId: person.id);

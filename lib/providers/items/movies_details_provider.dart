@@ -52,13 +52,22 @@ class MovieDetails extends _$MovieDetails {
           if (tmdbId == null) return null;
 
           final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 1);
-          if (itemRes == null || loadGen != _loadGeneration) return null;
+          if (itemRes == null || loadGen != _loadGeneration) {
+            if (itemRes == null) {
+              log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
+            }
+            return null;
+          }
+
+          var next = sushiEnrichMovieModel(item, itemRes, const []);
+          apply(next);
 
           final episodeId = itemRes.episodes.firstOrNull?.episodeId;
-          final filesRes = episodeId == null ? null : await sushiFetchFiles(episodeId: episodeId);
-          if (loadGen != _loadGeneration) return null;
-
-          apply(sushiEnrichMovieModel(item, itemRes, filesRes?.files ?? const []));
+          if (episodeId != null) {
+            final filesRes = await sushiFetchFiles(episodeId: episodeId);
+            if (loadGen != _loadGeneration) return null;
+            apply(next.copyWith(mediaStreams: sushiBuildMediaStreams(filesRes?.files ?? const [])));
+          }
           return null;
         }
 

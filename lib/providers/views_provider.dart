@@ -21,6 +21,7 @@ import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_views.dart';
 
 //Known supported collection types
 const enableCollectionTypes = {
@@ -54,10 +55,11 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       if (_fetchInFlight) return null;
       _fetchInFlight = true;
       try {
-        // Sushi: no Jellyfin Views / Home feed — empty rails until bot protocol fills them.
+        // Sushi: synthetic library views (Movies/Series/Box sets/Playlists) + empty home rails.
         if (SushiConfig.isEnabled) {
+          final sushiViews = sushiSyntheticViews();
           state = state.copyWith(
-            views: const [],
+            views: sushiViews,
             dashboardViews: const [],
             loading: false,
             loaded: true,

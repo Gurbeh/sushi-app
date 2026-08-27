@@ -31,6 +31,11 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_list_pb.dart';
+import 'package:fladder/sushi/sushi_list_transport.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/sushi_views.dart';
 import 'package:fladder/util/item_base_model/play_item_helpers.dart';
 import 'package:fladder/util/list_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
@@ -186,6 +191,40 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     String? viewModelId,
     LibraryFilterModel filters,
   ) async {
+    if (SushiConfig.isEnabled) {
+      final sushiViews = sushiSyntheticViews();
+      // Include watch-later as selectable when opened via that route.
+      final all = [
+        ...sushiViews,
+        if (viewModelId == sushiViewLater)
+          ViewModel(
+            name: 'Watch later',
+            id: sushiViewLater,
+            serverId: 'sushi',
+            dateCreated: DateTime.fromMillisecondsSinceEpoch(0),
+            canDelete: false,
+            canDownload: false,
+            parentId: '',
+            collectionType: CollectionType.playlists,
+            playAccess: PlayAccess.full,
+            recentlyAdded: const [],
+            imageData: null,
+            childCount: 0,
+            path: null,
+          ),
+      ];
+      Map<ViewModel, bool> mapped = {for (final v in all) v: false};
+      final selected = mapped.keys.firstWhereOrNull((e) => e.id == viewModelId);
+      final views = selected != null
+          ? mapped.setKey(selected, true)
+          : (filters.favourites == true
+              ? mapped
+              : mapped.setKey(mapped.keys.first, true));
+      state = state.copyWith(views: views);
+      loadModel(filters);
+      return;
+    }
+
     final cachedViews = oxLibrarySearchViewsFromCache(ref, viewModelId);
     if (cachedViews != null) {
       state = state.copyWith(views: cachedViews);
@@ -244,6 +283,10 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   Future<void> loadFilters() async {
     if (loadedFilters == true) return;
     loadedFilters = true;
+    if (SushiConfig.isEnabled) {
+      // Genre chips filled lazily from results; skip Jellyfin Filters2.
+      return;
+    }
     if (oxLibrarySearchDeferFilters(state)) {
       state = oxLibrarySearchPrimeCollectionTypes(state);
       return;
@@ -297,6 +340,15 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       int? limit,
       int? startIndex,
       String? searchTerm}) async {
+    if (SushiConfig.isEnabled) {
+      return _loadSushiLibrary(
+        viewModel: viewModel,
+        id: id,
+        limit: limit,
+        startIndex: startIndex,
+        searchTerm: searchTerm,
+      );
+    }
     final searchString = searchTerm ?? (state.searchQuery.isNotEmpty ? state.searchQuery : null);
     final collectionType = viewModel?.collectionType ?? state.views.included.firstOrNull?.collectionType;
     final oxFields = oxLibrarySearchListFields(collectionType);
@@ -336,6 +388,49 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       includeItemTypes: state.filters.types.included.map((e) => e.dtoKind).toList(),
     );
     return response.body;
+  }
+
+  Future<ServerQueryResult?> _loadSushiLibrary({
+    ViewModel? viewModel,
+    String? id,
+    int? limit,
+    int? startIndex,
+    String? searchTerm,
+  }) async {
+    final viewId = viewModel?.id ?? id ?? state.views.included.firstOrNull?.id ?? '';
+    final favourites = state.filters.favourites == true;
+    final scope = sushiScopeForViewId(viewId, favourites: favourites) ?? SushiListScope.movies;
+    final sort = switch (state.filters.sortingOption) {
+      SortingOptions.communityRating => SushiListSort.rating,
+      SortingOptions.releaseDate => SushiListSort.year,
+      SortingOptions.dateAdded || SortingOptions.dateLastContentAdded => SushiListSort.added,
+      _ => SushiListSort.name,
+    };
+    final genre = state.filters.genres.included.firstOrNull ?? '';
+    final year = state.filters.years.included.firstOrNull ?? 0;
+    final q = searchTerm ?? (state.searchQuery.isNotEmpty ? state.searchQuery : '');
+    final res = await sushiFetchList(
+      scope: scope,
+      sort: sort,
+      sortDesc: state.filters.sortOrder == SortingOrder.descending,
+      genre: genre,
+      year: year,
+      q: q,
+      cursor: startIndex ?? 0,
+    );
+    if (res == null) {
+      return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
+    }
+    final items = res.rows.map(sushiRowToItemBaseModel).toList();
+    final total = res.cursor == 0
+        ? (startIndex ?? 0) + items.length
+        : (startIndex ?? 0) + items.length + 1; // keep paging while cursor non-zero
+    return ServerQueryResult(
+      original: const [],
+      items: items,
+      totalRecordCount: total,
+      startIndex: startIndex,
+    );
   }
 
   Future<ServerQueryResult?> _loadPlaylistItems({ViewModel? viewModel, String? id, int? startIndex, int? limit}) async {

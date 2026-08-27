@@ -14,6 +14,7 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/chips/category_chip.dart';
 import 'package:fladder/seerr/seerr_models.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/map_bool_helper.dart';
 import 'package:fladder/util/position_provider.dart';
@@ -43,14 +44,14 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
     );
 
     final chips = [
-      if (seerrAuthenticated)
+      if (seerrAuthenticated && !SushiConfig.isEnabled)
         ExpressiveButton(
           isSelected: true,
           icon: const Icon(IconsaxPlusBold.discover),
           label: Text(context.localized.discover),
           onPressed: () => context.pushRoute(SeerrSearchRoute(mode: SeerrSearchMode.search)),
         ),
-      if (librarySearchResults.folderOverwrite.isEmpty)
+      if (librarySearchResults.folderOverwrite.isEmpty && !SushiConfig.isEnabled)
         CategoryChip(
           label: Text(context.localized.library(2)),
           items: librarySearchResults.views.sortByKey((value) => value.name),
@@ -59,6 +60,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           onCancel: () => libraryProvider.setViews(librarySearchResults.views),
           onClear: () => libraryProvider.setViews(librarySearchResults.views.setAll(false)),
         ),
+      if (!SushiConfig.isEnabled)
       CategoryChip<FladderItemType>(
         label: Text(context.localized.type(librarySearchResults.filters.types.length)),
         items: librarySearchResults.filters.types.sortByKey((value) => value.label(context.localized)),
@@ -82,6 +84,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           context.refreshData();
         },
       ),
+      if (!SushiConfig.isEnabled)
       ExpressiveButton(
         isSelected: recursive == true,
         icon: recursive == true ? const Icon(IconsaxPlusBold.tick_circle) : null,
@@ -101,7 +104,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           onCancel: () => libraryProvider.setGenres(librarySearchResults.filters.genres),
           onClear: () => libraryProvider.setGenres(librarySearchResults.filters.genres.setAll(false)),
         ),
-      if (librarySearchResults.filters.studios.isNotEmpty)
+      if (!SushiConfig.isEnabled && librarySearchResults.filters.studios.isNotEmpty)
         CategoryChip<Studio>(
           label: Text(context.localized.studio(librarySearchResults.filters.studios.length)),
           activeIcon: IconsaxPlusBold.airdrop,
@@ -111,7 +114,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           onCancel: () => libraryProvider.setStudios(librarySearchResults.filters.studios),
           onClear: () => libraryProvider.setStudios(librarySearchResults.filters.studios.setAll(false)),
         ),
-      if (librarySearchResults.filters.tags.isNotEmpty)
+      if (!SushiConfig.isEnabled && librarySearchResults.filters.tags.isNotEmpty)
         CategoryChip<String>(
           label: Text(context.localized.label(librarySearchResults.filters.tags.length)),
           activeIcon: Icons.label_rounded,
@@ -121,6 +124,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           onCancel: () => libraryProvider.setTags(librarySearchResults.filters.tags),
           onClear: () => libraryProvider.setTags(librarySearchResults.filters.tags.setAll(false)),
         ),
+      if (!SushiConfig.isEnabled)
       ExpressiveButton(
         isSelected: groupBy != GroupBy.none,
         icon: groupBy != GroupBy.none ? const Icon(IconsaxPlusBold.bag_tick) : null,
@@ -129,6 +133,7 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
           _openGroupDialogue(context, ref, libraryProvider, uniqueKey);
         },
       ),
+      if (!SushiConfig.isEnabled)
       CategoryChip<ItemFilter>(
         label: Text(context.localized.filter(librarySearchResults.filters.itemFilters.length)),
         items: librarySearchResults.filters.itemFilters,
@@ -136,14 +141,14 @@ class _LibraryFilterChipsState extends ConsumerState<LibraryFilterChips> {
         onSave: (value) => libraryProvider.setFilters(value),
         onClear: () => libraryProvider.setFilters(librarySearchResults.filters.itemFilters.setAll(false)),
       ),
-      if (librarySearchResults.filters.types[FladderItemType.series] == true)
+      if (!SushiConfig.isEnabled && librarySearchResults.filters.types[FladderItemType.series] == true)
         ExpressiveButton(
           isSelected: !hideEmpty,
           icon: !hideEmpty ? const Icon(IconsaxPlusBold.ghost) : null,
           label: Text(!hideEmpty ? context.localized.hideEmpty : context.localized.showEmpty),
           onPressed: libraryProvider.toggleEmptyShows,
         ),
-      if (librarySearchResults.filters.officialRatings.isNotEmpty)
+      if (!SushiConfig.isEnabled && librarySearchResults.filters.officialRatings.isNotEmpty)
         CategoryChip<String>(
           label: Text(context.localized.rating(librarySearchResults.filters.officialRatings.length)),
           activeIcon: Icons.star_rate_rounded,

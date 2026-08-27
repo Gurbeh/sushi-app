@@ -25,15 +25,15 @@ Future<SushiItemRes?> sushiFetchItem({required int tmdbId, required int kind}) a
     final reply = await sushiSendTextAndWaitReply(
       username: assignment.apiBotUsername,
       text: requestText,
-      timeoutMs: 15000,
+      timeoutMs: 25000,
     );
     final env = SushiEnvelope.decode(reply);
     if (env.type == SushiEnvelope.msgTypeErr) {
-      debugPrint('[sushi] item: server returned ERR (corr=${env.corr})');
+      debugPrint('[sushi] item: server returned ERR tmdbId=$tmdbId kind=$kind corr=${env.corr}');
       return null;
     }
     if (env.type != _msgTypeItemRes) {
-      debugPrint('[sushi] item: unexpected msgType=${env.type} (corr=${env.corr})');
+      debugPrint('[sushi] item: unexpected msgType=${env.type} tmdbId=$tmdbId kind=$kind corr=${env.corr}');
       return null;
     }
     return SushiItemRes.decode(env.payload);

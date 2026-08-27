@@ -9,6 +9,10 @@ import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_favourites_feed.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_list_pb.dart';
+import 'package:fladder/sushi/sushi_list_transport.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
 final favouritesProvider = StateNotifierProvider<FavouritesNotifier, FavouritesModel>((ref) {
@@ -37,6 +41,17 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
         );
         return;
       }
+    }
+
+    if (SushiConfig.isEnabled) {
+      final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
+      final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
+      state = state.copyWith(
+        favourites: items.groupedItems,
+        people: const [],
+        loading: false,
+      );
+      return;
     }
 
     await _fetchMoviesAndSeries();

@@ -51,7 +51,12 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
           final tmdbId = sushiTmdbIdFromItemId(seriesModel.id);
           if (tmdbId == null) return null;
           final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 2);
-          if (itemRes == null || loadGen != _loadGeneration) return null;
+          if (itemRes == null || loadGen != _loadGeneration) {
+            if (itemRes == null) {
+              log('[sushi] series details: itemRes null tmdbId=$tmdbId');
+            }
+            return null;
+          }
           apply(sushiEnrichSeriesModel(seriesModel, itemRes));
           return null;
         }
