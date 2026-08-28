@@ -87,6 +87,7 @@ class SushiEnvelope {
 
   // sushi.v1.MsgType (proto/sushi/v1/protocol.proto) — only the values the client currently acts on.
   static const int msgTypeHomeRes = 2;
+  static const int msgTypeSearchRes = 8;
   static const int msgTypeErr = 14;
   static const int msgTypeAssignment = 15;
 
