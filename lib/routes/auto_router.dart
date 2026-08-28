@@ -68,7 +68,7 @@ class AutoRouter extends RootStackRouter {
 
 final AutoRoute _homeRoute = AutoRoute(page: HomeRoute.page, path: '/');
 
-/// Home tabs. Sushi: dashboard / favourites / synced only (settings via its own route).
+/// Home tabs. Sushi: dashboard / favourites / watch-later / synced (settings via its own route).
 final List<AutoRoute> homeRoutes = [
   AutoRoute(
     page: DashboardRoute.page,
@@ -84,6 +84,11 @@ final List<AutoRoute> homeRoutes = [
     page: FavouritesRoute.page,
     path: 'favourites',
   ),
+  if (SushiConfig.isEnabled)
+    AutoRoute(
+      page: WatchLaterRoute.page,
+      path: 'watch-later',
+    ),
   AutoRoute(
     page: SyncedRoute.page,
     path: 'synced',

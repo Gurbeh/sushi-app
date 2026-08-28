@@ -48,9 +48,9 @@ void main() {
     expect(sushiPlaylistIdFromItemId(item.id), 42);
   });
 
-  test('watch later is a browse view, not a Library hub', () {
+  test('watch later is a home tab, not a drawer browse view', () {
     final ids = sushiSyntheticViews().map((v) => v.id).toList();
-    expect(ids, contains(sushiViewLater));
+    expect(ids, isNot(contains(sushiViewLater)));
     expect(ids, contains(sushiViewMovies));
     expect(sushiScopeForViewId(sushiViewPlaylists), SushiListScope.playlists);
     expect(sushiScopeForViewId(sushiViewLater), SushiListScope.later);

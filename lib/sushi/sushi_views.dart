@@ -37,7 +37,6 @@ List<ViewModel> sushiSyntheticViews() => [
       _sushiView(id: sushiViewSeries, name: 'Series', type: CollectionType.tvshows),
       _sushiView(id: sushiViewBoxsets, name: 'Box sets', type: CollectionType.boxsets),
       _sushiView(id: sushiViewPlaylists, name: 'Playlists', type: CollectionType.playlists),
-      _sushiView(id: sushiViewLater, name: 'Watch later', type: CollectionType.playlists),
     ];
 
 SushiListScope? sushiScopeForViewId(String id, {bool favourites = false}) {

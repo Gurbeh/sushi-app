@@ -32,6 +32,7 @@ enum HomeTabs {
   dashboard,
   library,
   favorites,
+  watchLater,
   seerr,
   sync;
 
@@ -41,6 +42,7 @@ enum HomeTabs {
         HomeTabs.dashboard => IconsaxPlusLinear.home_1,
         HomeTabs.library => IconsaxPlusLinear.book,
         HomeTabs.favorites => IconsaxPlusLinear.heart,
+        HomeTabs.watchLater => IconsaxPlusLinear.clock,
         HomeTabs.seerr => IconsaxPlusLinear.discover_1,
         HomeTabs.sync => IconsaxPlusLinear.cloud,
       };
@@ -49,6 +51,7 @@ enum HomeTabs {
         HomeTabs.dashboard => IconsaxPlusBold.home_1,
         HomeTabs.library => IconsaxPlusBold.book,
         HomeTabs.favorites => IconsaxPlusBold.heart,
+        HomeTabs.watchLater => IconsaxPlusBold.clock,
         HomeTabs.seerr => IconsaxPlusBold.discover,
         HomeTabs.sync => IconsaxPlusBold.cloud,
       };
@@ -57,6 +60,7 @@ enum HomeTabs {
         HomeTabs.dashboard => context.router.navigate(const DashboardRoute()),
         HomeTabs.library => context.router.navigate(const LibraryRoute()),
         HomeTabs.favorites => context.router.navigate(const FavouritesRoute()),
+        HomeTabs.watchLater => context.router.navigate(const WatchLaterRoute()),
         HomeTabs.seerr => context.router.navigate(const SeerrRoute()),
         HomeTabs.sync => context.router.navigate(const SyncedRoute()),
       };
@@ -65,6 +69,7 @@ enum HomeTabs {
         HomeTabs.dashboard => context.localized.dashboard,
         HomeTabs.library => context.localized.library(0),
         HomeTabs.favorites => context.localized.favorites,
+        HomeTabs.watchLater => context.localized.oxplayerWatchlist,
         HomeTabs.seerr => 'Seerr',
         HomeTabs.sync => context.localized.sync,
       };
@@ -128,6 +133,7 @@ class HomeScreen extends ConsumerWidget {
           // Sushi: no personal Library hub. Browse views live in the drawer.
           return e == HomeTabs.dashboard ||
               e == HomeTabs.favorites ||
+              e == HomeTabs.watchLater ||
               e == HomeTabs.sync;
         })
         .map((e) {
@@ -169,6 +175,15 @@ class HomeScreen extends ConsumerWidget {
                   onPressed: () => context.router.navigate(LibrarySearchRoute(favourites: true)),
                   child: const Icon(IconsaxPlusLinear.heart_search),
                 ),
+                action: () => e.navigate(context),
+              );
+            case HomeTabs.watchLater:
+              if (!SushiConfig.isEnabled) return null;
+              return DestinationModel(
+                label: context.localized.oxplayerWatchlist,
+                icon: Icon(e.icon),
+                selectedIcon: Icon(e.selectedIcon),
+                route: const WatchLaterRoute(),
                 action: () => e.navigate(context),
               );
             case HomeTabs.library:
