@@ -19,7 +19,6 @@ import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/sushi/sushi_config.dart';
-import 'package:fladder/sushi/sushi_views.dart';
 import 'package:fladder/util/input_handler.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/string_extensions.dart';
@@ -126,9 +125,8 @@ class HomeScreen extends ConsumerWidget {
     final destinations = HomeTabs.values
         .where((e) {
           if (!SushiConfig.isEnabled) return true;
-          // Sushi: dashboard, library (drawer views), favourites, sync.
+          // Sushi: no personal Library hub. Browse views live in the drawer.
           return e == HomeTabs.dashboard ||
-              e == HomeTabs.library ||
               e == HomeTabs.favorites ||
               e == HomeTabs.sync;
         })
@@ -173,26 +171,8 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 action: () => e.navigate(context),
               );
-            // Watch later sits beside favourites for Sushi (ADR 0009).
             case HomeTabs.library:
-              if (SushiConfig.isEnabled) {
-                return DestinationModel(
-                  label: context.localized.library(0),
-                  icon: Icon(e.icon),
-                  selectedIcon: Icon(e.selectedIcon),
-                  route: const LibraryRoute(),
-                  action: () => e.navigate(context),
-                  floatingActionButton: AdaptiveFab(
-                    context: context,
-                    title: 'Watch later',
-                    key: const Key('SushiWatchLater'),
-                    onPressed: () => context.router.navigate(
-                      LibrarySearchRoute(viewModelId: sushiViewLater),
-                    ),
-                    child: const Icon(IconsaxPlusLinear.clock),
-                  ),
-                );
-              }
+              if (SushiConfig.isEnabled) return null;
               return DestinationModel(
                 label: context.localized.library(0),
                 icon: Icon(e.icon),

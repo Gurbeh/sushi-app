@@ -31,6 +31,17 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
 
     state = state.copyWith(loading: true);
 
+    if (SushiConfig.isEnabled) {
+      final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
+      final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
+      state = state.copyWith(
+        favourites: items.groupedItems,
+        people: const [],
+        loading: false,
+      );
+      return;
+    }
+
     if (OxplayerConfig.isEnabled) {
       final feed = await OxplayerFavoritesFeed.fetch(ref);
       if (feed != null) {
@@ -41,17 +52,6 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
         );
         return;
       }
-    }
-
-    if (SushiConfig.isEnabled) {
-      final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
-      final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
-      state = state.copyWith(
-        favourites: items.groupedItems,
-        people: const [],
-        loading: false,
-      );
-      return;
     }
 
     await _fetchMoviesAndSeries();

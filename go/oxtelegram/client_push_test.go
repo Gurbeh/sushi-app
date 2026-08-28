@@ -28,3 +28,22 @@ func TestDeliverPushedDocRemembersRefAndArmKeepsEarlyPush(t *testing.T) {
 		t.Fatal("ArmDeliveryWaiter dropped early push")
 	}
 }
+
+func TestDeliverPushedDocKeepsArmedWaiterForLaterResolve(t *testing.T) {
+	c := NewClient(1, "hash", nil)
+	c.pushArrived = make(map[string]pushArrival)
+	c.pushWaiters = make(map[string]chan *pushedMessage)
+
+	c.ArmDeliveryWaiter("plm_34")
+	c.deliverPushedDoc("plm_34", &tg.Document{ID: 7}, 524, 99)
+
+	ch := c.registerPushWaiter("plm_34")
+	select {
+	case msg := <-ch:
+		if msg.messageID != 524 {
+			t.Fatalf("messageID=%d", msg.messageID)
+		}
+	default:
+		t.Fatal("armed waiter was deleted on send; 0/0 resolve would wait on a new empty channel")
+	}
+}

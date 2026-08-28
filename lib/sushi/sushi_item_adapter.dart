@@ -1,17 +1,23 @@
 import 'package:collection/collection.dart';
 
+import 'package:fladder/jellyfin/enum_models.dart';
+import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
 import 'package:fladder/models/items/person_model.dart';
+import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 const _sushiFileIdPrefix = 'sushi_file_';
+const _sushiEpisodeIdPrefix = 'sushi_ep_';
+const _sushiSeasonIdPrefix = 'sushi_season_';
 
 /// Recovers the file id from a [VersionStreamModel.id] built by [sushiBuildMediaStreams] — the
 /// reverse of that id's `'sushi_file_$fileId'`, needed once the user has picked a quality and
@@ -19,6 +25,11 @@ const _sushiFileIdPrefix = 'sushi_file_';
 int? sushiFileIdFromVersionStreamId(String? versionStreamId) {
   if (versionStreamId == null || !versionStreamId.startsWith(_sushiFileIdPrefix)) return null;
   return int.tryParse(versionStreamId.substring(_sushiFileIdPrefix.length));
+}
+
+int? sushiEpisodeIdFromItemId(String itemId) {
+  if (!itemId.startsWith(_sushiEpisodeIdPrefix)) return null;
+  return int.tryParse(itemId.substring(_sushiEpisodeIdPrefix.length));
 }
 
 /// Builds the [MediaStreamsModel] Fladder's play button / quality picker read
@@ -103,6 +114,21 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
   return MediaStreamsModel(versionStreamIndex: 0, versionStreams: versions);
 }
 
+/// Poster + TMDB logo/backdrop for a title. Seasons/episodes copy this onto
+/// [SeasonModel.parentImages] / [EpisodeModel.parentImages] — OverviewHeader on the season
+/// screen reads `image.logo`, so building it after those lists leaves the logo empty.
+ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) {
+  return ImagesData(
+    primary: base?.primary ?? sushiTmdbImage(item.row.poster, key: itemId),
+    // Title logos are wide PNGs; w500 crops poorly in MediaHeader — use original.
+    logo: sushiTmdbImage(item.logo, key: '${itemId}_logo', size: 'original', extension: 'png') ??
+        base?.logo,
+    backDrop: item.backdrop.isEmpty
+        ? base?.backDrop
+        : [sushiTmdbImage(item.backdrop, key: '${itemId}_bd', size: 'w780')!],
+  );
+}
+
 /// Merges a fetched [SushiItemRes] (overview) and its files (mediaStreams) into an already-shown
 /// [MovieModel] — called after the home-rail placeholder is on screen, same "paint first, enrich
 /// after" shape `movies_details_provider.dart` already uses for OXPlayer.
@@ -133,15 +159,7 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
   sushiRememberCollection(base.id, item.collectionName, item.collection.map(sushiRowToItemBaseModel).toList());
 
   return base.copyWith(
-    images: ImagesData(
-      primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
-      // Title logos are wide PNGs; w500 crops poorly in MediaHeader — use original.
-      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', size: 'original', extension: 'png') ??
-          base.images?.logo,
-      backDrop: item.backdrop.isEmpty
-          ? base.images?.backDrop
-          : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
-    ),
+    images: sushiTitleImages(base.id, base.images, item),
     overview: base.overview.copyWith(
       summary: item.overview,
       yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
@@ -157,6 +175,65 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
     mediaStreams: sushiBuildMediaStreams(files),
     related: related,
   );
+}
+
+List<EpisodeModel> sushiEpisodesFromItem(SeriesModel series, SushiItemRes item) {
+  final sorted = item.episodes.where((e) => e.episodeId != 0).toList()
+    ..sort((a, b) {
+      final bySeason = a.seasonNo.compareTo(b.seasonNo);
+      return bySeason != 0 ? bySeason : a.episodeNo.compareTo(b.episodeNo);
+    });
+  return [
+    for (final e in sorted)
+      EpisodeModel(
+        seriesName: series.name,
+        season: e.seasonNo,
+        episode: e.episodeNo,
+        episodeEnd: null,
+        location: ItemLocation.filesystem,
+        name: e.title.isEmpty ? 'Episode ${e.episodeNo}' : e.title,
+        id: '$_sushiEpisodeIdPrefix${e.episodeId}',
+        overview: OverviewModel(summary: e.title),
+        parentId: series.id,
+        playlistId: null,
+        images: series.images,
+        childCount: null,
+        primaryRatio: 1.78,
+        userData: const UserData(),
+        parentImages: series.images,
+        mediaStreams: MediaStreamsModel(versionStreams: const []),
+        canDelete: false,
+        canDownload: false,
+        jellyType: BaseItemKind.episode,
+      ),
+  ];
+}
+
+List<SeasonModel> sushiSeasonsFromEpisodes(SeriesModel series, List<EpisodeModel> episodes) {
+  return [
+    for (final entry in episodes.episodesBySeason.entries)
+      SeasonModel(
+        parentImages: series.images,
+        seasonName: entry.key == 0 ? 'Specials' : 'Season ${entry.key}',
+        episodes: entry.value,
+        episodeCount: entry.value.length,
+        seriesId: series.id,
+        season: entry.key,
+        seriesName: series.name,
+        name: entry.key == 0 ? 'Specials' : 'Season ${entry.key}',
+        id: '$_sushiSeasonIdPrefix${series.id}_${entry.key}',
+        overview: series.overview,
+        parentId: series.id,
+        playlistId: null,
+        images: series.images,
+        childCount: entry.value.length,
+        primaryRatio: 0.7,
+        userData: UserData(unPlayedItemCount: entry.value.length),
+        canDelete: false,
+        canDownload: false,
+        jellyType: BaseItemKind.season,
+      ),
+  ];
 }
 
 SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
@@ -184,16 +261,12 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
   ];
   final related = item.related.map(sushiRowToItemBaseModel).toList();
   sushiRememberCollection(base.id, item.collectionName, item.collection.map(sushiRowToItemBaseModel).toList());
+  final images = sushiTitleImages(base.id, base.images, item);
+  final withImages = base.copyWith(images: images);
+  final episodes = sushiEpisodesFromItem(withImages, item);
+  final seasons = sushiSeasonsFromEpisodes(withImages, episodes);
 
-  return base.copyWith(
-    images: ImagesData(
-      primary: base.images?.primary ?? sushiTmdbImage(item.row.poster, key: base.id),
-      logo: sushiTmdbImage(item.logo, key: '${base.id}_logo', size: 'original', extension: 'png') ??
-          base.images?.logo,
-      backDrop: item.backdrop.isEmpty
-          ? base.images?.backDrop
-          : [sushiTmdbImage(item.backdrop, key: '${base.id}_bd', size: 'w780')!],
-    ),
+  return withImages.copyWith(
     overview: base.overview.copyWith(
       summary: item.overview,
       yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
@@ -207,6 +280,9 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
       people: people.isEmpty ? base.overview.people : people,
     ),
     related: related,
+    availableEpisodes: episodes,
+    seasons: seasons,
+    childCount: episodes.length,
   );
 }
 

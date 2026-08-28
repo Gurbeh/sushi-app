@@ -5,10 +5,13 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
+import 'package:fladder/models/items/playlist_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_list_pb.dart';
 
 const _sushiTmdbIdPrefix = 'sushi_tmdb_';
+const _sushiPlaylistIdPrefix = 'sushi_playlist_';
 
 ImageData? sushiTmdbImage(String strippedPath, {required String key, String size = 'w500', String extension = 'jpg'}) {
   if (strippedPath.isEmpty) return null;
@@ -24,6 +27,42 @@ ImageData? sushiTmdbImage(String strippedPath, {required String key, String size
 int? sushiTmdbIdFromItemId(String itemId) {
   if (!itemId.startsWith(_sushiTmdbIdPrefix)) return null;
   return int.tryParse(itemId.substring(_sushiTmdbIdPrefix.length));
+}
+
+int? sushiPlaylistIdFromItemId(String itemId) {
+  if (!itemId.startsWith(_sushiPlaylistIdPrefix)) return null;
+  return int.tryParse(itemId.substring(_sushiPlaylistIdPrefix.length));
+}
+
+/// Compact-row lists have no episode/child counts. `childCount: 0` would make Fladder's
+/// `hideEmptyShows` (default on) drop every poster, so leave it unknown.
+PlaylistModel sushiPlaylistMetaToItem(SushiPlaylistMeta meta) {
+  return sushiPlaylistStub(
+    playlistId: meta.playlistId,
+    name: meta.name,
+    itemCount: meta.itemCount,
+  );
+}
+
+PlaylistModel sushiPlaylistStub({
+  required int playlistId,
+  String name = '',
+  int itemCount = 0,
+}) {
+  return PlaylistModel(
+    name: name.isEmpty ? 'Playlist' : name,
+    id: '$_sushiPlaylistIdPrefix$playlistId',
+    overview: const OverviewModel(),
+    parentId: null,
+    playlistId: null,
+    images: null,
+    childCount: itemCount == 0 ? null : itemCount,
+    primaryRatio: 0.8,
+    userData: const UserData(),
+    canDelete: false,
+    canDownload: false,
+    jellyType: BaseItemKind.playlist,
+  );
 }
 
 /// Maps one Sushi compact [SushiRow] into the Jellyfin-shaped model Fladder's poster widgets
@@ -60,7 +99,7 @@ ItemBaseModel sushiRowToItemBaseModel(SushiRow row) {
       overview: overview,
       parentId: null,
       playlistId: null,
-      childCount: 0,
+      childCount: null,
       primaryRatio: 0.7,
       userData: const UserData(),
       canDelete: false,
@@ -82,7 +121,7 @@ ItemBaseModel sushiRowToItemBaseModel(SushiRow row) {
     overview: overview,
     parentId: null,
     playlistId: null,
-    childCount: 0,
+    childCount: null,
     primaryRatio: 0.7,
     userData: const UserData(),
     canDelete: false,

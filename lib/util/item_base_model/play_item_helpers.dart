@@ -36,6 +36,8 @@ import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
 import 'package:fladder/providers/items/book_details_provider.dart';
+import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/book_viewer/book_viewer_screen.dart';
@@ -632,7 +634,15 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     final read = _playbackRead(playContext);
 
     if (SushiConfig.isEnabled) {
-      final op = CancelableOperation.fromFuture(sushiBuildPlaybackModel(itemModel));
+      // Android default player is libMPV. tdlib-file:// is Exo-only; feed the HTTP bridge
+      // (same choice oxplayer_stream_url_resolver.dart makes) or mpv opens a custom/loopback
+      // URL through its internal playlist and refuses it: "Refusing to load potentially unsafe
+      // URL from a playlist".
+      final preferHttpBridge =
+          read(videoPlayerSettingsProvider).wantedPlayer != PlayerOptions.nativePlayer;
+      final op = CancelableOperation.fromFuture(
+        sushiBuildPlaybackModel(itemModel, preferHttpBridge: preferHttpBridge),
+      );
       _showLoadingIndicator(playContext, itemModel, op);
       final model = await op.valueOrCancellation(null);
       if (op.isCanceled || model == null) {

@@ -31,12 +31,13 @@ ViewModel _sushiView({
   );
 }
 
-/// Synthetic library folders for Sushi drawer (ADR 0009).
+/// Synthetic browse folders for Sushi drawer (ADR 0009). No personal Library hub.
 List<ViewModel> sushiSyntheticViews() => [
       _sushiView(id: sushiViewMovies, name: 'Movies', type: CollectionType.movies),
       _sushiView(id: sushiViewSeries, name: 'Series', type: CollectionType.tvshows),
       _sushiView(id: sushiViewBoxsets, name: 'Box sets', type: CollectionType.boxsets),
       _sushiView(id: sushiViewPlaylists, name: 'Playlists', type: CollectionType.playlists),
+      _sushiView(id: sushiViewLater, name: 'Watch later', type: CollectionType.playlists),
     ];
 
 SushiListScope? sushiScopeForViewId(String id, {bool favourites = false}) {

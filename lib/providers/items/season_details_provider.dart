@@ -12,6 +12,7 @@ import 'package:fladder/oxplayer/ox_season_user_data.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:logging/logging.dart' as logging;
 
 final seasonDetailsProvider =
@@ -27,6 +28,10 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<Response?> fetchDetails(String seasonId, {SeasonModel? hint}) async {
+    if (SushiConfig.isEnabled) {
+      state = hint;
+      return null;
+    }
     SeasonModel? newState = hint;
 
     final season = await api.usersUserIdItemsItemIdGet(itemId: seasonId);

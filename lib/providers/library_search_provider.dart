@@ -32,6 +32,7 @@ import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_library_filters.dart';
 import 'package:fladder/sushi/sushi_list_pb.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -82,7 +83,9 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       }
     }
 
-    if (!oxLibrarySearchDeferFilters(state)) {
+    // OX defers Filters2 until a chip is used. Sushi has no Filters2 — chips
+    // stay empty forever unless we seed TMDB genre/year maps here.
+    if (SushiConfig.isEnabled || !oxLibrarySearchDeferFilters(state)) {
       await loadFilters();
     } else {
       state = oxLibrarySearchPrimeCollectionTypes(state);
@@ -193,27 +196,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   ) async {
     if (SushiConfig.isEnabled) {
       final sushiViews = sushiSyntheticViews();
-      // Include watch-later as selectable when opened via that route.
-      final all = [
-        ...sushiViews,
-        if (viewModelId == sushiViewLater)
-          ViewModel(
-            name: 'Watch later',
-            id: sushiViewLater,
-            serverId: 'sushi',
-            dateCreated: DateTime.fromMillisecondsSinceEpoch(0),
-            canDelete: false,
-            canDownload: false,
-            parentId: '',
-            collectionType: CollectionType.playlists,
-            playAccess: PlayAccess.full,
-            recentlyAdded: const [],
-            imageData: null,
-            childCount: 0,
-            path: null,
-          ),
-      ];
-      Map<ViewModel, bool> mapped = {for (final v in all) v: false};
+      Map<ViewModel, bool> mapped = {for (final v in sushiViews) v: false};
       final selected = mapped.keys.firstWhereOrNull((e) => e.id == viewModelId);
       final views = selected != null
           ? mapped.setKey(selected, true)
@@ -221,7 +204,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
               ? mapped
               : mapped.setKey(mapped.keys.first, true));
       state = state.copyWith(views: views);
-      loadModel(filters);
+      loadModel(filters.copyWith(hideEmptyShows: false));
       return;
     }
 
@@ -267,6 +250,18 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   }
 
   Future<void> loadFolders({List<String>? folderId}) async {
+    if (SushiConfig.isEnabled) {
+      final ids = folderId ?? state.folderOverwrite.map((e) => e.id).toList();
+      final playlists = [
+        for (final id in ids)
+          if (sushiPlaylistIdFromItemId(id) case final playlistId?)
+            sushiPlaylistStub(playlistId: playlistId),
+      ];
+      if (playlists.isNotEmpty) {
+        state = state.copyWith(folderOverwrite: playlists);
+        return;
+      }
+    }
     final response = await api.itemsGet(
       ids: folderId ?? state.folderOverwrite.map((e) => e.id).toList(),
       sortBy: state.filters.sortingOption.toSortBy,
@@ -284,7 +279,18 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     if (loadedFilters == true) return;
     loadedFilters = true;
     if (SushiConfig.isEnabled) {
-      // Genre chips filled lazily from results; skip Jellyfin Filters2.
+      final viewId = state.views.included.firstOrNull?.id ?? '';
+      final favourites = state.filters.favourites == true;
+      final genres = sushiFilterGenresForView(viewId, favourites: favourites);
+      if (genres.isEmpty) return;
+      final years = sushiFilterYears();
+      final tempFilters = state.filters;
+      state = state.copyWith(
+        filters: tempFilters.copyWith(
+          genres: {for (final g in genres) g: false}.replaceMap(tempFilters.genres),
+          years: {for (final y in years) y: false}.replaceMap(tempFilters.years),
+        ),
+      );
       return;
     }
     if (oxLibrarySearchDeferFilters(state)) {
@@ -421,6 +427,15 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     if (res == null) {
       return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
     }
+    if (scope == SushiListScope.playlists) {
+      final items = res.playlists.map(sushiPlaylistMetaToItem).toList();
+      return ServerQueryResult(
+        original: const [],
+        items: items,
+        totalRecordCount: items.length,
+        startIndex: startIndex,
+      );
+    }
     final items = res.rows.map(sushiRowToItemBaseModel).toList();
     final total = res.cursor == 0
         ? (startIndex ?? 0) + items.length
@@ -434,6 +449,31 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   }
 
   Future<ServerQueryResult?> _loadPlaylistItems({ViewModel? viewModel, String? id, int? startIndex, int? limit}) async {
+    if (SushiConfig.isEnabled) {
+      final rawId = viewModel?.id ?? id ?? '';
+      final playlistId = sushiPlaylistIdFromItemId(rawId) ?? 0;
+      if (playlistId == 0) {
+        return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
+      }
+      final res = await sushiFetchList(
+        scope: SushiListScope.playlist,
+        cursor: startIndex ?? 0,
+        playlistId: playlistId,
+      );
+      if (res == null) {
+        return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
+      }
+      final items = res.rows.map(sushiRowToItemBaseModel).toList();
+      final total = res.cursor == 0
+          ? (startIndex ?? 0) + items.length
+          : (startIndex ?? 0) + items.length + 1;
+      return ServerQueryResult(
+        original: const [],
+        items: items,
+        totalRecordCount: total,
+        startIndex: startIndex,
+      );
+    }
     final response = await api.playlistsPlaylistIdItemsGet(
       playlistId: viewModel?.id ?? id,
       limit: (limit ?? 0) > 0 ? limit : null,

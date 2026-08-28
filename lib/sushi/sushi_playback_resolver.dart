@@ -66,6 +66,11 @@ Future<OxTdlibDeliveryRef?> _pollDeliveryRef(
   return sushiDeliveryRefForLocator(locator);
 }
 
+SushiDelivered? _deliveredFromSessionRef(OxTdlibDeliveryRef? ref, String locator) {
+  if (ref == null || ref.messageId <= 0 || ref.providerBotId <= 0) return null;
+  return SushiDelivered(botId: ref.providerBotId, messageId: ref.messageId, locator: locator);
+}
+
 Future<String> _startSession({
   required int fileId,
   required String locator,
@@ -73,7 +78,13 @@ Future<String> _startSession({
   required bool preferHttpBridge,
   bool isRetry = false,
 }) async {
-  final delivered = playRes.delivered;
+  var delivered = playRes.delivered;
+  // copyMessage's message_id is the *sender* numbering. Bot-login TDLib uses the receiver's.
+  // A push that landed while /play was in flight is already in DeliveryRef — use that, don't 0/0.
+  if (delivered == null || delivered.messageId == 0) {
+    delivered = _deliveredFromSessionRef(await sushiDeliveryRefForLocator(locator), locator) ?? delivered;
+  }
+
   final source = OxTdlibPlaybackSource(
     providerBotId: delivered?.botId ?? 0,
     messageId: delivered?.messageId ?? 0,
@@ -96,30 +107,36 @@ Future<String> _startSession({
     return session;
   } catch (e) {
     _log('startPlaybackSession FAILED fileId=$fileId error=$e');
-    if (isRetry) rethrow;
 
     if (oxplayerIsTelegramDeliveryWaitTimeoutError(e)) {
-      // The native wait is a fixed 8s, but deliveryd's own idle-to-active latency can run close to
-      // that on its own (up to maxIdleDelay) before the copyMessage round-trip even starts — a cold
-      // first play can easily land just after the native side gives up (confirmed live: the push
-      // arrived a few seconds after this exact timeout). Keep checking a while longer before
-      // surfacing the failure.
       final landed = await _pollDeliveryRef(locator);
       if (landed != null && landed.messageId > 0 && landed.providerBotId > 0) {
         _log('retry after 0/0 timeout using landed botId=${landed.providerBotId} messageId=${landed.messageId}');
         return _startSession(
           fileId: fileId,
           locator: locator,
-          playRes: SushiPlayRes(
-            delivered: SushiDelivered(botId: landed.providerBotId, messageId: landed.messageId, locator: locator),
-          ),
+          playRes: SushiPlayRes(delivered: _deliveredFromSessionRef(landed, locator)),
           preferHttpBridge: preferHttpBridge,
           isRetry: true,
         );
       }
+      rethrow;
     }
 
+    if (isRetry) rethrow;
+
     if (delivered != null && oxplayerIsTdlibFileMissingError(e)) {
+      final sessionRef = _deliveredFromSessionRef(await sushiDeliveryRefForLocator(locator), locator);
+      if (sessionRef != null && sessionRef.messageId != delivered.messageId) {
+        _log('stale server id ${delivered.messageId}; using session ref ${sessionRef.messageId}');
+        return _startSession(
+          fileId: fileId,
+          locator: locator,
+          playRes: SushiPlayRes(delivered: sessionRef),
+          preferHttpBridge: preferHttpBridge,
+          isRetry: true,
+        );
+      }
       _log('delivery stale for $locator — forcing re-delivery');
       final forced = await sushiPlay(fileId: fileId, force: true);
       if (forced != null) {

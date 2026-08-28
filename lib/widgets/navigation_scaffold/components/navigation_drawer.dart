@@ -11,6 +11,7 @@ import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/metadata/refresh_metadata.dart';
 import 'package:fladder/screens/shared/animated_fade_size.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -88,13 +89,16 @@ class NestedNavigationDrawer extends ConsumerWidget {
         ),
         if (views.isNotEmpty) ...{
           const Divider(indent: 28, endIndent: 28),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
-            child: Text(
-              context.localized.library(2),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
+          if (!SushiConfig.isEnabled)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
+              child: Text(
+                context.localized.library(2),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            )
+          else
+            const SizedBox(height: 8),
           ...views.map((library) {
             var selected = context.router.currentUrl.contains(library.id);
             final Widget? posterIcon = useLibraryPosters
@@ -117,11 +121,12 @@ class NestedNavigationDrawer extends ConsumerWidget {
                 label: library.name,
                 selected: selected,
                 actions: [
-                  ItemActionButton(
-                    label: Text(context.localized.scanLibrary),
-                    icon: const Icon(IconsaxPlusLinear.refresh),
-                    action: () => showRefreshPopup(context, library.id, library.name),
-                  ),
+                  if (!SushiConfig.isEnabled)
+                    ItemActionButton(
+                      label: Text(context.localized.scanLibrary),
+                      icon: const Icon(IconsaxPlusLinear.refresh),
+                      action: () => showRefreshPopup(context, library.id, library.name),
+                    ),
                 ],
                 onPressed: () {
                   context.router.push(LibrarySearchRoute(viewModelId: library.id));

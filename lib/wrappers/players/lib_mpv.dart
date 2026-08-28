@@ -445,22 +445,19 @@ class LibMPV extends BasePlayer {
       } catch (_) {/* older libmpv */}
     }
 
-    // stream_cb (gotdstream://) only: mpv's stream/stream_cb.c registers custom protocols with
-    // STREAM_ORIGIN_UNSAFE (stream/stream_cb.c's stream_info_cb). Loads that don't carry
-    // STREAM_ORIGIN_DIRECT (mpv treats anything reached through its internal playlist mechanism
-    // this way, which loadfile always goes through) get check_origin()'d against UNSAFE and
-    // silently rejected before open_fn is ever called — confirmed by adding a log line inside
-    // the Go open_fn and seeing it never fire, while mpv logs "No protocol handler found". This
-    // property forces STREAM_ORIGIN_DIRECT for every stream open on this player instance
-    // (stream/stream.c's stream_create_instance), bypassing that check — mpv's own error message
-    // for the analogous STREAM_UNSAFE case literally names this option as the fix. Scoped to only
-    // when actually loading a gotdstream:// URL, and reset to 'no' otherwise, since it is a
-    // player-wide property (not a per-load flag) and widens what a *different*, actually-external
-    // playlist loaded later on this same player instance would be allowed to reach.
+    // stream_cb (gotdstream://) and the loopback HTTP bridge both go through mpv's internal
+    // playlist (loadfile always does). Custom protocols are STREAM_ORIGIN_UNSAFE
+    // (stream/stream_cb.c); nested http from that playlist is refused the same way — confirmed
+    // live: "Refusing to load potentially unsafe URL from a playlist" / "Reading plaintext
+    // playlist". --load-unsafe-playlists is the fix mpv's own error names. Reset to 'no' when
+    // the URL is not ours so a later external playlist on this player stays origin-checked.
     if (OxplayerEnv.isEnabled && _player?.platform is mpv.NativePlayer) {
       final native = _player!.platform as dynamic;
       try {
-        await native.setProperty('load-unsafe-playlists', oxplayerIsGotdStreamCbUrl(url) ? 'yes' : 'no');
+        await native.setProperty(
+          'load-unsafe-playlists',
+          oxplayerIsTelegramDirectPlayUrl(url) ? 'yes' : 'no',
+        );
       } catch (_) {/* older libmpv */}
     }
 

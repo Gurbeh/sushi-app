@@ -11,8 +11,12 @@ import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_transport.dart';
 
 class EpisodeDetailModel {
   final SeriesModel? series;
@@ -56,6 +60,23 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
   Future<Response?> fetchDetails(ItemBaseModel item) async {
     Future<Response?> load() async {
       try {
+      if (SushiConfig.isEnabled) {
+        if (item is! EpisodeModel) return null;
+        final seriesId = item.parentId ?? '';
+        final series = seriesId.isNotEmpty ? ref.read(seriesDetailsProvider(seriesId)) : null;
+        var episode = item;
+        final episodeId = sushiEpisodeIdFromItemId(item.id);
+        if (episodeId != null && item.mediaStreams.versionStreams.isEmpty) {
+          final filesRes = await sushiFetchFiles(episodeId: episodeId);
+          episode = item.copyWith(mediaStreams: sushiBuildMediaStreams(filesRes?.files ?? const []));
+        }
+        state = EpisodeDetailModel(
+          series: series,
+          episodes: series?.availableEpisodes ?? [episode],
+          episode: episode,
+        );
+        return null;
+      }
       final seriesResponse = await api.usersUserIdItemsItemIdGet(itemId: item.parentBaseModel.id);
       if (seriesResponse.body == null) return null;
       final episodes = await api.showsSeriesIdEpisodesGet(seriesId: item.parentBaseModel.id);

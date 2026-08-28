@@ -66,9 +66,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
     final selectedEpisode = oxSeriesSelectedEpisode(ref, details);
-    final needsEpisodePicker =
-        OxplayerConfig.isEnabled && oxSeriesNeedsEpisodePick(details) && selectedEpisode == null;
-    final currentEpisode = oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
+    final needsEpisodePicker = !SushiConfig.isEnabled &&
+        OxplayerConfig.isEnabled &&
+        oxSeriesNeedsEpisodePick(details) &&
+        selectedEpisode == null;
+    final currentEpisode = SushiConfig.isEnabled
+        ? (selectedEpisode ?? details?.selectedEpisode ?? details?.nextUp)
+        : oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
 
     return DetailScaffold(
       label: details?.name ?? "",
@@ -108,8 +112,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             },
                           )
                         : currentEpisode != null &&
-                                (!OxplayerConfig.isEnabled || currentEpisode.playAble)
-                            ? OxplayerConfig.isEnabled
+                                (!OxplayerConfig.isEnabled || SushiConfig.isEnabled || currentEpisode.playAble)
+                            ? OxplayerConfig.isEnabled && !SushiConfig.isEnabled
                                 ? OxSeriesDetailPlayButtons(
                                     series: details,
                                     episode: currentEpisode,

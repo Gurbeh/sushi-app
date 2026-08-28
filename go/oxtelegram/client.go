@@ -198,11 +198,14 @@ func (c *Client) deliverPushedDoc(locator string, doc *tg.Document, messageID, p
 	c.pruneStalePushesLocked()
 	msg := &pushedMessage{doc: doc, messageID: messageID, providerBotID: providerBotID}
 	if ch, ok := c.pushWaiters[locator]; ok {
-		delete(c.pushWaiters, locator)
 		select {
 		case ch <- msg:
 		default:
 		}
+		// Keep the waiter. Deleting it here dropped a buffered send: ArmDeliveryWaiter then a
+		// getMessages miss (sender-side copyMessage id ≠ receiver TDLib id) then 0/0
+		// registerPushWaiter built a new empty channel while the push sat on the old one.
+		c.pushArrived[locator] = pushArrival{msg: msg, at: time.Now()}
 		return
 	}
 	c.pushArrived[locator] = pushArrival{msg: msg, at: time.Now()}

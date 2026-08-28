@@ -57,7 +57,27 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
             }
             return null;
           }
-          apply(sushiEnrichSeriesModel(seriesModel, itemRes));
+          var next = sushiEnrichSeriesModel(seriesModel, itemRes);
+          apply(next);
+
+          final playTarget = next.selectedEpisode ?? next.nextUp;
+          if (playTarget != null) {
+            final episodeId = sushiEpisodeIdFromItemId(playTarget.id);
+            if (episodeId != null) {
+              final filesRes = await sushiFetchFiles(episodeId: episodeId);
+              if (loadGen != _loadGeneration) return null;
+              final streams = sushiBuildMediaStreams(filesRes?.files ?? const []);
+              final targetId = playTarget.id;
+              final episodes = [
+                for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
+                  episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
+              ];
+            next = next.copyWith(
+              availableEpisodes: episodes,
+            );
+              apply(next);
+            }
+          }
           return null;
         }
 

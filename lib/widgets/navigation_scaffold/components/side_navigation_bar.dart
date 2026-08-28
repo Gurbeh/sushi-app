@@ -15,6 +15,7 @@ import 'package:fladder/routes/auto_router.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/metadata/refresh_metadata.dart';
 import 'package:fladder/screens/shared/animated_fade_size.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -240,11 +241,12 @@ class _SideNavigationRail extends ConsumerState<SideNavigationRail> {
                                         (view) {
                                           final selected = context.router.currentUrl.contains(view.id);
                                           final actions = [
-                                            ItemActionButton(
-                                              label: Text(context.localized.scanLibrary),
-                                              icon: const Icon(IconsaxPlusLinear.refresh),
-                                              action: () => showRefreshPopup(context, view.id, view.name),
-                                            )
+                                            if (!SushiConfig.isEnabled)
+                                              ItemActionButton(
+                                                label: Text(context.localized.scanLibrary),
+                                                icon: const Icon(IconsaxPlusLinear.refresh),
+                                                action: () => showRefreshPopup(context, view.id, view.name),
+                                              )
                                           ];
                                           return CustomTooltip(
                                             tooltipContent: expandedSideBar
@@ -268,20 +270,24 @@ class _SideNavigationRail extends ConsumerState<SideNavigationRail> {
                                               true,
                                               shouldExpand,
                                               () => view.navigateToView(context),
-                                              onSecondaryTapDown: (details) => _showContextMenu(
-                                                context,
-                                                ref,
-                                                details.globalPosition,
-                                                actions,
-                                              ),
-                                              onLongPress: () => showBottomSheetPill(
-                                                context: context,
-                                                content: (context, scrollController) => ListView(
-                                                  shrinkWrap: true,
-                                                  controller: scrollController,
-                                                  children: actions.listTileItems(context, useIcons: true),
-                                                ),
-                                              ),
+                                              onSecondaryTapDown: actions.isEmpty
+                                                  ? null
+                                                  : (details) => _showContextMenu(
+                                                        context,
+                                                        ref,
+                                                        details.globalPosition,
+                                                        actions,
+                                                      ),
+                                              onLongPress: actions.isEmpty
+                                                  ? null
+                                                  : () => showBottomSheetPill(
+                                                        context: context,
+                                                        content: (context, scrollController) => ListView(
+                                                          shrinkWrap: true,
+                                                          controller: scrollController,
+                                                          children: actions.listTileItems(context, useIcons: true),
+                                                        ),
+                                                      ),
                                               customIcon: usePostersForLibrary
                                                   ? Container(
                                                       decoration: BoxDecoration(
