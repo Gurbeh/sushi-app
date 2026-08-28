@@ -6,9 +6,9 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
-import 'package:fladder/sushi/sushi_item_pb.dart';
-import 'package:fladder/sushi/sushi_item_transport.dart';
 import 'package:fladder/sushi/sushi_playback_model.dart';
 import 'package:fladder/sushi/sushi_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -24,43 +24,38 @@ import 'package:fladder/sushi/sushi_row_adapter.dart';
 /// Movies already carry `/files` on the model. Episodes fetch `/files` here if the pick-list is
 /// still empty (user tapped a season/episode that was not the header play target).
 /// Compact list rows have no files. Same `/item` + `/files` fetch the detail page does.
-Future<ItemBaseModel> _sushiHydrateForPlay(ItemBaseModel item) async {
+Future<ItemBaseModel> _sushiHydrateForPlay(ItemBaseModel item, SushiCatalogController catalog) async {
   if (item is MovieModel) {
     if (sushiFileIdFromVersionStreamId(item.streamModel?.currentVersionStream?.id) != null) {
       return item;
     }
     final tmdbId = sushiTmdbIdFromItemId(item.id);
     if (tmdbId == null) return item;
-    final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 1);
-    if (itemRes == null) return item;
-    List<SushiFile> files = const [];
-    final episodeId = itemRes.episodes.isEmpty ? null : itemRes.episodes.first.episodeId;
-    if (episodeId != null) {
-      final filesRes = await sushiFetchFiles(episodeId: episodeId);
-      files = filesRes?.files ?? const [];
-    }
-    return sushiEnrichMovieModel(item, itemRes, files);
+    final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.movie);
+    if (snap.page == null) return item;
+    return sushiEnrichMovieModel(item, snap.page!, snap.files);
   }
   if (item is SeriesModel) {
     if (item.availableEpisodes?.isNotEmpty == true) return item;
     final tmdbId = sushiTmdbIdFromItemId(item.id);
     if (tmdbId == null) return item;
-    final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 2);
-    if (itemRes == null) return item;
-    return sushiEnrichSeriesModel(item, itemRes);
+    final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
+    if (snap.page == null) return item;
+    return sushiEnrichSeriesModel(item, snap.page!);
   }
   return item;
 }
 
 Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   ItemBaseModel itemModel, {
+  required SushiCatalogController catalog,
   bool preferHttpBridge = false,
 }) async {
   var item = itemModel;
   if (item is SeriesModel ||
       (item is MovieModel &&
           sushiFileIdFromVersionStreamId(item.streamModel?.currentVersionStream?.id) == null)) {
-    item = await _sushiHydrateForPlay(item);
+    item = await _sushiHydrateForPlay(item, catalog);
   }
 
   if (item is SeriesModel) {
@@ -78,8 +73,8 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   if (fileId == null && item is EpisodeModel) {
     final episodeId = sushiEpisodeIdFromItemId(item.id);
     if (episodeId == null) return null;
-    final filesRes = await sushiFetchFiles(episodeId: episodeId);
-    streams = sushiBuildMediaStreams(filesRes?.files ?? const []);
+    final files = await catalog.openFiles(episodeId: episodeId);
+    streams = sushiBuildMediaStreams(files);
     fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
   }
 

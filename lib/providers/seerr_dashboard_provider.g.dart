@@ -6,7 +6,7 @@ part of 'seerr_dashboard_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$seerrDashboardHash() => r'bc8104716d693e781fdbe11d13c5171f5742d3a3';
+String _$seerrDashboardHash() => r'83231710a9e7d3548533d7c342507580c0e32193';
 
 /// See also [SeerrDashboard].
 @ProviderFor(SeerrDashboard)

@@ -8,6 +8,8 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_share.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_play_warmup.dart';
 
 /// Delivery / track flavor for a file variant (soft sub, dubbed, etc.).
 enum OxStreamDelivery {
@@ -304,6 +306,9 @@ MediaStreamsModel oxplayerOnUserMediaStreamsChanged(
   String? itemId,
 }) {
   oxplayerRememberMediaStreamsSelection(ref, changed);
+  if (SushiConfig.isEnabled) {
+    sushiPlayWarmup.scheduleFromStreams(changed);
+  }
   if (OxplayerConfig.isEnabled && itemId != null && itemId.isNotEmpty) {
     final msId = changed.currentVersionStream?.id;
     if (msId != null && msId.isNotEmpty) {

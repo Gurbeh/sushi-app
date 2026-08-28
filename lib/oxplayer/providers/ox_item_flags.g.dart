@@ -6,7 +6,7 @@ part of 'ox_item_flags.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$oxItemFlagsHash() => r'768cd13a033961d1693e43cdfecd782d6a6f607e';
+String _$oxItemFlagsHash() => r'f2491c1d025e52e6950b41b4a57b2f682f9a0a47';
 
 /// See also [OxItemFlags].
 @ProviderFor(OxItemFlags)

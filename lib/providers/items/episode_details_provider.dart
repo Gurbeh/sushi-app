@@ -14,9 +14,10 @@ import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
-import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_play_warmup.dart';
 
 class EpisodeDetailModel {
   final SeriesModel? series;
@@ -67,14 +68,15 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
         var episode = item;
         final episodeId = sushiEpisodeIdFromItemId(item.id);
         if (episodeId != null && item.mediaStreams.versionStreams.isEmpty) {
-          final filesRes = await sushiFetchFiles(episodeId: episodeId);
-          episode = item.copyWith(mediaStreams: sushiBuildMediaStreams(filesRes?.files ?? const []));
+          final files = await ref.read(sushiCatalogControllerProvider).openFiles(episodeId: episodeId);
+          episode = item.copyWith(mediaStreams: sushiBuildMediaStreams(files));
         }
         state = EpisodeDetailModel(
           series: series,
           episodes: series?.availableEpisodes ?? [episode],
           episode: episode,
         );
+        sushiPlayWarmup.scheduleFromStreams(episode.mediaStreams);
         return null;
       }
       final seriesResponse = await api.usersUserIdItemsItemIdGet(itemId: item.parentBaseModel.id);
@@ -142,5 +144,6 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
 
   void updateEpisode(EpisodeModel episode) {
     state = state.copyWith(episode: episode);
+    sushiPlayWarmup.scheduleFromStreams(episode.mediaStreams);
   }
 }

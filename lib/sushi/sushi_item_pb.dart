@@ -11,11 +11,18 @@ import 'package:fladder/sushi/sushi_wire.dart';
 /// Mirrors `sushi.v1.FileState`.
 enum SushiFileState { unspecified, ready, pending, unavailable }
 
-SushiFileState _fileStateFromWire(int v) => switch (v) {
+SushiFileState sushiFileStateFromWire(int v) => switch (v) {
       1 => SushiFileState.ready,
       2 => SushiFileState.pending,
       3 => SushiFileState.unavailable,
       _ => SushiFileState.unspecified,
+    };
+
+int sushiFileStateToWire(SushiFileState s) => switch (s) {
+      SushiFileState.ready => 1,
+      SushiFileState.pending => 2,
+      SushiFileState.unavailable => 3,
+      SushiFileState.unspecified => 0,
     };
 
 /// One entry of a title's season/episode tree. A movie gets exactly one, season 0 episode 0
@@ -155,7 +162,31 @@ class SushiFile {
       subLangs: subLangs,
       sizeBytes: sizeBytes,
       durationS: durationS,
-      state: _fileStateFromWire(state),
+        state: sushiFileStateFromWire(state),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'fileId': fileId,
+        'qualityLabel': qualityLabel,
+        'height': height,
+        'audioLangs': audioLangs,
+        'subLangs': subLangs,
+        'sizeBytes': sizeBytes,
+        'durationS': durationS,
+        'state': sushiFileStateToWire(state),
+      };
+
+  static SushiFile fromJson(Map<String, dynamic> json) {
+    return SushiFile(
+      fileId: (json['fileId'] as num?)?.toInt() ?? 0,
+      qualityLabel: json['qualityLabel'] as String? ?? '',
+      height: (json['height'] as num?)?.toInt() ?? 0,
+      audioLangs: json['audioLangs'] as String? ?? '',
+      subLangs: json['subLangs'] as String? ?? '',
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
+      durationS: (json['durationS'] as num?)?.toInt() ?? 0,
+      state: sushiFileStateFromWire((json['state'] as num?)?.toInt() ?? 0),
     );
   }
 }
@@ -307,6 +338,7 @@ class SushiItemRes {
     this.related = const [],
     this.collectionName = '',
     this.collection = const [],
+    this.wire,
   });
 
   final SushiRow row;
@@ -321,6 +353,8 @@ class SushiItemRes {
   final List<SushiRow> related;
   final String collectionName;
   final List<SushiRow> collection;
+  /// Original protobuf bytes. Needed to persist a title page without a Dart encoder.
+  final Uint8List? wire;
 
   static SushiItemRes decode(Uint8List bytes) {
     SushiRow row = const SushiRow(tmdbId: 0, kind: SushiKind.unspecified, title: '', year: 0, rating: 0, poster: '');
@@ -417,6 +451,7 @@ class SushiItemRes {
       related: List.unmodifiable(related),
       collectionName: collectionName,
       collection: List.unmodifiable(collection),
+      wire: bytes,
     );
   }
 }

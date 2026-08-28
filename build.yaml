@@ -10,6 +10,7 @@ targets:
       - lib/util/**.dart
       - lib/jellyfin/**.dart
       - lib/seerr/**.dart
+      - lib/sushi/**
       - "**/**_screen.dart"
       - "**/**_page.dart"
       - swagger/jellyfin-open-api.json

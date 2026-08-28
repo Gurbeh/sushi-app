@@ -60,8 +60,8 @@ void main() {
     expect(sushiEpisodeIdFromItemId(enriched.availableEpisodes!.first.id), 10);
     expect(enriched.nextUp, isNotNull);
     expect(enriched.seasons!.first.episodes, hasLength(2));
-    expect(enriched.images?.logo?.path, contains('/original/bb_logo.png'));
-    expect(enriched.seasons!.first.parentImages?.logo?.path, contains('/original/bb_logo.png'));
-    expect(enriched.availableEpisodes!.first.parentImages?.logo?.path, contains('/original/bb_logo.png'));
+    expect(enriched.images?.logo?.path, contains('/w780/bb_logo.png'));
+    expect(enriched.seasons!.first.parentImages?.logo?.path, contains('/w780/bb_logo.png'));
+    expect(enriched.availableEpisodes!.first.parentImages?.logo?.path, contains('/w780/bb_logo.png'));
   });
 }

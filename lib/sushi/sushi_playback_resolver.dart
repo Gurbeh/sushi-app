@@ -7,11 +7,8 @@ import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart'
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_play_pb.dart';
 import 'package:fladder/sushi/sushi_play_transport.dart';
+import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
-
-/// Matches `be/internal/app/api/play.go`'s `locatorPrefix` — the client hard-codes it too
-/// (docs/05 §3), so changing it is a wire break.
-const _sushiLocatorPrefix = 'plm';
 
 const _sushiPlayLogTag = 'OXPLAY_SUSHI';
 void _log(String message) => debugPrint('$_sushiPlayLogTag: $message');
@@ -31,7 +28,23 @@ Future<String> sushiResolvePlaybackUrl({
   required int fileId,
   bool preferHttpBridge = false,
 }) async {
-  final locator = '${_sushiLocatorPrefix}_$fileId';
+  final locator = sushiLocatorForFile(fileId);
+  final warmed = await sushiPlayWarmup.wait(fileId);
+  if (warmed != null && warmed.messageId > 0) {
+    await sushiArmDeliveryWaiter(locator);
+    try {
+      return await _startSession(
+        fileId: fileId,
+        locator: locator,
+        playRes: SushiPlayRes(delivered: warmed),
+        preferHttpBridge: preferHttpBridge,
+      );
+    } catch (e) {
+      sushiPlayWarmup.invalidate(fileId);
+      _log('warmup delivery unusable fileId=$fileId error=$e — falling through to /play');
+    }
+  }
+
   await sushiArmDeliveryWaiter(locator);
 
   final playRes = await sushiPlay(fileId: fileId);
@@ -138,6 +151,7 @@ Future<String> _startSession({
         );
       }
       _log('delivery stale for $locator — forcing re-delivery');
+      sushiPlayWarmup.invalidate(fileId);
       final forced = await sushiPlay(fileId: fileId, force: true);
       if (forced != null) {
         return _startSession(

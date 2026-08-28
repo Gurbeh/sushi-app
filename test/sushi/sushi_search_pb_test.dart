@@ -66,6 +66,21 @@ void main() {
     expect(res.rows[0].title, 'Inception');
     expect(res.rows[1].kind, SushiKind.series);
     expect(res.rows[1].title, 'Breaking Bad');
+    expect(res.missing, isEmpty);
+  });
+
+  test('SushiSearchRes decodes missing field 3', () {
+    final out = BytesBuilder();
+    out.add(_lenDelim(1, _encodeRow(tmdbId: 1, kind: 1, title: 'Have')));
+    out.add(_lenDelim(3, _encodeRow(tmdbId: 99, kind: 1, title: 'Ghost')));
+    out.add(_lenDelim(3, _encodeRow(tmdbId: 100, kind: 2, title: 'Ghost Show')));
+
+    final res = SushiSearchRes.decode(out.toBytes());
+    expect(res.rows, hasLength(1));
+    expect(res.missing, hasLength(2));
+    expect(res.missing[0].tmdbId, 99);
+    expect(res.missing[0].title, 'Ghost');
+    expect(res.missing[1].kind, SushiKind.series);
   });
 
   test('sushiEncodeRequestText search line matches docs/02 grammar', () {

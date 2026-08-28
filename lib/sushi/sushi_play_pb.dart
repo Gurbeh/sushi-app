@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:fladder/sushi/sushi_wire.dart';
 
-/// Hand-decode/encode of `sushi.v1.PlayReq`/`PlayRes`/`Delivered`/`Pending`/`AckReq`/`AckRes`
-/// (proto/sushi/v1/play.proto) — media delivery (docs/05). Same style as sushi_item_pb.dart.
+/// Matches `be/internal/app/api/play.go` locatorPrefix (docs/05 §3).
+const sushiLocatorPrefix = 'plm';
+
+String sushiLocatorForFile(int fileId) => '${sushiLocatorPrefix}_$fileId';
 
 /// Mirrors `sushi.v1.Mode`.
 const sushiModeUnspecified = 0;

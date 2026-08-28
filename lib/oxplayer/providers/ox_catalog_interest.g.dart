@@ -6,7 +6,7 @@ part of 'ox_catalog_interest.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$oxCatalogInterestHash() => r'09947559c13ebe29c8fa9c47fcee91d894ad530b';
+String _$oxCatalogInterestHash() => r'bdadab19f50f06411460fdac21bbb7fa20b0ada9';
 
 /// Copied from Dart SDK
 class _SystemHash {

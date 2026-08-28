@@ -32,6 +32,7 @@ import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
@@ -641,7 +642,11 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
       final preferHttpBridge =
           read(videoPlayerSettingsProvider).wantedPlayer != PlayerOptions.nativePlayer;
       final op = CancelableOperation.fromFuture(
-        sushiBuildPlaybackModel(itemModel, preferHttpBridge: preferHttpBridge),
+        sushiBuildPlaybackModel(
+          itemModel,
+          catalog: read(sushiCatalogControllerProvider),
+          preferHttpBridge: preferHttpBridge,
+        ),
       );
       _showLoadingIndicator(playContext, itemModel, op);
       final model = await op.valueOrCancellation(null);

@@ -7,7 +7,7 @@ part of 'ox_media_issue_context.dart';
 // **************************************************************************
 
 String _$oxMediaIssueContextHash() =>
-    r'6cbd3a2bfee16c2933958f6aaed52e2a46b0957a';
+    r'0040269771fd01d9eb3f39539445a79c09eef0f2';
 
 /// Copied from Dart SDK
 class _SystemHash {

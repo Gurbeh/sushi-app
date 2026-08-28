@@ -111,7 +111,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Sushi has no HTTP API — updateInformation()/OxplayerHomeRefresh both assume a Jellyfin-style
     // server and would throw (no host to resolve). Its own home fetch is enough.
     if (SushiConfig.isEnabled) {
-      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
+      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume(force: true);
       return;
     }
     if (OxplayerConfig.isEnabled) {

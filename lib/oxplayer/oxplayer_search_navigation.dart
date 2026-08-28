@@ -1,9 +1,8 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/screens/search/search_screen.dart';
 import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 
@@ -21,9 +20,8 @@ void oxplayerNavigateToSearch(
 }) {
   if (SushiConfig.isEnabled) {
     // Dedicated /search UI (docs/12 §6). LibrarySearchRoute would /list movies only.
-    context.router.pushNativeRoute(
-      MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
-    );
+    // Must be an AutoRoute so DetailsRoute stacks on top (native MaterialPageRoute hid details).
+    context.router.push(const SearchRoute());
     return;
   }
   context.router.navigate(oxplayerDefaultSearchRoute(seerrConfigured: seerrConfigured));

@@ -16,9 +16,11 @@ import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
-import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
@@ -51,23 +53,16 @@ class MovieDetails extends _$MovieDetails {
           final tmdbId = sushiTmdbIdFromItemId(item.id);
           if (tmdbId == null) return null;
 
-          final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 1);
-          if (itemRes == null || loadGen != _loadGeneration) {
-            if (itemRes == null) {
-              log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
-            }
+          final catalog = ref.read(sushiCatalogControllerProvider);
+          final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.movie);
+          if (cached?.page != null) {
+            final painted = sushiEnrichMovieModel(item, cached!.page!, cached.files);
+            apply(painted);
+            sushiPlayWarmup.scheduleFromStreams(painted.mediaStreams);
+            unawaited(_sushiRefreshMovie(item, tmdbId, loadGen));
             return null;
           }
-
-          var next = sushiEnrichMovieModel(item, itemRes, const []);
-          apply(next);
-
-          final episodeId = itemRes.episodes.firstOrNull?.episodeId;
-          if (episodeId != null) {
-            final filesRes = await sushiFetchFiles(episodeId: episodeId);
-            if (loadGen != _loadGeneration) return null;
-            apply(next.copyWith(mediaStreams: sushiBuildMediaStreams(filesRes?.files ?? const [])));
-          }
+          await _sushiRefreshMovie(item, tmdbId, loadGen);
           return null;
         }
 
@@ -131,6 +126,20 @@ class MovieDetails extends _$MovieDetails {
     return load();
   }
 
+  Future<void> _sushiRefreshMovie(MovieModel item, int tmdbId, int loadGen) async {
+    final snap = await ref.read(sushiCatalogControllerProvider).openTitle(
+          tmdbId: tmdbId,
+          kind: SushiKind.movie,
+        );
+    if (loadGen != _loadGeneration) return;
+    if (snap.page == null) {
+      log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
+      return;
+    }
+    state = sushiEnrichMovieModel(item, snap.page!, snap.files);
+    sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
+  }
+
   Future<void> _oxContinueMovieLoad(String itemId, int loadGen) async {
     try {
       final base = state;
@@ -156,6 +165,7 @@ class MovieDetails extends _$MovieDetails {
 
   void setMediaStreamHelper(MediaStreamsModel changed) {
     state = state?.copyWith(mediaStreams: changed);
+    sushiPlayWarmup.scheduleFromStreams(changed);
   }
 
   /// Local UserData patch after playback stop — avoids waiting on a stale post-play refetch.

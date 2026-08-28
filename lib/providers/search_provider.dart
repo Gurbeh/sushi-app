@@ -1,5 +1,4 @@
 import 'package:chopper/chopper.dart';
-import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/search_model.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -22,16 +21,29 @@ class SearchNotifier extends StateNotifier<SearchModel> {
 
   Future<Response?> searchQuery() async {
     if (state.searchQuery.isEmpty) return null;
-    state = state.copyWith(loading: true);
+    state = state.copyWith(loading: true, failed: false);
     if (SushiConfig.isEnabled) {
       final q = state.searchQuery;
       final res = await sushiFetchSearch(query: q);
       if (state.searchQuery != q) return null;
-      final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? <ItemBaseModel>[];
+      if (res == null) {
+        state = state.copyWith(
+          resultCount: 0,
+          results: const {},
+          missing: const [],
+          loading: false,
+          failed: true,
+        );
+        return null;
+      }
+      final items = res.rows.map(sushiRowToItemBaseModel).toList();
+      final missing = res.missing.map(sushiRowToItemBaseModel).toList();
       state = state.copyWith(
-        resultCount: items.length,
+        resultCount: items.length + missing.length,
         results: items.groupedItems,
+        missing: missing,
         loading: false,
+        failed: false,
       );
       return null;
     }
@@ -43,6 +55,8 @@ class SearchNotifier extends StateNotifier<SearchModel> {
     state = state.copyWith(
       resultCount: response.body?.totalRecordCount ?? 0,
       results: (response.body?.items)?.groupedItems,
+      missing: const [],
+      failed: false,
     );
     state = state.copyWith(loading: false);
     return response;

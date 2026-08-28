@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:chopper/chopper.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
@@ -12,9 +13,12 @@ import 'package:fladder/oxplayer/ox_seerr_ratings.dart';
 import 'package:fladder/oxplayer/ox_series_details_loader.dart';
 import 'package:fladder/oxplayer/ox_staged_detail_load.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
-import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -50,34 +54,21 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
           if (seriesModel is! SeriesModel) return null;
           final tmdbId = sushiTmdbIdFromItemId(seriesModel.id);
           if (tmdbId == null) return null;
-          final itemRes = await sushiFetchItem(tmdbId: tmdbId, kind: 2);
-          if (itemRes == null || loadGen != _loadGeneration) {
-            if (itemRes == null) {
-              log('[sushi] series details: itemRes null tmdbId=$tmdbId');
+          final catalog = ref.read(sushiCatalogControllerProvider);
+          final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.series);
+          if (cached?.page != null) {
+            var painted = sushiEnrichSeriesModel(seriesModel, cached!.page!);
+            if (cached.files.isNotEmpty) {
+              painted = _sushiApplySeriesFiles(painted, cached.files);
+              sushiPlayWarmup.scheduleFromStreams(
+                (painted.selectedEpisode ?? painted.nextUp)?.mediaStreams,
+              );
             }
+            apply(painted);
+            unawaited(_sushiRefreshSeries(seriesModel, tmdbId, loadGen));
             return null;
           }
-          var next = sushiEnrichSeriesModel(seriesModel, itemRes);
-          apply(next);
-
-          final playTarget = next.selectedEpisode ?? next.nextUp;
-          if (playTarget != null) {
-            final episodeId = sushiEpisodeIdFromItemId(playTarget.id);
-            if (episodeId != null) {
-              final filesRes = await sushiFetchFiles(episodeId: episodeId);
-              if (loadGen != _loadGeneration) return null;
-              final streams = sushiBuildMediaStreams(filesRes?.files ?? const []);
-              final targetId = playTarget.id;
-              final episodes = [
-                for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
-                  episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
-              ];
-            next = next.copyWith(
-              availableEpisodes: episodes,
-            );
-              apply(next);
-            }
-          }
+          await _sushiRefreshSeries(seriesModel, tmdbId, loadGen);
           return null;
         }
 
@@ -156,6 +147,29 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     return load();
   }
 
+  Future<void> _sushiRefreshSeries(SeriesModel seriesModel, int tmdbId, int loadGen) async {
+    final catalog = ref.read(sushiCatalogControllerProvider);
+    final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
+    if (loadGen != _loadGeneration) return;
+    if (snap.page == null) {
+      log('[sushi] series details: itemRes null tmdbId=$tmdbId');
+      return;
+    }
+    var next = sushiEnrichSeriesModel(seriesModel, snap.page!);
+    final playTarget = next.selectedEpisode ?? next.nextUp;
+    final playEpisodeId = playTarget == null ? null : sushiEpisodeIdFromItemId(playTarget.id);
+    final firstEpisodeId = snap.page!.episodes.firstOrNull?.episodeId;
+    var files = snap.files;
+    if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
+      files = await catalog.openFiles(episodeId: playEpisodeId);
+      if (loadGen != _loadGeneration) return;
+    }
+    state = _sushiApplySeriesFiles(next, files);
+    sushiPlayWarmup.scheduleFromStreams(
+      (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
+    );
+  }
+
   Future<void> _oxContinueSeriesSupplementary(String seriesId, int loadGen) async {
     try {
       final base = state;
@@ -187,9 +201,24 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         availableEpisodes: newList,
       );
     }
+    sushiPlayWarmup.scheduleFromStreams(episode.mediaStreams);
   }
 
   void setCurrentEpisode(EpisodeModel? episodeModel) {
     state = state?.copyWith(selectedEpisode: episodeModel);
+    sushiPlayWarmup.scheduleFromStreams(episodeModel?.mediaStreams);
   }
+}
+
+SeriesModel _sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files) {
+  final playTarget = next.selectedEpisode ?? next.nextUp;
+  if (playTarget == null) return next;
+  final streams = sushiBuildMediaStreams(files);
+  final targetId = playTarget.id;
+  return next.copyWith(
+    availableEpisodes: [
+      for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
+        episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
+    ],
+  );
 }

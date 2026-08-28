@@ -120,8 +120,8 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
 ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) {
   return ImagesData(
     primary: base?.primary ?? sushiTmdbImage(item.row.poster, key: itemId),
-    // Title logos are wide PNGs; w500 crops poorly in MediaHeader — use original.
-    logo: sushiTmdbImage(item.logo, key: '${itemId}_logo', size: 'original', extension: 'png') ??
+    // MediaHeader maxWidth 700 + BoxFit.contain; original PNG is 1–2s on first paint.
+    logo: sushiTmdbImage(item.logo, key: '${itemId}_logo', size: 'w780', extension: 'png') ??
         base?.logo,
     backDrop: item.backdrop.isEmpty
         ? base?.backDrop

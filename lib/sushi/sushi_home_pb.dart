@@ -13,20 +13,33 @@ const sushiHomeTabSeries = 2;
 /// Mirrors `sushi.v1.Kind`.
 enum SushiKind { unspecified, movie, series }
 
-SushiKind _kindFromWire(int v) => switch (v) {
+SushiKind sushiKindFromWire(int v) => switch (v) {
       1 => SushiKind.movie,
       2 => SushiKind.series,
       _ => SushiKind.unspecified,
     };
 
+int sushiKindToWire(SushiKind k) => switch (k) {
+      SushiKind.movie => 1,
+      SushiKind.series => 2,
+      SushiKind.unspecified => 0,
+    };
+
 /// Mirrors `sushi.v1.RailKind`.
 enum SushiRailKind { unspecified, slider, mostWatched, trending }
 
-SushiRailKind _railKindFromWire(int v) => switch (v) {
+SushiRailKind sushiRailKindFromWire(int v) => switch (v) {
       1 => SushiRailKind.slider,
       2 => SushiRailKind.mostWatched,
       3 => SushiRailKind.trending,
       _ => SushiRailKind.unspecified,
+    };
+
+int sushiRailKindToWire(SushiRailKind k) => switch (k) {
+      SushiRailKind.slider => 1,
+      SushiRailKind.mostWatched => 2,
+      SushiRailKind.trending => 3,
+      SushiRailKind.unspecified => 0,
     };
 
 /// One card, decoded from `sushi.v1.Row`.
@@ -92,7 +105,27 @@ class SushiRow {
           i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiRow(tmdbId: tmdbId, kind: _kindFromWire(kind), title: title, year: year, rating: rating, poster: poster);
+    return SushiRow(tmdbId: tmdbId, kind: sushiKindFromWire(kind), title: title, year: year, rating: rating, poster: poster);
+  }
+
+  Map<String, Object?> toJson() => {
+        'tmdbId': tmdbId,
+        'kind': sushiKindToWire(kind),
+        'title': title,
+        'year': year,
+        'rating': rating,
+        'poster': poster,
+      };
+
+  static SushiRow fromJson(Map<String, dynamic> json) {
+    return SushiRow(
+      tmdbId: (json['tmdbId'] as num?)?.toInt() ?? 0,
+      kind: sushiKindFromWire((json['kind'] as num?)?.toInt() ?? 0),
+      title: json['title'] as String? ?? '',
+      year: (json['year'] as num?)?.toInt() ?? 0,
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
+      poster: json['poster'] as String? ?? '',
+    );
   }
 }
 
@@ -126,7 +159,7 @@ class SushiRail {
           i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiRail(kind: _railKindFromWire(kind), rows: List.unmodifiable(rows));
+    return SushiRail(kind: sushiRailKindFromWire(kind), rows: List.unmodifiable(rows));
   }
 }
 

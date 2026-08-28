@@ -7,7 +7,7 @@ part of 'ox_watchlist_dashboard.dart';
 // **************************************************************************
 
 String _$oxWatchlistDashboardHash() =>
-    r'5624fb73c68fe4fe67e253ded0218a71dfc4a0b5';
+    r'5790f7b17fa4cd80f00cfb3d5041bd69c389840c';
 
 /// See also [oxWatchlistDashboard].
 @ProviderFor(oxWatchlistDashboard)

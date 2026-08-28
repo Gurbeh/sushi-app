@@ -22,6 +22,7 @@ const topBarNoBlurRoutes = {
   SettingsRoute.name,
   ControlPanelRoute.name,
   DetailsRoute.name,
+  SearchRoute.name,
 };
 
 @AutoRouterConfig(replaceInRouteName: 'Screen|Page,Route')
@@ -102,6 +103,7 @@ final List<AutoRoute> homeRoutes = [
 
 final List<AutoRoute> detailsRoutes = [
   AutoRoute(page: DetailsRoute.page, path: 'details'),
+  if (SushiConfig.isEnabled) AutoRoute(page: SearchRoute.page, path: 'search'),
   if (!SushiConfig.isEnabled) AutoRoute(page: PhotoViewerRoute.page, path: "album"),
   AutoRoute(page: LibrarySearchRoute.page, path: 'library'),
   if (!SushiConfig.isEnabled) ...[
