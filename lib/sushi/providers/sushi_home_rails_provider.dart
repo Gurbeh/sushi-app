@@ -10,11 +10,22 @@ class SushiHomeRailsData {
     this.slider = const [],
     this.mostWatched = const [],
     this.trending = const [],
+    this.seriesMostWatched = const [],
+    this.seriesTrending = const [],
   });
 
   final List<ItemBaseModel> slider;
   final List<ItemBaseModel> mostWatched;
   final List<ItemBaseModel> trending;
+  final List<ItemBaseModel> seriesMostWatched;
+  final List<ItemBaseModel> seriesTrending;
+
+  bool get hasAny =>
+      slider.isNotEmpty ||
+      mostWatched.isNotEmpty ||
+      trending.isNotEmpty ||
+      seriesMostWatched.isNotEmpty ||
+      seriesTrending.isNotEmpty;
 
   static const empty = SushiHomeRailsData();
 }

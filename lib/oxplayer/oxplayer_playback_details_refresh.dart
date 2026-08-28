@@ -7,6 +7,8 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_patch_playback_progress.dart';
 import 'package:fladder/providers/video_player_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/util/refresh_after_watch_state.dart';
 
 /// After playback ends, patch detail UserData immediately and refresh series/home.
@@ -47,6 +49,10 @@ class _OxplayerPlaybackDetailsRefreshState extends ConsumerState<OxplayerPlaybac
           position: position,
           runTime: duration,
         );
+
+        if (SushiConfig.isEnabled) {
+          unawaited(sushiContinueRemember(item, position, duration));
+        }
 
         unawaited(
           Future<void>.delayed(const Duration(milliseconds: 200), () async {

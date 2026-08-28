@@ -161,9 +161,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
     final homeCached = oxHomeDashboardHasCachedContent(dashboardData, views);
     final sliderCached = oxHomeHasCachedSliderData(dashboardData);
-    final sushiHasRails = sushiRails.slider.isNotEmpty ||
-        sushiRails.mostWatched.isNotEmpty ||
-        sushiRails.trending.isNotEmpty;
+    final sushiHasRails = SushiConfig.isEnabled && sushiRails.hasAny;
     final homeFullyReady = SushiConfig.isEnabled
         ? (dashboardData.loaded && !dashboardData.loading) || sushiHasRails
         : !OxplayerConfig.isEnabled ||
@@ -314,7 +312,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: context.localized.dashboardContinueReading,
                       posters: resumeBooks,
                     ),
-                  if (dashboardData.nextUp.isNotEmpty &&
+                  if (!SushiConfig.isEnabled &&
+                      dashboardData.nextUp.isNotEmpty &&
                       (homeSettings.nextUp == HomeNextUp.nextUp || homeSettings.nextUp == HomeNextUp.separate))
                     PosterRow(
                       tvMode: useTVExpandedLayout,
@@ -322,7 +321,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: context.localized.nextUp,
                       posters: dashboardData.nextUp,
                     ),
-                  if ([...allResume, ...dashboardData.nextUp].isNotEmpty && homeSettings.nextUp == HomeNextUp.combined)
+                  if (!SushiConfig.isEnabled &&
+                      [...allResume, ...dashboardData.nextUp].isNotEmpty &&
+                      homeSettings.nextUp == HomeNextUp.combined)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
@@ -349,6 +350,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       contentPadding: padding,
                       label: 'Trending',
                       posters: sushiRails.trending,
+                    ),
+                  if (sushiRails.seriesMostWatched.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: 'Series · Most watched',
+                      posters: sushiRails.seriesMostWatched,
+                    ),
+                  if (sushiRails.seriesTrending.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: 'Series · Trending',
+                      posters: sushiRails.seriesTrending,
                     ),
                   ...oxplayerDashboardRecentlyAddedRows(
                     context: context,

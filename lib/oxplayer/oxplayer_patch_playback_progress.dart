@@ -5,9 +5,11 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/oxplayer/oxplayer_home_refresh.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_user_data_derive.dart';
+import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 
 export 'package:fladder/oxplayer/oxplayer_playback_user_data_derive.dart';
 
@@ -63,6 +65,10 @@ void oxPatchDetailProvidersPlaybackProgress(
 /// Soft-refresh home shelves after playback (Continue Watching / Next Up).
 Future<void> oxRefreshHomeAfterPlayback(WidgetRef ref) async {
   try {
+    if (SushiConfig.isEnabled) {
+      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
+      return;
+    }
     await OxplayerHomeRefresh.refresh(ref);
   } catch (_) {}
 }

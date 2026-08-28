@@ -15,6 +15,7 @@ import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_home_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -173,25 +174,37 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     return response.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? const [];
   }
 
-  /// Sushi: fetch the movies-tab home rails from the API bot and adapt them into the models the
-  /// dashboard's `PosterRow`s already render (docs/12 §2). Failure just leaves the rails empty —
-  /// `sushiFetchHome` never throws.
+  /// Sushi: movies tab first, series tab right after (docs/12 §2.5). Continue-watching is local.
   Future<void> _fetchSushiHome() async {
-    final res = await sushiFetchHome(tab: sushiHomeTabMovies);
-    if (res == null) return;
+    final movies = await sushiFetchHome(tab: sushiHomeTabMovies);
+    final series = await sushiFetchHome(tab: sushiHomeTabSeries);
+    if (movies == null && series == null) return;
 
-    final slider = res.rowsFor(SushiRailKind.slider).map(sushiRowToItemBaseModel).toList();
-    final mostWatched = res.rowsFor(SushiRailKind.mostWatched).map(sushiRowToItemBaseModel).toList();
-    final trending = res.rowsFor(SushiRailKind.trending).map(sushiRowToItemBaseModel).toList();
+    List<ItemBaseModel> rail(SushiHomeRes? res, SushiRailKind kind) =>
+        res?.rowsFor(kind).map(sushiRowToItemBaseModel).toList() ?? const [];
+
+    final slider = [...rail(movies, SushiRailKind.slider), ...rail(series, SushiRailKind.slider)];
+    final mostWatched = rail(movies, SushiRailKind.mostWatched);
+    final trending = rail(movies, SushiRailKind.trending);
+    final seriesMostWatched = rail(series, SushiRailKind.mostWatched);
+    final seriesTrending = rail(series, SushiRailKind.trending);
     debugPrint(
-      '[sushi] home rails slider=${slider.length} mostWatched=${mostWatched.length} trending=${trending.length}',
+      '[sushi] home movies slider=${rail(movies, SushiRailKind.slider).length} '
+      'series slider=${rail(series, SushiRailKind.slider).length}',
     );
     oxApplySushiHomeRailsRef(
       ref,
-      SushiHomeRailsData(slider: slider, mostWatched: mostWatched, trending: trending),
+      SushiHomeRailsData(
+        slider: slider,
+        mostWatched: mostWatched,
+        trending: trending,
+        seriesMostWatched: seriesMostWatched,
+        seriesTrending: seriesTrending,
+      ),
     );
-    // Hero banner reads HomeModel.nextUp; Sushi has no Jellyfin Next Up, so the slider is that rail.
-    state = state.copyWith(nextUp: slider);
+    final resume = await sushiContinueLoad();
+    // Hero banner reads HomeModel.nextUp; Sushi has no Jellyfin Next Up, so the mixed slider is that rail.
+    state = state.copyWith(nextUp: slider, resumeVideo: resume);
   }
 
   void applyOxHomeFeed(OxHomeFeedDashboard feed) {
