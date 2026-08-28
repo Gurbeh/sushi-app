@@ -752,6 +752,21 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
   }
 
   Future<void> playLibraryItems(BuildContext context, WidgetRef ref, {bool shuffle = false}) async {
+    if (SushiConfig.isEnabled) {
+      final pool = state.selectedPosters.isNotEmpty ? state.selectedPosters : state.posters;
+      final items = shuffle ? pool.random() : pool;
+      final first = items.where((e) =>
+          e.type == FladderItemType.movie ||
+          e.type == FladderItemType.series ||
+          e.type == FladderItemType.episode).firstOrNull;
+      if (first == null) {
+        FladderSnack.show(context.localized.libraryFetchNoItemsFound, context: context);
+        return;
+      }
+      await first.play(context, ref);
+      return;
+    }
+
     List<ItemBaseModel> itemsToPlay = [];
 
     if (state.selectedPosters.isNotEmpty) {
