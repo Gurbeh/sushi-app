@@ -249,16 +249,18 @@ flutter:
   # So `flutter run` / `flutter build apk --debug` work without `--flavor` (matches Android flavor name).
   default-flavor: development
 
+  # Do not list `assets/` as a catch-all: it double-copies files also listed
+  # below and, on Windows, AOT bundling dies with PathExistsException errno 183.
+  # It would also ship Affinity sources and marketing screenshots in the APK.
+  # Font files live under `fonts:` (also available to rootBundle at the same path).
   assets:
     - icons/
-    - assets/fonts/
     - config/
-    - assets/mp-font.ttf
-    - assets/oxplayer/
-    - assets/oxplayer/flags/iran_android.png
-    - assets/oxplayer/flags/iran_splash_256.png
     - assets/env/default.env
-    - assets/
+    - assets/oxplayer/
+    - assets/gradient.png
+    - assets/Icon.svg
+    - assets/mp-font.ttf
 
   fonts:
     - family: Rubik
