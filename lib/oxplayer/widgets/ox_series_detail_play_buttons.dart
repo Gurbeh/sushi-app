@@ -8,6 +8,7 @@ import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_icon_button.dart';
 import 'package:fladder/screens/shared/media/components/media_play_button.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 
 class OxSeriesDetailPlayButtons extends ConsumerWidget {
   final SeriesModel series;
@@ -29,7 +30,8 @@ class OxSeriesDetailPlayButtons extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pickerSeasons = oxSeriesPickerSeasons(series);
     final episodeCount = pickerSeasons.fold<int>(0, (sum, season) => sum + season.episodes.length);
-    final showEpisodePicker = OxplayerConfig.isEnabled && episodeCount > 1;
+    final showEpisodePicker =
+        (OxplayerConfig.isEnabled || SushiConfig.isEnabled) && episodeCount > 1;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

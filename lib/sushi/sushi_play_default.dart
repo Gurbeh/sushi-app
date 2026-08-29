@@ -6,6 +6,7 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
@@ -24,7 +25,7 @@ import 'package:fladder/sushi/sushi_row_adapter.dart';
 /// Movies already carry `/files` on the model. Episodes fetch `/files` here if the pick-list is
 /// still empty (user tapped a season/episode that was not the header play target).
 /// Compact list rows have no files. Same `/item` + `/files` fetch the detail page does.
-Future<ItemBaseModel> _sushiHydrateForPlay(ItemBaseModel item, SushiCatalogController catalog) async {
+Future<ItemBaseModel> sushiHydrateForPlay(ItemBaseModel item, SushiCatalogController catalog) async {
   if (item is MovieModel) {
     if (sushiFileIdFromVersionStreamId(item.streamModel?.currentVersionStream?.id) != null) {
       return item;
@@ -50,12 +51,13 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   ItemBaseModel itemModel, {
   required SushiCatalogController catalog,
   bool preferHttpBridge = false,
+  SyncNotifier? sync,
 }) async {
   var item = itemModel;
   if (item is SeriesModel ||
       (item is MovieModel &&
           sushiFileIdFromVersionStreamId(item.streamModel?.currentVersionStream?.id) == null)) {
-    item = await _sushiHydrateForPlay(item, catalog);
+    item = await sushiHydrateForPlay(item, catalog);
   }
 
   if (item is SeriesModel) {
@@ -79,6 +81,18 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   }
 
   if (item is! MovieModel && item is! EpisodeModel) return null;
+
+  if (sync != null) {
+    final local = await sync.getSyncedItem(item.id);
+    if (local != null && local.videoFile.existsSync()) {
+      return SushiPlaybackModel(
+        item: item,
+        media: Media(url: local.videoFile.path),
+        mediaStreams: streams ?? item.streamModel,
+      );
+    }
+  }
+
   if (fileId == null) return null;
 
   // Never let this reject: the caller awaits it through CancelableOperation.valueOrCancellation,

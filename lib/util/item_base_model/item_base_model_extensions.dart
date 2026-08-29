@@ -135,11 +135,12 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     Function(ItemBaseModel item)? onDeleteSuccesFully,
   }) {
     final isAdmin = ref.read(userProvider)?.policy?.isAdministrator ?? false;
-    final downloadEnabled = ref.read(userProvider.select(
-          (value) => value?.canDownload ?? false,
-        )) &&
+    final downloadEnabled = (SushiConfig.isEnabled ||
+            ref.read(userProvider.select(
+              (value) => value?.canDownload ?? false,
+            ))) &&
         syncAble &&
-        (canDownload ?? false);
+        (SushiConfig.isEnabled || (canDownload ?? false));
     final downloadUrl = ref.read(userProvider.notifier).createDownloadUrl(this);
     final syncedItemFuture = ref.read(syncProvider.notifier).getSyncedItem(id);
     final hasSeerrData = overview.seerrUrl?.isNotEmpty == true;

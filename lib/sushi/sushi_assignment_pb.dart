@@ -30,7 +30,7 @@ class SushiAssignmentPb {
   final int epoch;
 
   /// Every delivery bot deliveryd round-robins across (docs/05 §6) — pre-started the same way
-  /// [apiBotUsername] is, so a reader's first play doesn't fail `400 chat not found` against
+  /// the API pool is, so a reader's first play doesn't fail `400 chat not found` against
   /// whichever one the copy job happens to land on.
   final List<String> deliveryBots;
 
@@ -115,7 +115,8 @@ class SushiAssignmentPb {
     List<String> deliveryBots = const [],
   }) {
     final out = BytesBuilder();
-    void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
+    void writeTag(int field, int wire) =>
+        out.add(sushiUvarint((field << 3) | wire));
     void writeBytes(List<int> b) {
       out.add(sushiUvarint(b.length));
       out.add(b);

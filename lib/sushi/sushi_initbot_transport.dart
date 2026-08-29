@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,10 +29,10 @@ class SushiAssignment {
     this.isError = false,
   });
 
-  /// Proto field 1 `api_bot_username`.
+  /// Proto field 1 `api_bot_username` — Ready/fallback handle, not the sole send target (ADR 0011).
   final String apiBotUsername;
 
-  /// Proto field 2 `pool`.
+  /// Proto field 2 `pool` — protocol DMs round-robin across these handles (ADR 0011).
   final List<String> pool;
 
   /// Proto field 3 `provider_id` (int32).
@@ -44,7 +45,7 @@ class SushiAssignment {
   final int epoch;
 
   /// Proto field 6 `delivery_bots` — the pool deliveryd round-robins across (docs/05 §6),
-  /// pre-started alongside the API bot so a first play doesn't fail `400 chat not found`.
+  /// pre-started alongside the API pool so a first play doesn't fail `400 chat not found`.
   final List<String> deliveryBots;
 
   /// True when `/initbot` could not complete (bridge missing / timeout / ERR / bad payload).
@@ -80,16 +81,17 @@ class SushiAssignment {
 
   factory SushiAssignment.fromJson(Map<String, dynamic> json) {
     final rawProvider = json['providerId'];
-    final providerId = rawProvider is int
-        ? rawProvider
-        : int.tryParse('$rawProvider') ?? 0;
+    final providerId =
+        rawProvider is int ? rawProvider : int.tryParse('$rawProvider') ?? 0;
     return SushiAssignment(
       apiBotUsername: (json['apiBotUsername'] as String?) ?? '',
       pool: (json['pool'] as List?)?.map((e) => '$e').toList() ?? const [],
       providerId: providerId,
       bindingToken: (json['bindingToken'] as String?) ?? '',
       epoch: (json['epoch'] as num?)?.toInt() ?? 0,
-      deliveryBots: (json['deliveryBots'] as List?)?.map((e) => '$e').toList() ?? const [],
+      deliveryBots:
+          (json['deliveryBots'] as List?)?.map((e) => '$e').toList() ??
+              const [],
       pending: json['pending'] == true,
       msgType: (json['msgType'] as num?)?.toInt() ?? 0,
       corr: (json['corr'] as num?)?.toInt() ?? 0,
@@ -108,6 +110,54 @@ class SushiAssignment {
         pending: true,
         rawReply: reason,
       );
+
+  /// Handles the client round-robins protocol DMs across (ADR 0011). Primary is included even
+  /// when [pool] omitted it; empty names dropped. Order is pool order, then primary.
+  List<String> get apiSendTargets {
+    final seen = <String>{};
+    final out = <String>[];
+    void add(String raw) {
+      final name = raw.trim();
+      if (name.isEmpty) return;
+      if (seen.add(name.toLowerCase())) out.add(name);
+    }
+
+    for (final name in pool) {
+      add(name);
+    }
+    add(apiBotUsername);
+    return out;
+  }
+}
+
+int _apiBotCursor = 0;
+bool _apiBotCursorSeeded = false;
+final _apiBotRng = Random();
+
+/// Reset the protocol-DM round-robin cursor. Pass `null` (default) to unseed so the next
+/// [sushiNextApiBot] picks a random start; pass an int to pin the next pick for tests.
+@visibleForTesting
+void sushiResetApiBotCursor([int? value]) {
+  if (value == null) {
+    _apiBotCursorSeeded = false;
+    _apiBotCursor = 0;
+    return;
+  }
+  _apiBotCursor = value;
+  _apiBotCursorSeeded = true;
+}
+
+/// Next API bot handle for a protocol DM (ADR 0011). Empty pool falls back to the primary.
+String sushiNextApiBot(SushiAssignment assignment) {
+  final bots = assignment.apiSendTargets;
+  if (bots.isEmpty) return assignment.apiBotUsername;
+  if (!_apiBotCursorSeeded) {
+    _apiBotCursor = _apiBotRng.nextInt(bots.length);
+    _apiBotCursorSeeded = true;
+  }
+  final bot = bots[_apiBotCursor % bots.length];
+  _apiBotCursor++;
+  return bot;
 }
 
 abstract final class SushiAssignmentStore {
@@ -145,7 +195,8 @@ abstract final class SushiAssignmentStore {
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   assert(SushiConfig.isEnabled);
 
-  final botSession = await OxplayerTdlibBridgeController.instance().isNativeSessionActuallyBot();
+  final botSession = await OxplayerTdlibBridgeController.instance()
+      .isNativeSessionActuallyBot();
   if (!botSession) {
     try {
       await sushiEnsureMainBotOnboarded(
@@ -153,7 +204,8 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
         timeoutMs: 90000,
       );
     } catch (e) {
-      debugPrint('[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
+      debugPrint(
+          '[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
     }
   }
 
@@ -189,16 +241,21 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
     // treatment oxplayer already gives its delivery senders (OxplayerProviderBotsBootstrap).
     // main-bot is deliberately excluded: it's the one bot a person may actually want to open.
     //
-    // Delivery bots ride along here too (docs/05 §6, docs/10 Q3): an API bot is sticky per user
-    // and this warms it once for good, but deliveryd picks a delivery bot per copy — without this,
-    // whichever one it happens to pick has never seen this chat, and the very first play fails
-    // `400 chat not found`.
-    if (!assignment.pending && assignment.apiBotUsername.isNotEmpty) {
-      unawaited(sushiEnsureProviderBotsReady([
-        OxTdlibProviderBot(id: 0, username: SushiConfig.initBotUsername),
-        OxTdlibProviderBot(id: 0, username: assignment.apiBotUsername),
-        for (final username in assignment.deliveryBots) OxTdlibProviderBot(id: 0, username: username),
-      ]));
+    // The whole API pool is warmed so protocol DMs can round-robin (ADR 0011). Delivery bots ride
+    // along too (docs/05 §6): deliveryd picks one per copy, and without a prior /start the first
+    // play fails `400 chat not found`.
+    if (!assignment.pending) {
+      final apiBots = assignment.apiSendTargets;
+      if (apiBots.isNotEmpty || assignment.deliveryBots.isNotEmpty) {
+        unawaited(sushiEnsureProviderBotsReady([
+          OxTdlibProviderBot(id: 0, username: SushiConfig.initBotUsername),
+          for (final username in apiBots)
+            OxTdlibProviderBot(id: 0, username: username),
+          for (final username in assignment.deliveryBots)
+            if (username.trim().isNotEmpty)
+              OxTdlibProviderBot(id: 0, username: username),
+        ]));
+      }
     }
 
     return assignment;
@@ -207,7 +264,9 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
     // Keep a working assignment. USER_IS_BOT (bot session DMing an API bot) used to overwrite
     // it with stubPending, after which home skipped fetch entirely ("no assignment yet").
     final previous = await SushiAssignmentStore.load();
-    if (previous != null && !previous.pending && previous.apiBotUsername.isNotEmpty) {
+    if (previous != null &&
+        !previous.pending &&
+        previous.apiSendTargets.isNotEmpty) {
       return previous;
     }
     final pending = SushiAssignment.stubPending(reason: e.toString());
@@ -237,7 +296,8 @@ void sushiRefreshInitbotOnColdStart({void Function()? onReady}) {
 }
 
 /// Parse `!` + base64url(envelope); decode Assignment protobuf when type == 15.
-SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36}) {
+SushiAssignment sushiParseInitbotReply(String reply,
+    {String? expectedCorrBase36}) {
   final SushiEnvelope env;
   try {
     env = SushiEnvelope.decode(reply);
@@ -274,7 +334,7 @@ SushiAssignment sushiParseInitbotReply(String reply, {String? expectedCorrBase36
       bindingToken: pb.bindingTokenBase64Url,
       epoch: pb.epoch,
       deliveryBots: pb.deliveryBots,
-      pending: pb.apiBotUsername.isEmpty,
+      pending: pb.apiBotUsername.isEmpty && pb.pool.isEmpty,
       msgType: env.type,
       corr: env.corr,
       rawReply: reply.trim(),

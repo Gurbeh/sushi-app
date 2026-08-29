@@ -226,7 +226,7 @@ class HomeScreen extends ConsumerWidget {
                 );
               }
             case HomeTabs.sync:
-              if (canDownload && !kIsWeb) {
+              if ((SushiConfig.isEnabled || canDownload) && !kIsWeb) {
                 return DestinationModel(
                   label: context.localized.navigationSync,
                   icon: Icon(e.icon),

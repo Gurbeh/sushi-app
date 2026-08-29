@@ -13,14 +13,17 @@ const _msgTypeListRes = 25;
 
 Future<SushiPersonRes?> sushiFetchPerson({required int tmdbId}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     return null;
   }
   final corr = sushiNewCorrBase36();
-  final requestText = sushiEncodeRequestText('person', corr, sushiEncodePersonReq(tmdbId: tmdbId));
+  final requestText = sushiEncodeRequestText(
+      'person', corr, sushiEncodePersonReq(tmdbId: tmdbId));
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 25000,
     );
@@ -47,7 +50,9 @@ Future<SushiListRes?> sushiFetchList({
   int playlistId = 0,
 }) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     return null;
   }
   final corr = sushiNewCorrBase36();
@@ -67,7 +72,7 @@ Future<SushiListRes?> sushiFetchList({
   );
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
     );
@@ -84,22 +89,31 @@ Future<SushiListRes?> sushiFetchList({
 }
 
 /// Fire-and-forget fav/later (docs/11).
-Future<void> sushiSendFavEvent({required int tmdbId, required int kind, required bool on}) async {
+Future<void> sushiSendFavEvent(
+    {required int tmdbId, required int kind, required bool on}) async {
   await _sendFlagEvent(field: 1, tmdbId: tmdbId, kind: kind, on: on);
 }
 
-Future<void> sushiSendLaterEvent({required int tmdbId, required int kind, required bool on}) async {
+Future<void> sushiSendLaterEvent(
+    {required int tmdbId, required int kind, required bool on}) async {
   await _sendFlagEvent(field: 2, tmdbId: tmdbId, kind: kind, on: on);
 }
 
-Future<void> _sendFlagEvent({required int field, required int tmdbId, required int kind, required bool on}) async {
+Future<void> _sendFlagEvent(
+    {required int field,
+    required int tmdbId,
+    required int kind,
+    required bool on}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     return;
   }
   // Events { seq=1, events=[ Event { fav|later = { tmdb_id, kind, on } } ] }
   final inner = BytesBuilder();
-  void writeTag(BytesBuilder b, int f, int wire) => b.add(sushiUvarint((f << 3) | wire));
+  void writeTag(BytesBuilder b, int f, int wire) =>
+      b.add(sushiUvarint((f << 3) | wire));
   writeTag(inner, 1, 0);
   inner.add(sushiUvarint(tmdbId));
   writeTag(inner, 2, 0);
@@ -124,7 +138,8 @@ Future<void> _sendFlagEvent({required int field, required int tmdbId, required i
   final corr = sushiNewCorrBase36();
   final requestText = sushiEncodeRequestText('ev', corr, events.toBytes());
   try {
-    await sushiSendTextFireAndForget(username: assignment.apiBotUsername, text: requestText);
+    await sushiSendTextFireAndForget(
+        username: sushiNextApiBot(assignment), text: requestText);
   } catch (e) {
     debugPrint('[sushi] ev failed: $e');
   }

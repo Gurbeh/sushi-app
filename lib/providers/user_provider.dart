@@ -22,11 +22,14 @@ import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_local_account.dart';
 
 part 'user_provider.g.dart';
 
 @riverpod
 bool showSyncButtonProvider(Ref ref) {
+  if (SushiConfig.isEnabled) return true;
   final userCanSync = ref.watch(userProvider.select((value) => value?.canDownload ?? false));
   final hasSyncedItems = ref.watch(syncProvider.select((value) => value.items.isNotEmpty));
   return userCanSync || hasSyncedItems;
@@ -37,6 +40,10 @@ class User extends _$User {
   late final JellyService api = ref.read(jellyApiProvider);
 
   set userState(AccountModel? account) {
+    // Policy is `includeFromJson: false` — re-attach on every write so download UI stays on.
+    if (SushiConfig.isEnabled && account != null && sushiIsLocalAccount(account)) {
+      account = sushiWithDownloadPolicy(account);
+    }
     state = account?.copyWith(lastUsed: DateTime.now());
     if (account != null) {
       ref.read(sharedUtilityProvider).updateAccountInfo(account);

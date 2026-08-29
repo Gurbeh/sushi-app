@@ -27,6 +27,8 @@ void main() {
 
     expect(movie, isA<MovieModel>());
     expect(series, isA<SeriesModel>());
+    expect(movie.canDownload, isTrue);
+    expect(series.canDownload, isTrue);
     expect(movie.childCount, isNull);
     expect(series.childCount, isNull);
 

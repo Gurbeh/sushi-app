@@ -11,20 +11,25 @@ const _msgTypePlayRes = 10;
 /// as-is by the server, so calling this more than once for the same [fileId] is cheap and safe.
 /// Returns null on any transport failure (never throws) — same defensive style as
 /// `sushiFetchItem`/`sushiFetchHome`.
-Future<SushiPlayRes?> sushiPlay({required int fileId, bool force = false, int mode = sushiModeStream}) async {
+Future<SushiPlayRes?> sushiPlay(
+    {required int fileId,
+    bool force = false,
+    int mode = sushiModeStream}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     debugPrint('[sushi] play: no assignment yet, skipping fetch');
     return null;
   }
 
   final corr = sushiNewCorrBase36();
-  final requestText =
-      sushiEncodeRequestText('play', corr, sushiEncodePlayReq(fileId: fileId, force: force, mode: mode));
+  final requestText = sushiEncodeRequestText('play', corr,
+      sushiEncodePlayReq(fileId: fileId, force: force, mode: mode));
 
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
     );
@@ -34,7 +39,8 @@ Future<SushiPlayRes?> sushiPlay({required int fileId, bool force = false, int mo
       return null;
     }
     if (env.type != _msgTypePlayRes) {
-      debugPrint('[sushi] play: unexpected msgType=${env.type} (corr=${env.corr})');
+      debugPrint(
+          '[sushi] play: unexpected msgType=${env.type} (corr=${env.corr})');
       return null;
     }
     return SushiPlayRes.decode(env.payload);
@@ -50,13 +56,17 @@ Future<SushiPlayRes?> sushiPlay({required int fileId, bool force = false, int mo
 /// failure here only costs one redundant copy on a future play, never a broken one.
 Future<void> sushiAck({required int fileId, required int messageId}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) return;
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) return;
 
   final corr = sushiNewCorrBase36();
-  final requestText = sushiEncodeRequestText('ack', corr, sushiEncodeAckReq(fileId: fileId, messageId: messageId));
+  final requestText = sushiEncodeRequestText(
+      'ack', corr, sushiEncodeAckReq(fileId: fileId, messageId: messageId));
 
   try {
-    await sushiSendTextFireAndForget(username: assignment.apiBotUsername, text: requestText);
+    await sushiSendTextFireAndForget(
+        username: sushiNextApiBot(assignment), text: requestText);
   } catch (e) {
     debugPrint('[sushi] ack failed (non-fatal): $e');
   }

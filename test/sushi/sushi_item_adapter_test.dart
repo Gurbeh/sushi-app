@@ -56,6 +56,7 @@ void main() {
     expect(enriched.seasons, hasLength(2));
     expect(enriched.availableEpisodes!.first, isA<EpisodeModel>());
     expect(enriched.availableEpisodes!.first.playAble, isTrue);
+    expect(enriched.availableEpisodes!.first.canDownload, isTrue);
     expect(enriched.availableEpisodes!.first.season, 1);
     expect(sushiEpisodeIdFromItemId(enriched.availableEpisodes!.first.id), 10);
     expect(enriched.nextUp, isNotNull);

@@ -103,7 +103,7 @@ ItemBaseModel sushiRowToItemBaseModel(SushiRow row) {
       primaryRatio: 0.7,
       userData: const UserData(),
       canDelete: false,
-      canDownload: false,
+      canDownload: true,
       jellyType: BaseItemKind.series,
     );
   }
@@ -125,7 +125,7 @@ ItemBaseModel sushiRowToItemBaseModel(SushiRow row) {
     primaryRatio: 0.7,
     userData: const UserData(),
     canDelete: false,
-    canDownload: false,
+    canDownload: true,
     jellyType: BaseItemKind.movie,
   );
 }

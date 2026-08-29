@@ -16,6 +16,7 @@ import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/providers/window_title_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
@@ -332,9 +333,10 @@ class _DetailScaffoldState extends ConsumerState<DetailScaffold> {
                                         error: (error, stackTrace) => const SizedBox.shrink(),
                                         data: (syncedItem) {
                                           if (syncedItem == null &&
-                                              ref.read(userProvider.select(
-                                                (value) => value?.canDownload ?? false,
-                                              )) &&
+                                              (SushiConfig.isEnabled ||
+                                                  ref.read(userProvider.select(
+                                                    (value) => value?.canDownload ?? false,
+                                                  ))) &&
                                               item?.syncAble == true) {
                                             return IconButton(
                                               onPressed: () =>

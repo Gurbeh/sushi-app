@@ -32,6 +32,7 @@ import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
@@ -646,6 +647,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
           itemModel,
           catalog: read(sushiCatalogControllerProvider),
           preferHttpBridge: preferHttpBridge,
+          sync: read(syncProvider.notifier),
         ),
       );
       _showLoadingIndicator(playContext, itemModel, op);

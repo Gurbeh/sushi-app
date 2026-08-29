@@ -27,6 +27,7 @@ void _log(String message) => debugPrint('$_sushiPlayLogTag: $message');
 Future<String> sushiResolvePlaybackUrl({
   required int fileId,
   bool preferHttpBridge = false,
+  int mode = sushiModeStream,
 }) async {
   final locator = sushiLocatorForFile(fileId);
   final warmed = await sushiPlayWarmup.wait(fileId);
@@ -38,6 +39,7 @@ Future<String> sushiResolvePlaybackUrl({
         locator: locator,
         playRes: SushiPlayRes(delivered: warmed),
         preferHttpBridge: preferHttpBridge,
+        mode: mode,
       );
     } catch (e) {
       sushiPlayWarmup.invalidate(fileId);
@@ -47,7 +49,7 @@ Future<String> sushiResolvePlaybackUrl({
 
   await sushiArmDeliveryWaiter(locator);
 
-  final playRes = await sushiPlay(fileId: fileId);
+  final playRes = await sushiPlay(fileId: fileId, mode: mode);
   if (playRes == null) {
     throw StateError('sushi play: no reply for file $fileId');
   }
@@ -57,6 +59,7 @@ Future<String> sushiResolvePlaybackUrl({
     locator: locator,
     playRes: playRes,
     preferHttpBridge: preferHttpBridge,
+    mode: mode,
   );
 }
 
@@ -89,6 +92,7 @@ Future<String> _startSession({
   required String locator,
   required SushiPlayRes playRes,
   required bool preferHttpBridge,
+  int mode = sushiModeStream,
   bool isRetry = false,
 }) async {
   var delivered = playRes.delivered;
@@ -130,6 +134,7 @@ Future<String> _startSession({
           locator: locator,
           playRes: SushiPlayRes(delivered: _deliveredFromSessionRef(landed, locator)),
           preferHttpBridge: preferHttpBridge,
+          mode: mode,
           isRetry: true,
         );
       }
@@ -147,18 +152,20 @@ Future<String> _startSession({
           locator: locator,
           playRes: SushiPlayRes(delivered: sessionRef),
           preferHttpBridge: preferHttpBridge,
+          mode: mode,
           isRetry: true,
         );
       }
       _log('delivery stale for $locator — forcing re-delivery');
       sushiPlayWarmup.invalidate(fileId);
-      final forced = await sushiPlay(fileId: fileId, force: true);
+      final forced = await sushiPlay(fileId: fileId, force: true, mode: mode);
       if (forced != null) {
         return _startSession(
           fileId: fileId,
           locator: locator,
           playRes: forced,
           preferHttpBridge: preferHttpBridge,
+          mode: mode,
           isRetry: true,
         );
       }

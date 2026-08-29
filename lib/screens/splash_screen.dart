@@ -19,6 +19,8 @@ import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/oxplayer/ox_splash_brand.dart';
 import 'package:fladder/screens/shared/fladder_logo.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_local_account.dart';
 
 @RoutePage()
 class SplashScreen extends ConsumerStatefulWidget {
@@ -56,7 +58,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       final AccountModel? lastUsedAccount = OxplayerConfig.isEnabled
           ? ref.read(sharedUtilityProvider).getMostRecentAccount()
           : ref.read(sharedUtilityProvider).getActiveAccount();
-      ref.read(userProvider.notifier).updateUser(lastUsedAccount);
+      final accountForSession = SushiConfig.isEnabled && lastUsedAccount != null && sushiIsLocalAccount(lastUsedAccount)
+          ? sushiWithDownloadPolicy(lastUsedAccount)
+          : lastUsedAccount;
+      ref.read(userProvider.notifier).updateUser(accountForSession);
 
       if (!context.mounted) return;
 

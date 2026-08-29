@@ -29,16 +29,19 @@ import 'package:fladder/theme.dart';
 /// Sushi: open main-bot (`?start=ac_<nonce>`). BotFather walkthrough is ForceReply in Telegram;
 /// then a monospace `s1.` code — paste that here, never the raw token.
 class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
-  const OxplayerMainBotLoginPanel({required this.onSuccess, this.onBack, super.key});
+  const OxplayerMainBotLoginPanel(
+      {required this.onSuccess, this.onBack, super.key});
 
   final Future<void> Function() onSuccess;
   final VoidCallback? onBack;
 
   @override
-  ConsumerState<OxplayerMainBotLoginPanel> createState() => _OxplayerMainBotLoginPanelState();
+  ConsumerState<OxplayerMainBotLoginPanel> createState() =>
+      _OxplayerMainBotLoginPanelState();
 }
 
-class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLoginPanel> {
+class _OxplayerMainBotLoginPanelState
+    extends ConsumerState<OxplayerMainBotLoginPanel> {
   final _api = OxplayerMainBotLoginApi();
   final _tokenController = TextEditingController();
   OxplayerLoginAttemptStart? _attempt;
@@ -91,7 +94,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
   String _sushiInitbotNotReady(SushiAssignment assignment) {
     final fa = Localizations.localeOf(context).languageCode == 'fa';
     final blob = assignment.rawReply.toLowerCase();
-    if (blob.contains('user_is_bot') || blob.contains("can't send messages to other bots")) {
+    if (blob.contains('user_is_bot') ||
+        blob.contains("can't send messages to other bots")) {
       return fa
           ? 'باتت هنوز نمی‌تونه به بات سوشی پیام بده. تو @BotFather روی همون بات، Bot to Bot Communication Mode رو روشن کن، بعد از تلگرام کد جدید بگیر.'
           : 'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then copy a fresh code from Telegram.';
@@ -108,13 +112,15 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
       _error = null;
     });
     try {
-      await OxplayerTdlibBridgeController.instance().ensureBotTokenSession(token);
+      await OxplayerTdlibBridgeController.instance()
+          .ensureBotTokenSession(token);
       final assignment = await sushiRunInitbotAfterTdlibReady();
-      if (assignment.pending || assignment.apiBotUsername.isEmpty) {
+      if (assignment.pending || assignment.apiSendTargets.isEmpty) {
         throw StateError(_sushiInitbotNotReady(assignment));
       }
       final account = await sushiEnsureLocalAccount(ref);
-      await OxplayerOxLoginKindStore.save(accountId: account.id, kind: OxplayerOxLoginKind.bot);
+      await OxplayerOxLoginKindStore.save(
+          accountId: account.id, kind: OxplayerOxLoginKind.bot);
       await widget.onSuccess();
     } catch (e) {
       if (!mounted) return;
@@ -133,7 +139,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
 
   Future<void> _openMainBotForAppCode() async {
     await OxplayerDotenv.ensureLoaded();
-    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl()), mode: LaunchMode.externalApplication);
+    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl()),
+        mode: LaunchMode.externalApplication);
   }
 
   /// [silent]: background auto-refresh (see _pollLoop) — swap in a fresh code/QR without
@@ -145,7 +152,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
     });
     final generation = ++_pollGeneration;
     try {
-      final identity = await OxplayerTdlibBridgeController.resolveDeviceIdentity();
+      final identity =
+          await OxplayerTdlibBridgeController.resolveDeviceIdentity();
       final attempt = await _api.createAttempt(deviceId: identity);
       if (!mounted || generation != _pollGeneration) return;
       setState(() {
@@ -158,7 +166,9 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
       setState(() {
         _starting = false;
         _attempt = null;
-        _error = e is OxplayerLoginAttemptException ? e.message : 'Could not start sign-in';
+        _error = e is OxplayerLoginAttemptException
+            ? e.message
+            : 'Could not start sign-in';
       });
     }
   }
@@ -167,7 +177,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
   /// long-poll cycle, so a refresh is never raced by a call that was already in flight.
   static const _refreshMargin = Duration(seconds: 75);
 
-  Future<void> _pollLoop(OxplayerLoginAttemptStart attempt, String deviceId, int generation) async {
+  Future<void> _pollLoop(OxplayerLoginAttemptStart attempt, String deviceId,
+      int generation) async {
     final deadline = DateTime.now().add(Duration(seconds: attempt.expiresIn));
     var consecutiveFailures = 0;
     while (mounted && generation == _pollGeneration) {
@@ -176,7 +187,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
         return;
       }
       try {
-        final result = await _api.poll(attemptId: attempt.attemptId, deviceId: deviceId);
+        final result =
+            await _api.poll(attemptId: attempt.attemptId, deviceId: deviceId);
         if (!mounted || generation != _pollGeneration) return;
         consecutiveFailures = 0;
         if (result.isPending) continue;
@@ -186,7 +198,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
         if (!mounted || generation != _pollGeneration) return;
         consecutiveFailures++;
         if (consecutiveFailures <= 6) {
-          await Future<void>.delayed(Duration(seconds: consecutiveFailures.clamp(1, 5)));
+          await Future<void>.delayed(
+              Duration(seconds: consecutiveFailures.clamp(1, 5)));
           continue;
         }
         unawaited(_start(silent: true));
@@ -261,7 +274,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
 
   Widget _buildSushi(ThemeData theme) {
     final fa = Localizations.localeOf(context).languageCode == 'fa';
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final muted = theme.textTheme.bodyMedium
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -271,15 +285,24 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
-        _sushiStep(theme, fa ? '۱' : '1', fa
-            ? 'دکمهٔ نارنجی رو بزن تا تلگرام باز بشه.'
-            : 'Tap the salmon button to open Telegram.'),
-        _sushiStep(theme, fa ? '۲' : '2', fa
-            ? 'تو BotFather بات بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن — تو اپ نچسبون.'
-            : 'In BotFather: create a bot, turn on Bot-to-Bot, reply with the token there — never paste it in the app.'),
-        _sushiStep(theme, fa ? '۳' : '3', fa
-            ? 'کادر کد (s1.) رو کپی کن و اینجا بچسبون. اپ خودش وارد می‌شه.'
-            : 'Copy the boxed code (s1.) and paste it here. Sushi signs in on a valid code.'),
+        _sushiStep(
+            theme,
+            fa ? '۱' : '1',
+            fa
+                ? 'دکمهٔ نارنجی رو بزن تا تلگرام باز بشه.'
+                : 'Tap the salmon button to open Telegram.'),
+        _sushiStep(
+            theme,
+            fa ? '۲' : '2',
+            fa
+                ? 'تو BotFather بات بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن — تو اپ نچسبون.'
+                : 'In BotFather: create a bot, turn on Bot-to-Bot, reply with the token there — never paste it in the app.'),
+        _sushiStep(
+            theme,
+            fa ? '۳' : '3',
+            fa
+                ? 'کادر کد (s1.) رو کپی کن و اینجا بچسبون. اپ خودش وارد می‌شه.'
+                : 'Copy the boxed code (s1.) and paste it here. Sushi signs in on a valid code.'),
         const SizedBox(height: 20),
         FilledButton.icon(
           autofocus: true,
@@ -307,7 +330,9 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
           TextButton.icon(
             onPressed: widget.onBack,
             icon: const Icon(IconsaxPlusLinear.arrow_left_2, size: 18),
-            label: Text(fa ? 'با اکانت تلگرام وارد شو' : 'Use my Telegram account instead'),
+            label: Text(fa
+                ? 'با اکانت تلگرام وارد شو'
+                : 'Use my Telegram account instead'),
           ),
         ],
         if (_error != null) ...[
@@ -335,10 +360,12 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
             width: 28,
             height: 28,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(color: _sushiSalmon, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: _sushiSalmon, shape: BoxShape.circle),
             child: Text(
               n,
-              style: theme.textTheme.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(width: 10),
@@ -365,7 +392,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
         const SizedBox(height: 6),
         Text(
           "Approve sign-in in Telegram — OXPlayer never sees your Telegram account.",
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
@@ -378,7 +406,9 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
                 borderRadius: BorderRadius.circular(12),
               ),
               child: QrImageView(
-                data: OxplayerEnv.telegramBotLoginAttemptLink(_attempt!.attemptId) ?? '',
+                data: OxplayerEnv.telegramBotLoginAttemptLink(
+                        _attempt!.attemptId) ??
+                    '',
                 size: 180,
                 backgroundColor: Colors.white,
               ),
@@ -398,7 +428,8 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
           const SizedBox(height: 14),
           Text(
             'Or type this code into @${OxplayerEnv.botUsername ?? "main-bot"} in Telegram:',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
@@ -426,10 +457,12 @@ class _OxplayerMainBotLoginPanelState extends ConsumerState<OxplayerMainBotLogin
             textAlign: TextAlign.center,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.error),
           ),
           const SizedBox(height: 8),
-          TextButton(onPressed: () => unawaited(_start()), child: const Text('Retry')),
+          TextButton(
+              onPressed: () => unawaited(_start()), child: const Text('Retry')),
         ],
       ],
     );

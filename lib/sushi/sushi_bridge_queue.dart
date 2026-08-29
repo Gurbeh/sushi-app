@@ -23,7 +23,7 @@ Future<T> _enqueue<T>(Future<T> Function() call) {
 }
 
 /// Set by sushi_initbot_transport.dart. Fired after enough consecutive [sushiSendTextAndWaitReply]
-/// failures in a row that the bound API bot looks dead, not just having one bad moment (docs/02
+/// failures in a row that the API pool looks dead, not just having one bad moment (docs/02
 /// §6-7) — the reactive half of bot rotation, whose cold-start half is
 /// sushiRefreshInitbotOnColdStart. A queue with nobody listening (this field left null) just logs
 /// failures and moves on, same as before this existed.
@@ -52,7 +52,8 @@ Future<String> sushiSendTextAndWaitReply({
   sushiRequestCount++;
   try {
     final reply = await _enqueue(
-      () => controller.sendTextAndWaitReply(username: username, text: text, timeoutMs: timeoutMs),
+      () => controller.sendTextAndWaitReply(
+          username: username, text: text, timeoutMs: timeoutMs),
     );
     _consecutiveSendFailures = 0;
     return reply;
@@ -61,7 +62,8 @@ Future<String> sushiSendTextAndWaitReply({
     // Bot-to-bot is a session-identity problem, not a dead API bot. Refreshing /initbot here
     // wiped a good assignment and left home empty.
     if (msg.contains('USER_IS_BOT')) {
-      debugPrint('[sushi] send failed USER_IS_BOT — session is a bot; need phone/QR user login');
+      debugPrint(
+          '[sushi] send failed USER_IS_BOT — session is a bot; need phone/QR user login');
       rethrow;
     }
     _consecutiveSendFailures++;
@@ -78,16 +80,20 @@ Future<String> sushiSendTextAndWaitReply({
 /// call crosses into the same gomobile client, so it must stay serialized against them — but it
 /// resolves as soon as the send completes, never blocking on a reply that is not coming. Counted in
 /// [sushiRequestCount] like every other wire call.
-Future<void> sushiSendTextFireAndForget({required String username, required String text}) {
+Future<void> sushiSendTextFireAndForget(
+    {required String username, required String text}) {
   final controller = OxplayerTdlibBridgeController.instance();
   sushiRequestCount++;
-  return _enqueue(() => controller.sendTextFireAndForget(username: username, text: text));
+  return _enqueue(
+      () => controller.sendTextFireAndForget(username: username, text: text));
 }
 
-Future<void> sushiEnsureMainBotOnboarded({required String username, required int timeoutMs}) {
+Future<void> sushiEnsureMainBotOnboarded(
+    {required String username, required int timeoutMs}) {
   final controller = OxplayerTdlibBridgeController.instance();
   return _enqueue(
-    () => controller.ensureMainBotOnboarded(username: username, timeoutMs: timeoutMs),
+    () => controller.ensureMainBotOnboarded(
+        username: username, timeoutMs: timeoutMs),
   );
 }
 
@@ -104,6 +110,12 @@ Future<void> sushiArmDeliveryWaiter(String locator) {
 Future<String> sushiStartPlaybackSession(OxTdlibPlaybackSource source) {
   final controller = OxplayerTdlibBridgeController.instance();
   return _enqueue(() => controller.startPlaybackSession(source));
+}
+
+Future<void> sushiStopPlaybackSession(String sessionUri) {
+  if (sessionUri.isEmpty) return Future.value();
+  final controller = OxplayerTdlibBridgeController.instance();
+  return _enqueue(() => controller.stopPlaybackSession(sessionUri));
 }
 
 Future<OxTdlibDeliveryRef?> sushiDeliveryRefForLocator(String locator) {

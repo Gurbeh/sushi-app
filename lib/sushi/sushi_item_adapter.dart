@@ -27,6 +27,29 @@ int? sushiFileIdFromVersionStreamId(String? versionStreamId) {
   return int.tryParse(versionStreamId.substring(_sushiFileIdPrefix.length));
 }
 
+/// Local offline filename Fladder's SyncedItem.videoFile uses. Encodes the Sushi file id so a later
+/// tap on "download again" can recover it from data.json without another `/files`.
+String sushiOfflineFileName(int fileId) => '$_sushiFileIdPrefix$fileId.mkv';
+
+int? sushiFileIdFromOfflineName(String? name) {
+  if (name == null || name.isEmpty) return null;
+  final match = RegExp(r'^sushi_file_(\d+)\.').firstMatch(name);
+  if (match == null) return null;
+  return int.tryParse(match.group(1)!);
+}
+
+SushiFile? sushiPickReadyFile(List<SushiFile> files, {String? versionStreamId}) {
+  final ready = files.where((f) => f.state == SushiFileState.ready).toList();
+  if (ready.isEmpty) return null;
+  final wanted = sushiFileIdFromVersionStreamId(versionStreamId);
+  if (wanted != null) {
+    for (final file in ready) {
+      if (file.fileId == wanted) return file;
+    }
+  }
+  return ready.first;
+}
+
 int? sushiEpisodeIdFromItemId(String itemId) {
   if (!itemId.startsWith(_sushiEpisodeIdPrefix)) return null;
   return int.tryParse(itemId.substring(_sushiEpisodeIdPrefix.length));
@@ -203,7 +226,7 @@ List<EpisodeModel> sushiEpisodesFromItem(SeriesModel series, SushiItemRes item) 
         parentImages: series.images,
         mediaStreams: MediaStreamsModel(versionStreams: const []),
         canDelete: false,
-        canDownload: false,
+        canDownload: true,
         jellyType: BaseItemKind.episode,
       ),
   ];
@@ -230,7 +253,7 @@ List<SeasonModel> sushiSeasonsFromEpisodes(SeriesModel series, List<EpisodeModel
         primaryRatio: 0.7,
         userData: UserData(unPlayedItemCount: entry.value.length),
         canDelete: false,
-        canDownload: false,
+        canDownload: true,
         jellyType: BaseItemKind.season,
       ),
   ];

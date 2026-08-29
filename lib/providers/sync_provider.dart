@@ -45,6 +45,8 @@ import 'package:fladder/providers/sync/sync_provider_media.dart';
 import 'package:fladder/providers/sync/sync_provider_overlay.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_sync.dart';
 import 'package:fladder/util/duration_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/string_extensions.dart';
@@ -80,6 +82,7 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<void> updateSyncStates() async {
+    if (SushiConfig.isEnabled) return;
     final lastState =
         (await _db.getAllItems.get()).where((item) => item.unSyncedData && item.userData != null).toList();
     if (updatingSyncStatus || lastState.isEmpty) return;
@@ -345,6 +348,13 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
         ref.read(clientSettingsProvider.notifier).setSyncPath(selectedDirectory);
       }
 
+      if (SushiConfig.isEnabled) {
+        FladderSnack.show(context.localized.syncAddItemForSyncing(item.detailedName(context.localized) ?? "Unknown"),
+            context: context);
+        await sushiAddSyncItem(this, context, item);
+        return;
+      }
+
       if (context.mounted) {
         FladderSnack.show(context.localized.syncAddItemForSyncing(item.detailedName(context.localized) ?? "Unknown"),
             context: context);
@@ -394,6 +404,13 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
               .toList());
 
       await ref.read(backgroundDownloaderProvider).cancelTaskWithId(item.id);
+
+      if (SushiConfig.isEnabled) {
+        sushiCancelDownload(item.id);
+        for (final element in nestedChildren) {
+          sushiCancelDownload(element.id);
+        }
+      }
 
       await _db.deleteAllItems([...nestedChildren, item]);
 
@@ -456,6 +473,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<void> _deleteSyncedItemAndFiles(SyncedItem item) async {
+    if (SushiConfig.isEnabled) {
+      sushiCancelDownload(item.id);
+    }
     await ref.read(backgroundDownloaderProvider).cancelTaskWithId(item.id);
     await _db.deleteAllItems([item]);
     if (await item.directory.exists()) {
@@ -527,6 +547,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<int> updateItem(SyncedItem item) async {
+    if (SushiConfig.isEnabled) {
+      return _db.insertItem(item);
+    }
     SyncedItem syncedItem = item;
     try {
       await ref.read(jellyApiProvider).userItemsItemIdUserDataPost(itemId: syncedItem.id, body: syncedItem.userData);
@@ -538,6 +561,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<SyncedItem> deleteFullSyncFiles(SyncedItem syncedItem, DownloadTask? task) async {
+    if (SushiConfig.isEnabled) {
+      sushiCancelDownload(syncedItem.id);
+    }
     await syncedItem.deleteDatFiles(ref);
 
     syncedItem = syncedItem.copyWith(
@@ -561,6 +587,10 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
     TranscodeMusicDownloadModel? musicTranscodeModel,
   }) async {
     cleanupTemporaryFiles();
+
+    if (SushiConfig.isEnabled) {
+      return sushiSyncFile(this, syncItem, skipDownload);
+    }
 
     if (!skipDownload && syncItem.videoFile.existsSync()) {
       return true;
@@ -828,9 +858,13 @@ extension SyncNotifierHelpers on SyncNotifier {
 
     File dataFile = File(path.joinAll([directory.path, 'data.json']));
     await dataFile.writeAsString(jsonEncode(response.toJson()));
+    // Sushi has no Jellyfin image host (`sushi://local` → DNS fail on `http://sushi/...`).
+    // TMDB posters are saved in sushi_sync `_upsert` from the live ItemBaseModel.
     final imageData = item is AudioModel
         ? _audioImageDataFromParent(parent: parent, directory: directory)
-        : await saveImageData(item.images, directory);
+        : SushiConfig.isEnabled
+            ? null
+            : await saveImageData(item.images, directory);
 
     SyncedItem syncItem = SyncedItem(
       syncing: true,

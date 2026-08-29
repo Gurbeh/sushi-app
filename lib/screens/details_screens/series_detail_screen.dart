@@ -113,7 +113,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                           )
                         : currentEpisode != null &&
                                 (!OxplayerConfig.isEnabled || SushiConfig.isEnabled || currentEpisode.playAble)
-                            ? OxplayerConfig.isEnabled && !SushiConfig.isEnabled
+                            ? OxplayerConfig.isEnabled || SushiConfig.isEnabled
                                 ? OxSeriesDetailPlayButtons(
                                     series: details,
                                     episode: currentEpisode,

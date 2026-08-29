@@ -5,24 +5,27 @@ import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
 import 'package:fladder/sushi/sushi_wire.dart';
 
-/// Fetches one home tab from the Sushi API bot (docs/02 §3, docs/12 §2).
+/// Fetches one home tab from the Sushi API bot pool (docs/02 §3, docs/12 §2, ADR 0011).
 ///
 /// Returns null on any failure — missing/pending assignment, a timed-out reply, an `ERR` reply, or
 /// a malformed envelope. A failed fetch means empty rails on the dashboard, never a crash (mirrors
 /// `sushiRunInitbotAfterTdlibReady`'s defensive style).
 Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     debugPrint('[sushi] home: no assignment yet, skipping fetch');
     return null;
   }
 
   final corr = sushiNewCorrBase36();
-  final requestText = sushiEncodeRequestText('home', corr, sushiEncodeHomeReq(tab: tab));
+  final requestText =
+      sushiEncodeRequestText('home', corr, sushiEncodeHomeReq(tab: tab));
 
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
     );
@@ -32,7 +35,8 @@ Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
       return null;
     }
     if (env.type != SushiEnvelope.msgTypeHomeRes) {
-      debugPrint('[sushi] home: unexpected msgType=${env.type} (corr=${env.corr})');
+      debugPrint(
+          '[sushi] home: unexpected msgType=${env.type} (corr=${env.corr})');
       return null;
     }
     return SushiHomeRes.decode(env.payload);

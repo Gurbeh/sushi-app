@@ -8,32 +8,39 @@ import 'package:fladder/sushi/sushi_wire.dart';
 const _msgTypeItemRes = 4;
 const _msgTypeFilesRes = 6;
 
-/// Fetches one title's full record — overview and episode/season tree (docs/12 §4) — from the
-/// assigned API bot. Returns null on any failure (never throws): a title page with no extra detail
-/// yet is a normal, recoverable state, not different from the home rails' own defensive style.
-Future<SushiItemRes?> sushiFetchItem({required int tmdbId, required int kind}) async {
+/// Fetches one title's full record — overview and episode/season tree (docs/12 §4).
+/// Round-robins the API pool (ADR 0011). Returns null on any failure (never throws): a title
+/// page with no extra detail yet is a normal, recoverable state, not different from the home
+/// rails' own defensive style.
+Future<SushiItemRes?> sushiFetchItem(
+    {required int tmdbId, required int kind}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     debugPrint('[sushi] item: no assignment yet, skipping fetch');
     return null;
   }
 
   final corr = sushiNewCorrBase36();
-  final requestText = sushiEncodeRequestText('item', corr, sushiEncodeItemReq(tmdbId: tmdbId, kind: kind));
+  final requestText = sushiEncodeRequestText(
+      'item', corr, sushiEncodeItemReq(tmdbId: tmdbId, kind: kind));
 
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 25000,
     );
     final env = SushiEnvelope.decode(reply);
     if (env.type == SushiEnvelope.msgTypeErr) {
-      debugPrint('[sushi] item: server returned ERR tmdbId=$tmdbId kind=$kind corr=${env.corr}');
+      debugPrint(
+          '[sushi] item: server returned ERR tmdbId=$tmdbId kind=$kind corr=${env.corr}');
       return null;
     }
     if (env.type != _msgTypeItemRes) {
-      debugPrint('[sushi] item: unexpected msgType=${env.type} tmdbId=$tmdbId kind=$kind corr=${env.corr}');
+      debugPrint(
+          '[sushi] item: unexpected msgType=${env.type} tmdbId=$tmdbId kind=$kind corr=${env.corr}');
       return null;
     }
     return SushiItemRes.decode(env.payload);
@@ -48,17 +55,20 @@ Future<SushiItemRes?> sushiFetchItem({required int tmdbId, required int kind}) a
 /// responsibility (this always goes to the network).
 Future<SushiFilesRes?> sushiFetchFiles({required int episodeId}) async {
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     debugPrint('[sushi] files: no assignment yet, skipping fetch');
     return null;
   }
 
   final corr = sushiNewCorrBase36();
-  final requestText = sushiEncodeRequestText('files', corr, sushiEncodeFilesReq(episodeId: episodeId));
+  final requestText = sushiEncodeRequestText(
+      'files', corr, sushiEncodeFilesReq(episodeId: episodeId));
 
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
     );
@@ -68,7 +78,8 @@ Future<SushiFilesRes?> sushiFetchFiles({required int episodeId}) async {
       return null;
     }
     if (env.type != _msgTypeFilesRes) {
-      debugPrint('[sushi] files: unexpected msgType=${env.type} (corr=${env.corr})');
+      debugPrint(
+          '[sushi] files: unexpected msgType=${env.type} (corr=${env.corr})');
       return null;
     }
     return SushiFilesRes.decode(env.payload);

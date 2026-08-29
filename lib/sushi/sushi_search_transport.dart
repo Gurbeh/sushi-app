@@ -5,16 +5,19 @@ import 'package:fladder/sushi/sushi_initbot_transport.dart';
 import 'package:fladder/sushi/sushi_search_pb.dart';
 import 'package:fladder/sushi/sushi_wire.dart';
 
-/// One committed catalog search against the bound API bot (`/search`, docs/12 §6).
+/// One committed catalog search (`/search`, docs/12 §6). Round-robins the API pool (ADR 0011).
 ///
 /// Returns null on missing assignment, timeout, `ERR`, or a malformed envelope — same defensive
 /// contract as [sushiFetchHome]. Debounce belongs to the caller (R-META-3).
-Future<SushiSearchRes?> sushiFetchSearch({required String query, int cursor = 0}) async {
+Future<SushiSearchRes?> sushiFetchSearch(
+    {required String query, int cursor = 0}) async {
   final trimmed = query.trim();
   if (trimmed.isEmpty) return null;
 
   final assignment = await SushiAssignmentStore.load();
-  if (assignment == null || assignment.pending || assignment.apiBotUsername.isEmpty) {
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
     debugPrint('[sushi] search: no assignment yet, skipping fetch');
     return null;
   }
@@ -28,7 +31,7 @@ Future<SushiSearchRes?> sushiFetchSearch({required String query, int cursor = 0}
 
   try {
     final reply = await sushiSendTextAndWaitReply(
-      username: assignment.apiBotUsername,
+      username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
     );
@@ -38,7 +41,8 @@ Future<SushiSearchRes?> sushiFetchSearch({required String query, int cursor = 0}
       return null;
     }
     if (env.type != SushiEnvelope.msgTypeSearchRes) {
-      debugPrint('[sushi] search: unexpected msgType=${env.type} (corr=${env.corr})');
+      debugPrint(
+          '[sushi] search: unexpected msgType=${env.type} (corr=${env.corr})');
       return null;
     }
     return SushiSearchRes.decode(env.payload);
