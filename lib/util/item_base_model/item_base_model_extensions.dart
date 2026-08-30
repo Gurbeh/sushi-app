@@ -25,6 +25,7 @@ import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
+import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/collections/add_to_collection.dart';
 import 'package:fladder/screens/metadata/edit_item.dart';
@@ -135,11 +136,13 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     Function(ItemBaseModel item)? onDeleteSuccesFully,
   }) {
     final isAdmin = ref.read(userProvider)?.policy?.isAdministrator ?? false;
+    final hasPlaybackActions = sushiItemHasPlaybackActions(this);
     final downloadEnabled = (SushiConfig.isEnabled ||
             ref.read(userProvider.select(
               (value) => value?.canDownload ?? false,
             ))) &&
         syncAble &&
+        hasPlaybackActions &&
         (SushiConfig.isEnabled || (canDownload ?? false));
     final downloadUrl = ref.read(userProvider.notifier).createDownloadUrl(this);
     final syncedItemFuture = ref.read(syncProvider.notifier).getSyncedItem(id);
@@ -191,7 +194,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     };
     return [
       if (!exclude.contains(ItemActions.play))
-        if (playAble)
+        if (playAble && hasPlaybackActions)
           ItemActionButton(
             action: () => play(context, ref),
             icon: const Icon(IconsaxPlusLinear.play),
@@ -235,7 +238,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           label: Text(context.localized.showAlbum),
         ),
       if (!exclude.contains(ItemActions.playFromStart))
-        if ((userData.progress) > 0)
+        if ((userData.progress) > 0 && hasPlaybackActions)
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.refresh),
             action: (this is BookModel)

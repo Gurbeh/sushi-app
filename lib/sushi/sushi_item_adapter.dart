@@ -197,6 +197,7 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
     ),
     mediaStreams: sushiBuildMediaStreams(files),
     related: related,
+    canDownload: sushiPickReadyFile(files) != null,
   );
 }
 
@@ -306,6 +307,24 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
     availableEpisodes: episodes,
     seasons: seasons,
     childCount: episodes.length,
+    canDownload: false,
+  );
+}
+
+/// Attaches the `/files` pick-list to the series play target. Pending-only / empty lists leave
+/// [ItemBaseModel.canDownload] false so Play/Sync stay hidden.
+SeriesModel sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files) {
+  final playTarget = next.selectedEpisode ?? next.nextUp;
+  if (playTarget == null) return next.copyWith(canDownload: false);
+  final streams = sushiBuildMediaStreams(files);
+  final ready = streams.versionStreams.isNotEmpty;
+  final targetId = playTarget.id;
+  return next.copyWith(
+    canDownload: ready,
+    availableEpisodes: [
+      for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
+        episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
+    ],
   );
 }
 

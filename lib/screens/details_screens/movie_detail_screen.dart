@@ -18,6 +18,7 @@ import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
 import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_request_button.dart';
@@ -69,7 +70,15 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
         details?.tmdbId != null &&
         !hasPlayableMedia;
     // Sushi: no Seerr — a native /request replaces play when there is nothing to play (ADR 0014).
-    final sushiRequestTmdb = SushiConfig.isEnabled && details != null && !hasPlayableMedia
+    // Only after /item has resolved (sushiTitleResolved): before that the placeholder card cannot
+    // tell "no file" from "not loaded", which flashed Request before Play. Until resolved,
+    // mainButton is null — neither Play nor Request.
+    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: SushiConfig.isEnabled);
+    final sushiRequestTmdb = SushiConfig.isEnabled &&
+            details != null &&
+            sushiResolved &&
+            details.canDownload == false &&
+            !hasPlayableMedia
         ? sushiTmdbIdFromItemId(details.id)
         : null;
 
@@ -199,7 +208,13 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 controller: scrollController,
                                 shrinkWrap: true,
                                 children: details
-                                    .generateActions(detailsContext, ref)
+                                    .generateActions(detailsContext, ref, exclude: {
+                                  if (!hasPlayableMedia) ...{
+                                    ItemActions.play,
+                                    ItemActions.playFromStart,
+                                    ItemActions.download,
+                                  },
+                                })
                                     .listTileItems(context, useIcons: true),
                               ),
                             );

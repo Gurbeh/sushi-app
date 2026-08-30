@@ -17,8 +17,8 @@ import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
-import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
+import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
@@ -59,7 +59,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
           if (cached?.page != null) {
             var painted = sushiEnrichSeriesModel(seriesModel, cached!.page!);
             if (cached.files.isNotEmpty) {
-              painted = _sushiApplySeriesFiles(painted, cached.files);
+              painted = sushiApplySeriesFiles(painted, cached.files);
               sushiPlayWarmup.scheduleFromStreams(
                 (painted.selectedEpisode ?? painted.nextUp)?.mediaStreams,
               );
@@ -148,26 +148,33 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
   }
 
   Future<void> _sushiRefreshSeries(SeriesModel seriesModel, int tmdbId, int loadGen) async {
-    final catalog = ref.read(sushiCatalogControllerProvider);
-    final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
-    if (loadGen != _loadGeneration) return;
-    if (snap.page == null) {
-      log('[sushi] series details: itemRes null tmdbId=$tmdbId');
-      return;
-    }
-    var next = sushiEnrichSeriesModel(seriesModel, snap.page!);
-    final playTarget = next.selectedEpisode ?? next.nextUp;
-    final playEpisodeId = playTarget == null ? null : sushiEpisodeIdFromItemId(playTarget.id);
-    final firstEpisodeId = snap.page!.episodes.firstOrNull?.episodeId;
-    var files = snap.files;
-    if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
-      files = await catalog.openFiles(episodeId: playEpisodeId);
+    try {
+      final catalog = ref.read(sushiCatalogControllerProvider);
+      final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
       if (loadGen != _loadGeneration) return;
+      if (snap.page == null) {
+        log('[sushi] series details: itemRes null tmdbId=$tmdbId');
+        return;
+      }
+      var next = sushiEnrichSeriesModel(seriesModel, snap.page!);
+      final playTarget = next.selectedEpisode ?? next.nextUp;
+      final playEpisodeId = playTarget == null ? null : sushiEpisodeIdFromItemId(playTarget.id);
+      final firstEpisodeId = snap.page!.episodes.firstOrNull?.episodeId;
+      var files = snap.files;
+      if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
+        files = await catalog.openFiles(episodeId: playEpisodeId);
+        if (loadGen != _loadGeneration) return;
+      }
+      state = sushiApplySeriesFiles(next, files);
+      sushiPlayWarmup.scheduleFromStreams(
+        (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
+      );
+    } finally {
+      // Play/Request are only decidable once this has run (ADR 0014). Not on a superseded load.
+      if (loadGen == _loadGeneration) {
+        ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
+      }
     }
-    state = _sushiApplySeriesFiles(next, files);
-    sushiPlayWarmup.scheduleFromStreams(
-      (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
-    );
   }
 
   Future<void> _oxContinueSeriesSupplementary(String seriesId, int loadGen) async {
@@ -208,17 +215,4 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     state = state?.copyWith(selectedEpisode: episodeModel);
     sushiPlayWarmup.scheduleFromStreams(episodeModel?.mediaStreams);
   }
-}
-
-SeriesModel _sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files) {
-  final playTarget = next.selectedEpisode ?? next.nextUp;
-  if (playTarget == null) return next;
-  final streams = sushiBuildMediaStreams(files);
-  final targetId = playTarget.id;
-  return next.copyWith(
-    availableEpisodes: [
-      for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
-        episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
-    ],
-  );
 }

@@ -22,8 +22,10 @@ import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
 import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
+import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/sushi/sushi_request_button.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
@@ -75,11 +77,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final currentEpisode = SushiConfig.isEnabled
         ? (selectedEpisode ?? details?.selectedEpisode ?? details?.nextUp)
         : oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
-    // Sushi: we carry no episode of this series yet — offer a native /request (ADR 0014 §D2).
-    final sushiSeriesRequestTmdb =
-        SushiConfig.isEnabled && details != null && (details.availableEpisodes?.isEmpty ?? true)
-            ? sushiTmdbIdFromItemId(details.id)
-            : null;
+    final sushiHasPlayback = details != null && sushiItemHasPlaybackActions(details);
+    // Only after /item has resolved (sushiTitleResolved) — the cached-page paint can populate
+    // availableEpisodes before files land, so key off the network-refresh completion instead.
+    // Until then, no Play and no Request (ADR 0014 §D2).
+    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: SushiConfig.isEnabled);
+    final sushiSeriesRequestTmdb = SushiConfig.isEnabled &&
+            details != null &&
+            sushiResolved &&
+            !sushiHasPlayback
+        ? sushiTmdbIdFromItemId(details.id)
+        : null;
 
     return DetailScaffold(
       label: details?.name ?? "",
@@ -119,6 +127,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             },
                           )
                         : currentEpisode != null &&
+                                (!SushiConfig.isEnabled || sushiHasPlayback) &&
                                 (!OxplayerConfig.isEnabled || SushiConfig.isEnabled || currentEpisode.playAble)
                             ? OxplayerConfig.isEnabled || SushiConfig.isEnabled
                                 ? OxSeriesDetailPlayButtons(
@@ -252,7 +261,12 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                 shrinkWrap: true,
                                 children: details.generateActions(detailsContext, ref, exclude: {
                                   ItemActions.openParent,
-                                  ItemActions.details
+                                  ItemActions.details,
+                                  if (!sushiHasPlayback) ...{
+                                    ItemActions.play,
+                                    ItemActions.playFromStart,
+                                    ItemActions.download,
+                                  },
                                 }).listTileItems(context, useIcons: true),
                               ),
                             );
