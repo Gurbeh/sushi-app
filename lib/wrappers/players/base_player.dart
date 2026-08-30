@@ -41,6 +41,10 @@ abstract class BasePlayer {
   Future<int> setAudioTrack(AudioStreamModel? model, PlaybackModel playbackModel);
   void applySubtitleSettings(SubtitleSettingsModel settings) {}
 
+  /// Sushi: inject an external subtitle straight from decoded text (no track index, no URL).
+  /// Used by the Automatic / Online subtitle picker. Default no-op; mpv overrides.
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {}
+
   Uri? isValidUrl(String input) {
     try {
       final uri = Uri.tryParse(input);

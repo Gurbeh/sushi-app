@@ -24,6 +24,7 @@ import 'package:fladder/screens/playlists/add_to_playlists.dart';
 import 'package:fladder/screens/video_player/components/video_player_quality_controls.dart';
 import 'package:fladder/screens/video_player/components/video_player_queue.dart';
 import 'package:fladder/screens/video_player/components/video_subtitle_controls.dart';
+import 'package:fladder/sushi/subtitles/sushi_online_subtitle_sheet.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/device_orientation_extension.dart';
@@ -68,6 +69,7 @@ class _VideoOptionsMobileState extends ConsumerState<VideoOptions> {
     final videoSettings = ref.watch(videoPlayerSettingsProvider);
     final currentMediaStreams = ref.watch(playBackModel.select((value) => value?.mediaStreams));
     final bitRateOptions = ref.watch(playBackModel.select((value) => value?.bitRateOptions));
+    final sushiSub = ref.watch(sushiActiveSubtitleProvider);
 
     Widget mainPage() {
       return ListView(
@@ -139,8 +141,16 @@ class _VideoOptionsMobileState extends ConsumerState<VideoOptions> {
             ),
           SpacedListTile(
             title: Text(context.localized.subtitles),
-            content: Text(currentMediaStreams?.currentSubStream?.label(context) ?? context.localized.off),
-            onTap: currentMediaStreams?.subStreams.isNotEmpty == true ? () => showSubSelection(context) : null,
+            content: Text(
+              sushiSub != null
+                  ? (sushiSub.auto ? 'Automatic · ${sushiSub.label}' : sushiSub.label)
+                  : currentMediaStreams?.currentSubStream?.label(context) ?? context.localized.off,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Always openable: the sheet also hosts the Sushi Automatic / Online picker, which
+            // does not need an embedded subtitle track to exist (doc 15 §7).
+            onTap: () => showSubSelection(context),
           ),
           SpacedListTile(
             title: Text(context.localized.audio(1)),
@@ -397,6 +407,7 @@ Future<void> showSubSelection(BuildContext context) {
         builder: (context, ref, child) {
           final playbackModel = ref.watch(playBackModel);
           final player = ref.watch(videoPlayerProvider);
+          final sushiSubActive = !sushiEmbeddedRowSelectable(ref);
           return SimpleDialog(
             contentPadding: const EdgeInsets.only(top: 8, bottom: 24),
             title: Row(
@@ -424,31 +435,37 @@ Future<void> showSubSelection(BuildContext context) {
                   )
               ],
             ),
-            children: playbackModel?.subStreams?.mapIndexed(
-              (index, subModel) {
-                final selected = playbackModel.mediaStreams?.defaultSubStreamIndex == subModel.index;
-                return ListTile(
-                  title: OxLabeledIranFlag(
-                    label: subModel.label(context),
-                    subtitleLanguage: subModel.language,
-                    playbackModel: playbackModel,
-                    subtitleIndex: subModel.index,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  tileColor: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3) : null,
-                  subtitle: subModel.language.isNotEmpty
-                      ? Opacity(opacity: 0.6, child: Text(subModel.language.capitalize()))
-                      : null,
-                  onTap: () async {
-                    final newModel = await playbackModel.setSubtitle(subModel, player);
-                    ref.read(playBackModel.notifier).update((state) => newModel);
-                    if (newModel != null) {
-                      await ref.read(playbackModelHelper).shouldReload(newModel);
-                    }
-                  },
-                );
-              },
-            ).toList(),
+            children: [
+              ...sushiSubtitleMenuRows(context, ref),
+              ...?playbackModel?.subStreams?.mapIndexed(
+                (index, subModel) {
+                  final selected = !sushiSubActive &&
+                      playbackModel.mediaStreams?.defaultSubStreamIndex == subModel.index;
+                  return ListTile(
+                    title: OxLabeledIranFlag(
+                      label: subModel.label(context),
+                      subtitleLanguage: subModel.language,
+                      playbackModel: playbackModel,
+                      subtitleIndex: subModel.index,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    tileColor: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3) : null,
+                    subtitle: subModel.language.isNotEmpty
+                        ? Opacity(opacity: 0.6, child: Text(subModel.language.capitalize()))
+                        : null,
+                    onTap: () async {
+                      // Leaving the Sushi online subtitle for a normal track — drop the mark.
+                      sushiClearActiveSubtitle(ref);
+                      final newModel = await playbackModel.setSubtitle(subModel, player);
+                      ref.read(playBackModel.notifier).update((state) => newModel);
+                      if (newModel != null) {
+                        await ref.read(playbackModelHelper).shouldReload(newModel);
+                      }
+                    },
+                  );
+                },
+              ),
+            ],
           );
         },
       );

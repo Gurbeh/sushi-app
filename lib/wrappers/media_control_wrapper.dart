@@ -629,6 +629,10 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   Future<int> setSubtitleTrack(SubStreamModel? model, PlaybackModel playbackModel) async =>
       await _player?.setSubtitleTrack(model, playbackModel) ?? -1;
 
+  /// Sushi Automatic / Online subtitle picker: inject a subtitle from decoded text.
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async =>
+      _player?.setSubtitleFromText(data, title: title, language: language);
+
   Future<void> setVolume(double volume) async => _player?.setVolume(volume);
 
   @override

@@ -953,6 +953,42 @@ class LibMPV extends BasePlayer {
   Future<void> setSpeed(double speed) async => _player?.setRate(speed);
 
   @override
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
+    if (_player == null || data.trim().isEmpty) {
+      OxplayerStreamLog.event('sushi_sub_from_text_skip', fields: {
+        'player': _player != null,
+        'chars': data.trim().length,
+      });
+      return;
+    }
+    // Invalidate any in-flight external fetch so it can't land on top of this one.
+    _externalSubtitleLoadGen++;
+    _currentSubtitleCodec = 'subrip';
+    _currentSubtitleLanguage = language ?? '';
+    _subtitleTextSeen = false;
+    OxplayerStreamLog.event('sushi_sub_from_text', fields: {
+      'chars': data.length,
+      'preview': data.trimLeft().length > 60 ? '${data.trimLeft().substring(0, 60)}…' : data.trimLeft(),
+    });
+    await _configureMpvForTextSubtitle('subrip');
+    await _player!.setSubtitleTrack(
+      mpv.SubtitleTrack.data(data, title: title ?? 'External', language: language),
+    );
+    await _syncLibassSubtitleStyle();
+    // Confirm mpv accepted it and (a beat later) whether any cue actually surfaced.
+    OxplayerStreamLog.event('sushi_sub_from_text_set', fields: {
+      'activeId': _player?.state.track.subtitle.id,
+      'subCount': _player?.state.tracks.subtitle.length,
+    });
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      OxplayerStreamLog.event('sushi_sub_from_text_check', fields: {
+        'textSeen': _subtitleTextSeen,
+        'activeId': _player?.state.track.subtitle.id,
+      });
+    });
+  }
+
+  @override
   Future<int> setSubtitleTrack(SubStreamModel? model, PlaybackModel playbackModel) async {
     if (_player == null) return -1;
     final wantedSubtitle = model ?? playbackModel.defaultSubStream;

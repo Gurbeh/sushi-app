@@ -20,6 +20,10 @@ class OxIranFlagIcon extends StatelessWidget {
       gaplessPlayback: true,
       cacheWidth: cachePx,
       cacheHeight: cachePx,
+      // A decorative flag must never take down a Row's layout: if the asset is
+      // missing (e.g. dropped from pubspec), collapse to empty space instead of
+      // Flutter's oversized error box.
+      errorBuilder: (_, __, ___) => SizedBox(width: size, height: size),
     );
   }
 }

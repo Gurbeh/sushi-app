@@ -258,6 +258,9 @@ flutter:
     - config/
     - assets/env/default.env
     - assets/oxplayer/
+    # A directory entry is not recursive; the Iran-flag PNGs live one level down
+    # and the subtitle picker (OxIranFlagIcon) 404s without this line.
+    - assets/oxplayer/flags/
     - assets/gradient.png
     - assets/Icon.svg
     - assets/mp-font.ttf
