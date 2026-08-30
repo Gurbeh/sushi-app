@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
+import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_request_pb.dart';
 import 'package:fladder/sushi/sushi_request_transport.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/selectable_icon_button.dart';
 
 /// The Request button (ADR 0014 §D2). Shown in place of the play button when a title has no
-/// playable file — a wish for a movie or whole series we do not carry yet. Tapping it sends one
-/// `/request` and reports the outcome as a SnackBar in the user's language (R-UI-7).
+/// playable file — a wish for a movie or whole series we do not carry yet.
 ///
-/// The "it's ready" news arrives later as a main-bot Telegram DM, so there is no status to render
-/// here beyond the one-shot outcome.
+/// Once a request has gone in (this session or a previous one — [sushiRequestedProvider] is
+/// persisted), it turns into a disabled "Requested" button. The "it's ready" news arrives later as
+/// a main-bot Telegram DM, so there is nothing else to render here.
 class SushiRequestButton extends ConsumerStatefulWidget {
   const SushiRequestButton({
     required this.tmdbId,
@@ -51,14 +52,18 @@ class _SushiRequestButtonState extends ConsumerState<SushiRequestButton> {
     setState(() => _busy = false);
 
     final l = context.localized;
+    final requested = ref.read(sushiRequestedProvider.notifier);
     final String message;
     switch (res?.outcome) {
       case SushiRequestOutcome.accepted:
         message = l.sushiRequestSent;
+        await requested.mark(widget.tmdbId, widget.kind);
       case SushiRequestOutcome.duplicate:
         message = l.sushiRequestDuplicate;
+        await requested.mark(widget.tmdbId, widget.kind);
       case SushiRequestOutcome.alreadyAvailable:
         message = l.sushiRequestAvailableNow;
+        await requested.clear(widget.tmdbId, widget.kind);
         widget.onAlreadyAvailable?.call();
       case SushiRequestOutcome.quotaExceeded:
         message = l.sushiRequestQuota;
@@ -66,6 +71,7 @@ class _SushiRequestButtonState extends ConsumerState<SushiRequestButton> {
       case null:
         message = l.sushiRequestFailed;
     }
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
@@ -73,24 +79,29 @@ class _SushiRequestButtonState extends ConsumerState<SushiRequestButton> {
 
   @override
   Widget build(BuildContext context) {
-    final label = context.localized.request;
+    final alreadyRequested =
+        ref.watch(sushiRequestedProvider.select((s) => s.contains('${widget.tmdbId}:${widget.kind}')));
+    final label = alreadyRequested ? context.localized.sushiRequested : context.localized.request;
+    final icon = alreadyRequested ? IconsaxPlusLinear.tick_circle : IconsaxPlusLinear.add;
+    final onPressed = (alreadyRequested || _busy) ? null : _submit;
+
     if (!widget.prominent) {
       return SelectableIconButton(
-        onPressed: _submit,
-        selected: false,
+        onPressed: onPressed ?? () {},
+        selected: alreadyRequested,
         refreshOnEnd: false,
-        icon: IconsaxPlusLinear.add,
+        icon: icon,
         label: label,
       );
     }
     return FilledButton.icon(
-      onPressed: _busy ? null : _submit,
+      onPressed: onPressed,
       icon: _busy
           ? const SizedBox.square(
               dimension: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(IconsaxPlusLinear.add),
+          : Icon(icon),
       label: Text(label),
       style: FilledButton.styleFrom(
         padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 14),

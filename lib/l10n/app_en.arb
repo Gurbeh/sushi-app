@@ -3058,5 +3058,7 @@
   "sushiFollow": "Follow",
   "@sushiFollow": {},
   "sushiFollowing": "Following",
-  "@sushiFollowing": {}
+  "@sushiFollowing": {},
+  "sushiRequested": "Requested",
+  "@sushiRequested": {}
 }

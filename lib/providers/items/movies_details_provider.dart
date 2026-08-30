@@ -21,6 +21,7 @@ import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
+import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 
@@ -127,17 +128,25 @@ class MovieDetails extends _$MovieDetails {
   }
 
   Future<void> _sushiRefreshMovie(MovieModel item, int tmdbId, int loadGen) async {
-    final snap = await ref.read(sushiCatalogControllerProvider).openTitle(
-          tmdbId: tmdbId,
-          kind: SushiKind.movie,
-        );
-    if (loadGen != _loadGeneration) return;
-    if (snap.page == null) {
-      log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
-      return;
+    try {
+      final snap = await ref.read(sushiCatalogControllerProvider).openTitle(
+            tmdbId: tmdbId,
+            kind: SushiKind.movie,
+          );
+      if (loadGen != _loadGeneration) return;
+      if (snap.page == null) {
+        log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
+        return;
+      }
+      state = sushiEnrichMovieModel(item, snap.page!, snap.files);
+      sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
+    } finally {
+      // Play/Request are only decidable once this has run (ADR 0014) — mark it so the screen can
+      // stop showing a placeholder. Not on a superseded load.
+      if (loadGen == _loadGeneration) {
+        ref.read(sushiTitleResolvedProvider.notifier).markResolved(item.id);
+      }
     }
-    state = sushiEnrichMovieModel(item, snap.page!, snap.files);
-    sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
   }
 
   Future<void> _oxContinueMovieLoad(String itemId, int loadGen) async {

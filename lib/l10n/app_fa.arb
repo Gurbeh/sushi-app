@@ -2227,5 +2227,6 @@
     "sushiRequestQuota": "به سقف درخواست‌های امروزت رسیدی. فردا دوباره امتحان کن.",
     "sushiRequestFailed": "ارسال درخواست نشد. لطفاً دوباره امتحان کن.",
     "sushiFollow": "دنبال‌کردن",
-    "sushiFollowing": "دنبال می‌کنی"
+    "sushiFollowing": "دنبال می‌کنی",
+    "sushiRequested": "درخواست داده شد"
 }
