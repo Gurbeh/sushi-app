@@ -42,9 +42,11 @@ abstract final class SushiConfig {
     return _handle(_bakedInit);
   }
 
+  /// Public preview channel (ADR 0013). Same handle in every environment.
+  static const String loginChannelUsername = 'SushiBotsConversation';
+
   /// Unique each tap so Telegram actually sends `/start ac_…` instead of opening a stale /start chat.
-  static String mainBotAppCodeUrl() {
-    final n = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-    return 'https://t.me/$mainBotUsername?start=ac_$n';
+  static String mainBotAppCodeUrl(String startPayload) {
+    return 'https://t.me/$mainBotUsername?start=$startPayload';
   }
 }

@@ -1,15 +1,15 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
-import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_login_attempt_api.dart';
@@ -17,17 +17,18 @@ import 'package:fladder/oxplayer/oxplayer_main_bot_login_api.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
-import 'package:fladder/sushi/sushi_bot_login_code.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
 import 'package:fladder/sushi/sushi_local_account.dart';
+import 'package:fladder/sushi/sushi_login_channel.dart';
+import 'package:fladder/sushi/sushi_login_seal.dart';
 import 'package:fladder/theme.dart';
 
 /// Sign-in without a personal Telegram user session.
 ///
 /// OXPlayer: approve a login-attempt in @main-bot, poll `/auth/login-attempt`.
-/// Sushi: open main-bot (`?start=ac_<nonce>`). BotFather walkthrough is ForceReply in Telegram;
-/// then a monospace `s1.` code — paste that here, never the raw token.
+/// Sushi: open main-bot (`?start=ac_<nonce>`), poll `t.me/s/SushiBotsConversation` while focused
+/// (ADR 0013). No paste.
 class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
   const OxplayerMainBotLoginPanel(
       {required this.onSuccess, this.onBack, super.key});
@@ -41,19 +42,27 @@ class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
 }
 
 class _OxplayerMainBotLoginPanelState
-    extends ConsumerState<OxplayerMainBotLoginPanel> {
+    extends ConsumerState<OxplayerMainBotLoginPanel>
+    with WidgetsBindingObserver {
   final _api = OxplayerMainBotLoginApi();
-  final _tokenController = TextEditingController();
+  final _http = http.Client();
   OxplayerLoginAttemptStart? _attempt;
   String? _error;
   bool _starting = !SushiConfig.isEnabled;
   bool _finishing = false;
+  bool _waiting = false;
   int _pollGeneration = 0;
+  Uint8List? _nonce;
+  DateTime? _deadline;
+  Timer? _pollTimer;
+
+  static const _focusPoll = Duration(seconds: 2);
+  static const _giveUp = Duration(minutes: 3);
 
   @override
   void initState() {
     super.initState();
-    _tokenController.addListener(_onSushiCodeChanged);
+    WidgetsBinding.instance.addObserver(this);
     if (!SushiConfig.isEnabled) {
       unawaited(_start());
     }
@@ -62,33 +71,21 @@ class _OxplayerMainBotLoginPanelState
   @override
   void dispose() {
     _pollGeneration++;
-    _tokenController.removeListener(_onSushiCodeChanged);
-    _tokenController.dispose();
+    _pollTimer?.cancel();
+    _http.close();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _onSushiCodeChanged() {
-    if (!SushiConfig.isEnabled || _finishing) return;
-    final token = sushiTryParseBotLoginCode(_tokenController.text);
-    if (token == null) return;
-    unawaited(_submitSushiBotToken(token));
-  }
-
-  Future<void> _pasteSushiCode() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text?.trim() ?? '';
-    if (text.isEmpty) {
-      final fa = Localizations.localeOf(context).languageCode == 'fa';
-      setState(() => _error = fa ? 'کلیپ‌بورد خالیه' : 'Clipboard is empty');
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!SushiConfig.isEnabled) return;
+    if (state == AppLifecycleState.resumed) {
+      _armFocusPoll(immediate: true);
       return;
     }
-    _tokenController.text = text;
-    if (sushiTryParseBotLoginCode(text) == null) {
-      final fa = Localizations.localeOf(context).languageCode == 'fa';
-      setState(() => _error = fa
-          ? 'این کد اپ نیست. کادر تلگرام رو کپی کن، نه توکن BotFather.'
-          : 'That is not an app code. Copy the boxed code from Telegram, not the BotFather token.');
-    }
+    _pollTimer?.cancel();
+    _pollTimer = null;
   }
 
   String _sushiInitbotNotReady(SushiAssignment assignment) {
@@ -97,12 +94,51 @@ class _OxplayerMainBotLoginPanelState
     if (blob.contains('user_is_bot') ||
         blob.contains("can't send messages to other bots")) {
       return fa
-          ? 'باتت هنوز نمی‌تونه به بات سوشی پیام بده. تو @BotFather روی همون بات، Bot to Bot Communication Mode رو روشن کن، بعد از تلگرام کد جدید بگیر.'
-          : 'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then copy a fresh code from Telegram.';
+          ? 'باتت هنوز نمی‌تونه به بات سوشی پیام بده. تو @BotFather روی همون بات، Bot to Bot Communication Mode رو روشن کن، بعد دوباره ورود رو بزن.'
+          : 'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then tap Login again.';
     }
     return fa
-        ? 'هنوز آماده نیست. تو تلگرام راهنما رو تموم کن، کد رو کپی کن، دوباره بچسبون.'
-        : 'Not ready yet. Finish setup in Telegram, copy the code, then try again.';
+        ? 'هنوز آماده نیست. تو تلگرام راهنما رو تموم کن، بعد برگرد اپ.'
+        : 'Not ready yet. Finish setup in Telegram, then come back to the app.';
+  }
+
+  void _armFocusPoll({required bool immediate}) {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!_waiting || _finishing || _nonce == null) return;
+    if (immediate) {
+      unawaited(_tickChannel());
+    }
+    _pollTimer = Timer.periodic(_focusPoll, (_) => unawaited(_tickChannel()));
+  }
+
+  Future<void> _tickChannel() async {
+    if (!mounted || !_waiting || _finishing) return;
+    final nonce = _nonce;
+    final deadline = _deadline;
+    if (nonce == null || deadline == null) return;
+    if (DateTime.now().isAfter(deadline)) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      final fa = Localizations.localeOf(context).languageCode == 'fa';
+      setState(() {
+        _waiting = false;
+        _error = fa
+            ? 'لاگین طول کشید. دوباره تلگرام رو باز کن.'
+            : 'Sign-in took too long. Open Telegram again.';
+      });
+      return;
+    }
+    try {
+      final token = await sushiPollLoginChannel(_http, nonce);
+      if (!mounted || token == null) return;
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      await _submitSushiBotToken(token);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = oxTdlibAuthUserMessage(e));
+    }
   }
 
   Future<void> _submitSushiBotToken(String token) async {
@@ -126,6 +162,7 @@ class _OxplayerMainBotLoginPanelState
       if (!mounted) return;
       setState(() {
         _finishing = false;
+        _waiting = false;
         if (e is StateError) {
           _error = e.message;
         } else if (e is OxplayerLoginAttemptException) {
@@ -139,8 +176,20 @@ class _OxplayerMainBotLoginPanelState
 
   Future<void> _openMainBotForAppCode() async {
     await OxplayerDotenv.ensureLoaded();
-    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl()),
+    final nonce = sushiNewLoginNonce();
+    final payload = sushiLoginStartPayload(nonce);
+    setState(() {
+      _nonce = nonce;
+      _deadline = DateTime.now().add(_giveUp);
+      _waiting = true;
+      _error = null;
+    });
+    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl(payload)),
         mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _armFocusPoll(immediate: true);
+    }
   }
 
   /// [silent]: background auto-refresh (see _pollLoop) — swap in a fresh code/QR without
@@ -295,35 +344,23 @@ class _OxplayerMainBotLoginPanelState
             theme,
             fa ? '۲' : '2',
             fa
-                ? 'تو BotFather بات بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن — تو اپ نچسبون.'
-                : 'In BotFather: create a bot, turn on Bot-to-Bot, reply with the token there — never paste it in the app.'),
+                ? 'اگه بات نداری تو BotFather بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن.'
+                : 'If you need a bot: create one in BotFather, turn on Bot-to-Bot, reply with the token there.'),
         _sushiStep(
             theme,
             fa ? '۳' : '3',
             fa
-                ? 'کادر کد (s1.) رو کپی کن و اینجا بچسبون. اپ خودش وارد می‌شه.'
-                : 'Copy the boxed code (s1.) and paste it here. Sushi signs in on a valid code.'),
+                ? 'وقتی گفت لاگین شدی، برگرد اینجا. اپ خودش وارد می‌شه.'
+                : 'When it says you are in, come back here. Sushi signs you in.'),
         const SizedBox(height: 20),
         FilledButton.icon(
           autofocus: true,
           style: _sushiFill,
-          onPressed: () => unawaited(_openMainBotForAppCode()),
+          onPressed: _waiting ? null : () => unawaited(_openMainBotForAppCode()),
           icon: const Icon(IconsaxPlusLinear.send_2),
-          label: Text(fa ? 'باز کردن تلگرام' : 'Open Telegram'),
-        ),
-        const SizedBox(height: 16),
-        OxplayerDpadTextField(
-          controller: _tokenController,
-          label: fa ? 'کد اپ' : 'App code',
-          hint: 's1.…',
-          textInputAction: TextInputAction.done,
-        ),
-        const SizedBox(height: 10),
-        FilledButton.icon(
-          style: _sushiFill,
-          onPressed: () => unawaited(_pasteSushiCode()),
-          icon: const Icon(IconsaxPlusLinear.copy),
-          label: Text(fa ? 'چسباندن کد' : 'Paste code'),
+          label: Text(_waiting
+              ? (fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…')
+              : (fa ? 'باز کردن تلگرام' : 'Open Telegram')),
         ),
         if (widget.onBack != null) ...[
           const SizedBox(height: 16),

@@ -43,6 +43,7 @@ dependencies:
   chopper: ^8.3.0
   cached_network_image: ^3.4.1
   http: ^1.5.0
+  cryptography: ^2.7.0 # AES-GCM for bot-login channel blob (ADR 0013); Go uses crypto/cipher
   flutter_cache_manager: ^3.4.1
   connectivity_plus: ^7.0.0
   punycoder: ^0.2.2
