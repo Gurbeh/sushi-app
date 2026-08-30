@@ -10,6 +10,7 @@ import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/oxplayer/oxplayer_account_switch.dart';
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/oxplayer/oxplayer_login_method_chooser.dart';
 import 'package:fladder/oxplayer/oxplayer_main_bot_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
@@ -51,8 +52,8 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   bool _editUsersMode = false;
   /// TV only: false = QR-first, true = phone panel after remote select.
   bool _tvUsePhone = false;
-  /// false = TDLib (personal Telegram account), true = @main-bot (no account access at all).
-  bool _useMainBot = false;
+  /// Chooser first; telegram = phone/QR session; bot = personal-bot / main-bot.
+  _LoginPath _path = _LoginPath.choose;
 
   @override
   void initState() {
@@ -222,11 +223,17 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   void _backToAccountGrid() {
     setState(() {
       _editUsersMode = false;
+      _path = _LoginPath.choose;
     });
     ref.read(authProvider.notifier).goUserSelect();
   }
 
   bool _consumeSystemBack(List<AccountModel> accounts, bool showAccountGrid) {
+    if (_path != _LoginPath.choose) {
+      setState(() => _path = _LoginPath.choose);
+      return true;
+    }
+
     if (accounts.isEmpty) return false;
 
     if (!showAccountGrid) {
@@ -240,9 +247,14 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
   void _startAddAccount() {
     setState(() {
       _editUsersMode = false;
+      _path = _LoginPath.choose;
     });
     ref.read(authProvider.notifier).addNewUser();
   }
+
+  void _chooseTelegram() => setState(() => _path = _LoginPath.telegram);
+
+  void _chooseBot() => setState(() => _path = _LoginPath.bot);
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +262,17 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     final accounts = ref.watch(authProvider.select((value) => value.accounts));
     final showAccountGrid = screen == LoginScreenType.users && accounts.isNotEmpty;
     final showBackToAccounts = !showAccountGrid && accounts.isNotEmpty;
-    final interceptSystemBack = accounts.isNotEmpty && !showAccountGrid;
+    final interceptSystemBack =
+        (accounts.isNotEmpty && !showAccountGrid) || _path != _LoginPath.choose;
+    final showingChooser = !_bootstrapping &&
+        _bootstrapError == null &&
+        !showAccountGrid &&
+        _path == _LoginPath.choose;
+    final maxContentWidth = showAccountGrid
+        ? 1000.0
+        : showingChooser
+            ? 880.0
+            : 420.0;
 
     return PopScope(
       canPop: !interceptSystemBack,
@@ -299,7 +321,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: showAccountGrid ? 1000 : 420),
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: _bootstrapping
@@ -355,7 +377,7 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
-                                          if (showBackToAccounts)
+                                          if (showBackToAccounts || _path != _LoginPath.choose)
                                             ValueListenableBuilder<bool>(
                                               valueListenable:
                                                   OxplayerTdlibConnectingExperience.isActive,
@@ -366,82 +388,75 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                                       crossAxisAlignment: CrossAxisAlignment.stretch,
                                                       children: [
                                                         Align(
-                                                          alignment: Alignment.centerLeft,
+                                                          alignment: AlignmentDirectional.centerStart,
                                                           child: TextButton.icon(
-                                                            onPressed: _backToAccountGrid,
+                                                            onPressed: _path != _LoginPath.choose
+                                                                ? () => setState(
+                                                                    () => _path = _LoginPath.choose)
+                                                                : _backToAccountGrid,
                                                             icon: const Icon(
                                                                 IconsaxPlusLinear.arrow_left_2),
-                                                            label: Text(context.localized.switchUser),
+                                                            label: Text(
+                                                              _path != _LoginPath.choose
+                                                                  ? (Localizations.localeOf(context)
+                                                                              .languageCode ==
+                                                                          'fa'
+                                                                      ? 'بازگشت'
+                                                                      : 'Back')
+                                                                  : context.localized.switchUser,
+                                                            ),
                                                           ),
                                                         ),
                                                         const SizedBox(height: 8),
                                                       ],
                                                     ),
                                             ),
-                                          _useMainBot
-                                              ? OxplayerMainBotLoginPanel(
-                                                  onSuccess: _onLoginSuccess,
-                                                  onBack: () => setState(() => _useMainBot = false),
-                                                )
-                                              : _isTv(context)
-                                                  ? (_tvUsePhone
-                                                      ? OxplayerTdlibLoginPanel(
-                                                          onSuccess: _onLoginSuccess,
-                                                          showQrShortcut: false,
-                                                          onBackToQr: () async {
-                                                            final tdlib =
-                                                                OxplayerTdlibBridgeController.instance();
-                                                            await tdlib.resetForPhoneLogin();
-                                                            await tdlib.requestQrLogin();
-                                                            if (mounted) {
-                                                              setState(() => _tvUsePhone = false);
-                                                            }
-                                                          },
-                                                        )
-                                                      : OxplayerTdlibQrLoginPanel(
-                                                          onSuccess: _onLoginSuccess,
-                                                          onUsePhoneNumber: () async {
-                                                            await OxplayerTdlibBridgeController
-                                                                .instance()
-                                                                .resetForPhoneLogin();
-                                                            if (mounted) {
-                                                              setState(() => _tvUsePhone = true);
-                                                            }
-                                                          },
-                                                          onNeedTwoFactorPassword: () {
-                                                            // Keep TDLib waitingForPassword — do not reset.
+                                          switch (_path) {
+                                            _LoginPath.choose => OxplayerLoginMethodChooser(
+                                                sideBySide: AdaptiveLayout.viewSizeOf(context) !=
+                                                    ViewSize.phone,
+                                                onPhone: _chooseTelegram,
+                                                onBot: _chooseBot,
+                                              ),
+                                            _LoginPath.bot => OxplayerMainBotLoginPanel(
+                                                onSuccess: _onLoginSuccess,
+                                                onBack: () =>
+                                                    setState(() => _path = _LoginPath.choose),
+                                              ),
+                                            _LoginPath.telegram => _isTv(context)
+                                                ? (_tvUsePhone
+                                                    ? OxplayerTdlibLoginPanel(
+                                                        onSuccess: _onLoginSuccess,
+                                                        showQrShortcut: false,
+                                                        onBackToQr: () async {
+                                                          final tdlib =
+                                                              OxplayerTdlibBridgeController
+                                                                  .instance();
+                                                          await tdlib.resetForPhoneLogin();
+                                                          await tdlib.requestQrLogin();
+                                                          if (mounted) {
+                                                            setState(() => _tvUsePhone = false);
+                                                          }
+                                                        },
+                                                      )
+                                                    : OxplayerTdlibQrLoginPanel(
+                                                        onSuccess: _onLoginSuccess,
+                                                        onUsePhoneNumber: () async {
+                                                          await OxplayerTdlibBridgeController
+                                                              .instance()
+                                                              .resetForPhoneLogin();
+                                                          if (mounted) {
                                                             setState(() => _tvUsePhone = true);
-                                                          },
-                                                        ))
-                                                  : OxplayerTdlibLoginPanel(
-                                                      onSuccess: _onLoginSuccess,
-                                                    ),
-                                          if (!_useMainBot)
-                                            ListenableBuilder(
-                                              listenable: OxplayerTdlibBridgeController.instance(),
-                                              builder: (context, _) {
-                                                final kind = OxplayerTdlibBridgeController.instance().state.kind;
-                                                final onFirstSessionStep = kind ==
-                                                        OxTdlibAuthStateKind.waitingForPhoneNumber ||
-                                                    kind == OxTdlibAuthStateKind.waitingForQrConfirmation ||
-                                                    kind == OxTdlibAuthStateKind.uninitialized;
-                                                if (!onFirstSessionStep) {
-                                                  return const SizedBox.shrink();
-                                                }
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(top: 14),
-                                                  child: TextButton(
-                                                    onPressed: () => setState(() => _useMainBot = true),
-                                                    child: Text(
-                                                      SushiConfig.isEnabled
-                                                          ? "Don't want to link your Telegram account? Sign in with a personal bot instead"
-                                                          : "Don't want to link your Telegram account? Sign in with @${OxplayerEnv.botUsername ?? 'main-bot'} instead",
-                                                      textAlign: TextAlign.center,
-                                                    ),
+                                                          }
+                                                        },
+                                                        onNeedTwoFactorPassword: () {
+                                                          setState(() => _tvUsePhone = true);
+                                                        },
+                                                      ))
+                                                : OxplayerTdlibLoginPanel(
+                                                    onSuccess: _onLoginSuccess,
                                                   ),
-                                                );
-                                              },
-                                            ),
+                                          },
                                         ],
                                       ),
                               ),
@@ -456,3 +471,5 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
     );
   }
 }
+
+enum _LoginPath { choose, telegram, bot }
