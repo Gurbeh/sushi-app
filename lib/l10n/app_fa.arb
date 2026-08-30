@@ -2220,5 +2220,12 @@
     "oxplayerLoggingOutPhrase5": "در حال هماهنگ‌سازی نشست انتقال…",
     "oxplayerLoggingOutPhrase6": "در حال آماده‌سازی برای ورود…",
     "oxplayerLoggingOutPhrase7": "تقریباً تمام شد…",
-    "oxplayerLoggingOutPhrase8": "در حال نهایی‌سازی…"
+    "oxplayerLoggingOutPhrase8": "در حال نهایی‌سازی…",
+    "sushiRequestSent": "درخواست ثبت شد. وقتی آماده شد توی تلگرام بهت خبر می‌دیم.",
+    "sushiRequestDuplicate": "قبلاً این رو درخواست دادی — توی صف هست.",
+    "sushiRequestAvailableNow": "خبر خوب — همین الان موجوده!",
+    "sushiRequestQuota": "به سقف درخواست‌های امروزت رسیدی. فردا دوباره امتحان کن.",
+    "sushiRequestFailed": "ارسال درخواست نشد. لطفاً دوباره امتحان کن.",
+    "sushiFollow": "دنبال‌کردن",
+    "sushiFollowing": "دنبال می‌کنی"
 }

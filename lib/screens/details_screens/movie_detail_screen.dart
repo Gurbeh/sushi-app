@@ -20,6 +20,8 @@ import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
+import 'package:fladder/sushi/sushi_request_button.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -66,6 +68,10 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
         details?.overview.seerrUrl?.isNotEmpty == true &&
         details?.tmdbId != null &&
         !hasPlayableMedia;
+    // Sushi: no Seerr — a native /request replaces play when there is nothing to play (ADR 0014).
+    final sushiRequestTmdb = SushiConfig.isEnabled && details != null && !hasPlayableMedia
+        ? sushiTmdbIdFromItemId(details.id)
+        : null;
 
     return DetailScaffold(
       label: widget.item.name,
@@ -130,12 +136,21 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                   .fetchDetails(widget.item);
                             },
                           )
-                        : showMovieRequest
-                            ? OxMovieRequestButton(
-                                tmdbId: details.tmdbId!,
+                        : sushiRequestTmdb != null
+                            ? SushiRequestButton(
+                                tmdbId: sushiRequestTmdb,
+                                kind: 1,
                                 prominent: true,
+                                onAlreadyAvailable: () => ref
+                                    .read(providerInstance.notifier)
+                                    .fetchDetails(widget.item),
                               )
-                            : null,
+                            : showMovieRequest
+                                ? OxMovieRequestButton(
+                                    tmdbId: details.tmdbId!,
+                                    prominent: true,
+                                  )
+                                : null,
                     centerButtons: OxDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [

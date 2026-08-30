@@ -88,49 +88,64 @@ Future<SushiListRes?> sushiFetchList({
   }
 }
 
-/// Fire-and-forget fav/later (docs/11).
+/// Fire-and-forget fav / later / follow (docs/11, ADR 0014 §D3).
 Future<void> sushiSendFavEvent(
     {required int tmdbId, required int kind, required bool on}) async {
-  await _sendFlagEvent(field: 1, tmdbId: tmdbId, kind: kind, on: on);
+  await _sendEvent(eventField: 1, inner: _flagInner(tmdbId: tmdbId, kind: kind, on: on));
 }
 
 Future<void> sushiSendLaterEvent(
     {required int tmdbId, required int kind, required bool on}) async {
-  await _sendFlagEvent(field: 2, tmdbId: tmdbId, kind: kind, on: on);
+  await _sendEvent(eventField: 2, inner: _flagInner(tmdbId: tmdbId, kind: kind, on: on));
 }
 
-Future<void> _sendFlagEvent(
-    {required int field,
-    required int tmdbId,
-    required int kind,
-    required bool on}) async {
+/// FollowEvent { tmdb_id = 1; bool on = 2; } — series-only, so no kind field (ADR 0014 §D3).
+Future<void> sushiSendFollowEvent({required int tmdbId, required bool on}) async {
+  final inner = BytesBuilder();
+  _writeTag(inner, 1, 0);
+  inner.add(sushiUvarint(tmdbId));
+  if (on) {
+    _writeTag(inner, 2, 0);
+    inner.add(sushiUvarint(1));
+  }
+  await _sendEvent(eventField: 3, inner: inner.toBytes());
+}
+
+void _writeTag(BytesBuilder b, int field, int wire) =>
+    b.add(sushiUvarint((field << 3) | wire));
+
+/// FavEvent / LaterEvent share a body: { tmdb_id = 1; Kind kind = 2; bool on = 3; }.
+Uint8List _flagInner({required int tmdbId, required int kind, required bool on}) {
+  final inner = BytesBuilder();
+  _writeTag(inner, 1, 0);
+  inner.add(sushiUvarint(tmdbId));
+  _writeTag(inner, 2, 0);
+  inner.add(sushiUvarint(kind));
+  if (on) {
+    _writeTag(inner, 3, 0);
+    inner.add(sushiUvarint(1));
+  }
+  return inner.toBytes();
+}
+
+/// Wraps one event body as `Events { seq, events = [ Event { <eventField> = <inner> } ] }` and
+/// sends it down the `ev` command, fire-and-forget.
+Future<void> _sendEvent({required int eventField, required Uint8List inner}) async {
   final assignment = await SushiAssignmentStore.load();
   if (assignment == null ||
       assignment.pending ||
       assignment.apiSendTargets.isEmpty) {
     return;
   }
-  // Events { seq=1, events=[ Event { fav|later = { tmdb_id, kind, on } } ] }
-  final inner = BytesBuilder();
-  void writeTag(BytesBuilder b, int f, int wire) =>
-      b.add(sushiUvarint((f << 3) | wire));
-  writeTag(inner, 1, 0);
-  inner.add(sushiUvarint(tmdbId));
-  writeTag(inner, 2, 0);
-  inner.add(sushiUvarint(kind));
-  if (on) {
-    writeTag(inner, 3, 0);
-    inner.add(sushiUvarint(1));
-  }
   final event = BytesBuilder();
-  writeTag(event, field, 2);
-  final body = inner.toBytes();
-  event.add(sushiUvarint(body.length));
-  event.add(body);
+  _writeTag(event, eventField, 2);
+  event.add(sushiUvarint(inner.length));
+  event.add(inner);
+
   final events = BytesBuilder();
-  writeTag(events, 1, 0);
+  _writeTag(events, 1, 0);
   events.add(sushiUvarint(DateTime.now().millisecondsSinceEpoch & 0x3fffffff));
-  writeTag(events, 2, 2);
+  _writeTag(events, 2, 2);
   final evBytes = event.toBytes();
   events.add(sushiUvarint(evBytes.length));
   events.add(evBytes);

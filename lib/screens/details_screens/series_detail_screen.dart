@@ -24,6 +24,8 @@ import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
+import 'package:fladder/sushi/sushi_request_button.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
@@ -73,6 +75,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final currentEpisode = SushiConfig.isEnabled
         ? (selectedEpisode ?? details?.selectedEpisode ?? details?.nextUp)
         : oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
+    // Sushi: we carry no episode of this series yet — offer a native /request (ADR 0014 §D2).
+    final sushiSeriesRequestTmdb =
+        SushiConfig.isEnabled && details != null && (details.availableEpisodes?.isEmpty ?? true)
+            ? sushiTmdbIdFromItemId(details.id)
+            : null;
 
     return DetailScaffold(
       label: details?.name ?? "",
@@ -163,11 +170,19 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                               ref.read(providerId.notifier).fetchDetails(widget.item);
                             },
                           )
-                        : null,
+                        : sushiSeriesRequestTmdb != null
+                            ? SushiRequestButton(
+                                tmdbId: sushiSeriesRequestTmdb,
+                                kind: 2,
+                                prominent: true,
+                                onAlreadyAvailable: () =>
+                                    ref.read(providerId.notifier).fetchDetails(widget.item),
+                              )
+                            : null,
                     centerButtons: OxDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
-                        if (SushiConfig.isEnabled)
+                        if (SushiConfig.isEnabled) ...[
                           Consumer(
                             builder: (context, ref, _) {
                               final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
@@ -183,8 +198,28 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                 icon: IconsaxPlusLinear.clock,
                               );
                             },
-                          )
-                        else
+                          ),
+                          // Follow the series for new-episode notifications (ADR 0014 §D3).
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                                  const SushiItemFlags();
+                              return SelectableIconButton(
+                                onPressed: () async {
+                                  await ref
+                                      .read(sushiItemFlagsProvider.notifier)
+                                      .setFollowing(details, !flags.following);
+                                },
+                                selected: flags.following,
+                                selectedIcon: IconsaxPlusBold.notification,
+                                icon: IconsaxPlusLinear.notification,
+                                label: flags.following
+                                    ? context.localized.sushiFollowing
+                                    : context.localized.sushiFollow,
+                              );
+                            },
+                          ),
+                        ] else
                           SelectableIconButton(
                             onPressed: () async {
                               await ref

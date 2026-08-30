@@ -3044,5 +3044,19 @@
   "oxplayerLoggingOutPhrase7": "Almost there…",
   "@oxplayerLoggingOutPhrase7": {},
   "oxplayerLoggingOutPhrase8": "Finishing setup…",
-  "@oxplayerLoggingOutPhrase8": {}
+  "@oxplayerLoggingOutPhrase8": {},
+  "sushiRequestSent": "Request sent. We'll message you on Telegram when it's ready.",
+  "@sushiRequestSent": {},
+  "sushiRequestDuplicate": "You've already requested this — it's in the queue.",
+  "@sushiRequestDuplicate": {},
+  "sushiRequestAvailableNow": "Good news — it's already available!",
+  "@sushiRequestAvailableNow": {},
+  "sushiRequestQuota": "You've reached today's request limit. Try again tomorrow.",
+  "@sushiRequestQuota": {},
+  "sushiRequestFailed": "Couldn't send the request. Please try again.",
+  "@sushiRequestFailed": {},
+  "sushiFollow": "Follow",
+  "@sushiFollow": {},
+  "sushiFollowing": "Following",
+  "@sushiFollowing": {}
 }
