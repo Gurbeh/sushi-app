@@ -2,7 +2,8 @@
 # Tag v* → release. Schedule / push main / workflow_dispatch → nightly. PR → development (Android debug only).
 # Main push skips nightly when commit is release-related (bump / prepare / Release X.Y.Z) so tag alone builds.
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
-# OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols, Play app.oxplayer, admin Telegram notify.
+# OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols.
+# Sushi: Android is APK-only — no Google Play Console / AAB / R2 mirror.
 # Bootstrap GitHub secrets: INFISICAL_API_URL, INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET, TS_CI_AUTHKEY
 name: Build OXPlayer
 
@@ -263,7 +264,8 @@ jobs:
               --flavor direct \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
-      - name: Build Android APK and AAB
+      # Sushi ships APKs only — no Google Play deployment, so no AAB.
+      - name: Build Android APK
         if: needs.fetch-info.outputs.build_type != 'development'
         run: |
           chmod +x .github/scripts/retry_command.sh
@@ -272,12 +274,6 @@ jobs:
               --split-debug-info=build/debug-info \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --flavor direct \
-              --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
-          .github/scripts/retry_command.sh 5 60 -- \
-            flutter build appbundle --release \
-              --split-debug-info=build/debug-info \
-              --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-              --flavor production \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
       - name: Upload debug symbols to Sentry
@@ -297,14 +293,6 @@ jobs:
           done
           chmod +x .github/scripts/retry_command.sh
           .github/scripts/retry_command.sh 3 45 -- dart run sentry_dart_plugin
-
-      - name: Verify native ABI parity (Play 64-bit / no x86)
-        if: needs.fetch-info.outputs.build_type != 'development'
-        run: |
-          set -euo pipefail
-          AAB="build/app/outputs/bundle/productionRelease/app-production-release.aab"
-          test -f "$AAB"
-          dart run tool/android/verify_native_abi_parity.dart --aab "$AAB"
 
       - name: Clean up keystore
         if: always()
@@ -329,7 +317,6 @@ jobs:
           cp "build/app/outputs/flutter-apk/app-armeabi-v7a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-armeabi-v7a.apk" || true
           cp "build/app/outputs/flutter-apk/app-arm64-v8a-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-arm64-v8a.apk" || true
           cp "build/app/outputs/flutter-apk/app-x86_64-direct-release.apk" "build/app/outputs/android_artifacts/${SUF}-x86_64.apk" || true
-          mv "build/app/outputs/bundle/productionRelease/app-production-release.aab" "build/app/outputs/android_artifacts/${SUF}.aab"
 
       - name: Attest APKs
         if: needs.fetch-info.outputs.build_type != 'development'
@@ -907,7 +894,6 @@ jobs:
           mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "OXPlayer-Android-${V}-armeabi-v7a.apk" || true
           mv "oxplayer-android/${SUF}-arm64-v8a.apk" "OXPlayer-Android-${V}-arm64-v8a.apk" || true
           mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk" || true
-          mv "oxplayer-android/${SUF}.aab" "OXPlayer-Android-${V}.aab"
 
       - uses: actions/download-artifact@v5
         with:
@@ -1027,7 +1013,6 @@ jobs:
             "OXPlayer-Android-${V}-arm64-v8a.apk"
             "OXPlayer-Android-${V}-armeabi-v7a.apk"
             "OXPlayer-Android-${V}-x86_64.apk"
-            "OXPlayer-Android-${V}.aab"
             "OXPlayer-Windows-${V}-Setup.exe"
             "OXPlayer-Windows-${V}.zip"
             "OXPlayer-iOS-${V}.ipa"
@@ -1087,7 +1072,6 @@ jobs:
             OXPlayer-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
             OXPlayer-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
             OXPlayer-Android-${{ steps.version.outputs.version }}-x86_64.apk
-            OXPlayer-Android-${{ steps.version.outputs.version }}.aab
             OXPlayer-Windows-${{ steps.version.outputs.version }}-Setup.exe
             OXPlayer-Windows-${{ steps.version.outputs.version }}.zip
             OXPlayer-iOS-${{ steps.version.outputs.version }}.ipa
@@ -1112,109 +1096,6 @@ jobs:
           fi
           echo "::error::Create Release failed (gh + softprops)"
           exit 1
-
-      # Website short links (/dl/*) redirect to R2 releases/latest/* — not GitHub CDN.
-      # Nightly must not overwrite stable latest keys.
-      - name: Mirror release assets to R2
-        if: needs.fetch-info.outputs.build_type == 'release'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          : "${CLOUDFLARE_S3_ACCESS_KEY_ID:?CLOUDFLARE_S3_ACCESS_KEY_ID missing from Infisical /core/client-ci}"
-          : "${CLOUDFLARE_S3_SECRET_ACCESS_KEY:?CLOUDFLARE_S3_SECRET_ACCESS_KEY missing}"
-          : "${CLOUDFLARE_S3_API_ENDPOINT:?CLOUDFLARE_S3_API_ENDPOINT missing}"
-          export CLOUDFLARE_R2_BUCKET="${CLOUDFLARE_R2_BUCKET:-oxplayer-channel-news}"
-          bash scripts/mirror-release-to-r2.sh
-
-      - name: Notify admins (Telegram via oxplayer API)
-        if: success()
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          BUILD_TYPE: ${{ needs.fetch-info.outputs.build_type }}
-        shell: bash
-        run: |
-          API_BASE="${OXPLAYER_API_BASE_URL:-}"
-          NOTIFY_TOKEN="${OXPLAYER_CLIENT_RELEASE_NOTIFY_TOKEN:-${PROVIDER_INTERNAL_TOKEN:-}}"
-          if [ -z "${API_BASE}" ] || [ -z "${NOTIFY_TOKEN}" ]; then
-            echo "Skipping admin release notify."
-            exit 0
-          fi
-          if [[ "${BUILD_TYPE}" == "nightly" ]]; then
-            TAG="${{ env.NIGHTLY_TAG }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          BASE="${API_BASE%/}"
-          if ! JSON=$(gh release view "${TAG}" --repo "${REPO}" --json url,name,assets 2>/tmp/gh-release-view.err); then
-            echo "::warning::Could not read release ${TAG}: $(cat /tmp/gh-release-view.err)"
-            exit 0
-          fi
-          RELEASE_URL=$(echo "$JSON" | jq -r .url)
-          RELEASE_NAME=$(echo "$JSON" | jq -r .name)
-          ASSETS=$(echo "$JSON" | jq -c '[.assets[] | {name:.name, url:.url}]')
-          BODY=$(jq -n \
-            --arg releaseUrl "$RELEASE_URL" \
-            --arg releaseTag "$TAG" \
-            --arg releaseTitle "$RELEASE_NAME" \
-            --arg buildType "$BUILD_TYPE" \
-            --arg repository "$REPO" \
-            --argjson assets "$ASSETS" \
-            '{releaseUrl:$releaseUrl, releaseTag:$releaseTag, releaseTitle:$releaseTitle, buildType:$buildType, repository:$repository, assets:$assets}')
-          HTTP_CODE=$(curl -sS -o /tmp/ox-release-notify.json -w "%{http_code}" -X POST \
-            "${BASE}/internal/oxplayer-client/release-admin-notify" \
-            -H "Authorization: Bearer ${NOTIFY_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$BODY")
-          NOTIFY_OK=$(jq -r '.ok // false' /tmp/ox-release-notify.json 2>/dev/null || echo false)
-          if [ "$HTTP_CODE" != "200" ] || [ "$NOTIFY_OK" != "true" ]; then
-            echo "::warning::Admin Telegram notify failed (HTTP ${HTTP_CODE})"
-          else
-            echo "Admin release notify sent."
-          fi
-
-  release_play_console:
-    name: Upload AAB to Google Play Console
-    needs:
-      - fetch-info
-      - create_release
-      - build-android
-    runs-on: ubuntu-latest
-    if: |
-      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
-      needs.create_release.result == 'success'
-    concurrency:
-      group: google-play-upload-${{ github.repository }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: ./.github/actions/oxplayer-infisical-secrets
-        with:
-          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
-          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
-          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
-          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
-
-      - name: Download Artifacts Android
-        uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-android
-          path: oxplayer-android
-
-      - name: Upload AAB to Google Play Console
-        uses: r0adkll/upload-google-play@v1.1.4
-        continue-on-error: true
-        with:
-          serviceAccountJsonPlainText: ${{ env.SERVICE_ACCOUNT_JSON }}
-          packageName: "app.oxplayer"
-          releaseFiles: "oxplayer-android/${{ needs.build-android.outputs.artifact_suffix }}.aab"
-          # OX: internal track until production is promoted in Play Console (Fladder uses production/draft for release).
-          tracks: internal
-          status: completed
-          releaseName: "${{ needs.fetch-info.outputs.version_name }} (${{ needs.fetch-info.outputs.android_version_code }})"
 
   # Temporarily disabled — Flutter web app paused.
   release_web:
