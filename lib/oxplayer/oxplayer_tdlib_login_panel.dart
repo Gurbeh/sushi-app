@@ -11,7 +11,6 @@ import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
@@ -90,6 +89,10 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     _lastKind = _controller.state.kind;
     _controller.addListener(_onStateChanged);
     _phoneController.addListener(_onPhoneTextChanged);
+    // Telegram is warmed in the background from the login screen (no pre-choice "connecting"
+    // takeover any more), so it may not be past setTdlibParameters yet when this panel mounts.
+    // ensureConfigured() is idempotent / single-flight — it just joins that in-flight attempt.
+    unawaited(_ensureConnected());
     // TDLib is warmed in OxplayerLoginScreen bootstrap — focus the active auth field.
     // When QR hands off mid-2FA, kind is already waitingForPassword on first mount.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -125,6 +128,18 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
 
   void _onPhoneTextChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// Joins the background warm-up so this panel can leave the `uninitialized` loading state.
+  /// Errors here render inline (see the `uninitialized` branch in [build]) with a Try again.
+  Future<void> _ensureConnected() async {
+    if (!mounted) return;
+    if (_controller.state.kind != OxTdlibAuthStateKind.uninitialized) return;
+    try {
+      await _controller.ensureConfigured();
+    } catch (e) {
+      if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
+    }
   }
 
   void _onSubmitPressed() {
@@ -543,12 +558,47 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
     final showBackToQr = widget.onBackToQr != null && onPhoneContinueStep;
     final showBackToPhone = showPasswordStep || kind == OxTdlibAuthStateKind.waitingForCode;
 
-    // Still bringing the connection up: show what is happening instead of a phone form whose
-    // Continue button can only fail (submitPhoneNumber requires waitingForPhoneNumber). Restricted
-    // to uninitialized because closed/failed are real outcomes with their own messaging, and the
-    // transient kinds noted above must keep rendering the normal form.
+    // Still bringing the connection up: a plain spinner instead of the phone form whose Continue
+    // button can only fail (submitPhoneNumber requires waitingForPhoneNumber). Restricted to
+    // uninitialized because closed/failed are real outcomes with their own messaging, and the
+    // transient kinds noted above must keep rendering the normal form. The user reached this by
+    // choosing "Continue with phone", so a quiet "Connecting…" is enough — no takeover.
     if (kind == OxTdlibAuthStateKind.uninitialized) {
-      return const OxplayerTdlibConnectingExperience();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _error == null
+              ? [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Connecting…',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ]
+              : [
+                  Icon(IconsaxPlusBold.warning_2,
+                      size: 40, color: theme.colorScheme.error),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.error),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _error = null);
+                      unawaited(_ensureConnected());
+                    },
+                    child: const Text('Try again'),
+                  ),
+                ],
+        ),
+      );
     }
 
     if (kind == OxTdlibAuthStateKind.waitingForQrConfirmation && !_qrSheetOpen) {

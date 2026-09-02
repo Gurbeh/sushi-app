@@ -17,7 +17,6 @@ import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_login_panel.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
-import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_qr_hold.dart';
 import 'package:fladder/oxplayer/oxplayer_test_account_sign_in.dart';
 import 'package:fladder/providers/arguments_provider.dart';
@@ -107,38 +106,27 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
       return;
     }
 
-    // Warm TDLib during the same splash — do not show login UI until past setTdlibParameters.
-    try {
-      final phoneFirst = !_isTv(context);
-      final controller = OxplayerTdlibBridgeController.instance();
-      await controller.prepareForLoginScreen(
-        phoneFirst: phoneFirst,
-      );
-      // TV defaults to QR; kick off token while splash still covers the screen. Only from a
-      // state requestQrLogin() actually accepts — prepareForLoginScreen deliberately leaves an
-      // already-`ready` session alone (see its doc), and calling requestQrLogin() on that throws
-      // "Cannot start QR login from state=ready", which this catch below then misreports as a
-      // stuck-session error. Confirmed live (2026-08-18): a cached bot-token session landing on
-      // `ready` here hit exactly that. The panel that mounts next already handles `ready` itself
-      // (re-checks current state in its own initState), so skipping here is enough.
-      final kind = controller.state.kind;
-      final canStartQr = kind == OxTdlibAuthStateKind.waitingForPhoneNumber ||
-          kind == OxTdlibAuthStateKind.waitingForQrConfirmation;
-      if (!phoneFirst && canStartQr) {
-        await controller.requestQrLogin();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _bootstrapping = false;
-        _bootstrapError = '$e';
-        _bootstrapErrorIsStuckSession = e is OxplayerTdlibBridgeException;
-      });
-      return;
-    }
-
     if (!mounted) return;
     setState(() => _bootstrapping = false);
+
+    // Bring the Telegram client up in the BACKGROUND. The login chooser and the phone/bot
+    // panels render immediately instead of sitting behind a 15-20s "Connecting to Telegram…"
+    // takeover before the user has chosen anything. Each panel re-runs ensureConfigured()
+    // itself (idempotent / single-flight) and shows its own loading + recovery UI if the
+    // connection is not up yet by the time the user acts. TV's QR panel starts its own QR
+    // request from initState, so nothing extra is kicked off here for that path.
+    unawaited(_warmTelegramInBackground(phoneFirst: !_isTv(context)));
+  }
+
+  Future<void> _warmTelegramInBackground({required bool phoneFirst}) async {
+    try {
+      await OxplayerTdlibBridgeController.instance()
+          .prepareForLoginScreen(phoneFirst: phoneFirst);
+    } catch (e) {
+      // Not fatal at this point — the real error is surfaced with a retry when the user
+      // enters the phone/QR path (that panel re-runs ensureConfigured and renders it).
+      debugPrint('[ox-login] background Telegram warm-up failed: $e');
+    }
   }
 
   /// Retry action for a TDLib-originated error: restarts the whole app process when available
@@ -325,12 +313,18 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: _bootstrapping
-                    // This is where prepareForLoginScreen()/requestQrLogin() actually run (see
-                    // _bootstrap) — the same 15-20s TDLib connect the panels' own connecting
-                    // state covers, just earlier. Without this, that whole stretch showed a bare
-                    // spinner and the panels' animated version rarely got a chance to appear at
-                    // all, because _bootstrapping only clears after this work already finished.
-                    ? const OxplayerTdlibConnectingExperience()
+                    // Only covers initModel() now — Telegram is warmed in the background after
+                    // this clears (see _warmTelegramInBackground), so this is a short, neutral
+                    // wait with no "Connecting to Telegram…" narrative before the user has even
+                    // chosen a sign-in method.
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _loginLogo(holdEnabled: false),
+                          const SizedBox(height: 24),
+                          const CircularProgressIndicator(),
+                        ],
+                      )
                     : _bootstrapError != null
                         ? Column(
                             mainAxisSize: MainAxisSize.min,

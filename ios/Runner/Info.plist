@@ -53,6 +53,13 @@
 			<string>fetch</string>
 		</array>
 
+		<!-- Lets canLaunchUrl("tg://…") detect the Telegram app so the bot login screen can
+		     fall back to a QR code when it is absent. -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>tg</string>
+		</array>
+
 		<!-- URL schemes for deep linking -->
 		<key>CFBundleURLTypes</key>
 		<array>

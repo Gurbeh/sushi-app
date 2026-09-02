@@ -29,6 +29,19 @@
         android:name="android.hardware.biometrics"
         android:required="false" />
 
+    <!-- Package visibility (Android 11+): lets url_launcher's canLaunchUrl("tg://…") tell
+         whether Telegram is installed, so the bot login screen can fall back to a QR code
+         when it is not. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tg" />
+        </intent>
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.telegram.messenger.web" />
+        <package android:name="org.thunderdog.challegram" />
+    </queries>
+
     <application
         android:label="Sushi"
         android:name="${applicationName}"

@@ -141,20 +141,34 @@ class _MethodCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final buttonStyle = filled
-        ? FilledButton.styleFrom(
-            backgroundColor: accent,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: accent.withValues(alpha: 0.4),
-            minimumSize: const Size.fromHeight(48),
-            shape: FladderTheme.defaultShape,
-          )
-        : OutlinedButton.styleFrom(
-            foregroundColor: accent,
-            side: BorderSide(color: accent.withValues(alpha: 0.7)),
-            minimumSize: const Size.fromHeight(48),
-            shape: FladderTheme.defaultShape,
-          );
+    // Both variants get an explicit, high-contrast focus ring — the bot card's plain
+    // OutlinedButton was otherwise nearly invisible when focused by keyboard / D-pad.
+    final restingSide =
+        filled ? BorderSide.none : BorderSide(color: accent.withValues(alpha: 0.7));
+    final focusSide =
+        BorderSide(color: filled ? Colors.white : accent, width: 3);
+    final buttonStyle = (filled
+            ? FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: accent.withValues(alpha: 0.4),
+                minimumSize: const Size.fromHeight(48),
+                shape: FladderTheme.defaultShape,
+              )
+            : OutlinedButton.styleFrom(
+                foregroundColor: accent,
+                side: restingSide,
+                minimumSize: const Size.fromHeight(48),
+                shape: FladderTheme.defaultShape,
+              ))
+        .copyWith(
+      side: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused) ? focusSide : restingSide,
+      ),
+      elevation: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused) ? 6.0 : 0.0,
+      ),
+    );
 
     return Material(
       color: scheme.surfaceContainerHigh,

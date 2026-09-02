@@ -56,6 +56,17 @@ class _OxplayerMainBotLoginPanelState
   DateTime? _deadline;
   Timer? _pollTimer;
 
+  /// Sushi: whether this device has a Telegram app to hand off to. When false the QR is the
+  /// only way forward, so it is shown immediately (see [_detectTelegram]).
+  bool _telegramInstalled = true;
+
+  /// Sushi: the user asked to sign in from their phone — render [_qrPayloadUrl] as a QR code
+  /// instead of only offering the "Open Telegram" hand-off on this device.
+  bool _showQr = false;
+
+  /// The `https://t.me/<mainbot>?start=ac_<nonce>` URL backing both the hand-off and the QR.
+  String? _qrPayloadUrl;
+
   static const _focusPoll = Duration(seconds: 2);
   static const _giveUp = Duration(minutes: 3);
 
@@ -65,6 +76,8 @@ class _OxplayerMainBotLoginPanelState
     WidgetsBinding.instance.addObserver(this);
     if (!SushiConfig.isEnabled) {
       unawaited(_start());
+    } else {
+      unawaited(_detectTelegram());
     }
   }
 
@@ -174,22 +187,55 @@ class _OxplayerMainBotLoginPanelState
     }
   }
 
-  Future<void> _openMainBotForAppCode() async {
+  Future<void> _openMainBotForAppCode() => _startAppCodeAttempt(launch: true);
+
+  Future<void> _showQrForAppCode() async {
+    // Reuse the in-flight attempt if there is one — minting a fresh nonce would orphan a code
+    // the user may have already opened in Telegram.
+    if (_waiting && _qrPayloadUrl != null) {
+      setState(() => _showQr = true);
+      return;
+    }
+    setState(() => _showQr = true);
+    await _startAppCodeAttempt(launch: false);
+  }
+
+  Future<void> _startAppCodeAttempt({required bool launch}) async {
     await OxplayerDotenv.ensureLoaded();
     final nonce = sushiNewLoginNonce();
     final payload = sushiLoginStartPayload(nonce);
+    final url = SushiConfig.mainBotAppCodeUrl(payload);
     setState(() {
       _nonce = nonce;
       _deadline = DateTime.now().add(_giveUp);
       _waiting = true;
       _error = null;
+      _qrPayloadUrl = url;
     });
-    await launchUrl(Uri.parse(SushiConfig.mainBotAppCodeUrl(payload)),
-        mode: LaunchMode.externalApplication);
+    if (launch) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
     if (!mounted) return;
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
       _armFocusPoll(immediate: true);
     }
+  }
+
+  /// If this device has no Telegram app, "Open Telegram" is a dead end — surface the QR right
+  /// away so the user can finish from their phone. Relies on the `tg` scheme being declared in
+  /// AndroidManifest `<queries>` / iOS `LSApplicationQueriesSchemes` for the probe to work.
+  Future<void> _detectTelegram() async {
+    var installed = true;
+    try {
+      installed = await canLaunchUrl(
+        Uri.parse('tg://resolve?domain=${SushiConfig.mainBotUsername}'),
+      );
+    } catch (_) {
+      installed = true; // probe not permitted — assume present; the hand-off still works
+    }
+    if (!mounted) return;
+    setState(() => _telegramInstalled = installed);
+    if (!installed) unawaited(_showQrForAppCode());
   }
 
   /// [silent]: background auto-refresh (see _pollLoop) — swap in a fresh code/QR without
@@ -301,6 +347,27 @@ class _OxplayerMainBotLoginPanelState
     final theme = Theme.of(context);
 
     if (_finishing || _starting) {
+      if (SushiConfig.isEnabled) {
+        // The user already acted (opened Telegram / replied with a token); a plain "Signing
+        // you in…" spinner, not the animated "Connecting to Telegram…" takeover.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                Localizations.localeOf(context).languageCode == 'fa'
+                    ? 'در حال ورود…'
+                    : 'Signing you in…',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        );
+      }
       return const OxplayerTdlibConnectingExperience();
     }
 
@@ -338,8 +405,8 @@ class _OxplayerMainBotLoginPanelState
             theme,
             fa ? '۱' : '1',
             fa
-                ? 'دکمهٔ نارنجی رو بزن تا تلگرام باز بشه.'
-                : 'Tap the salmon button to open Telegram.'),
+                ? 'دکمهٔ نارنجی رو بزن، یا با آیکن QR از گوشیت وارد شو.'
+                : 'Tap Open Telegram — or use the QR icon to sign in from your phone.'),
         _sushiStep(
             theme,
             fa ? '۲' : '2',
@@ -353,15 +420,92 @@ class _OxplayerMainBotLoginPanelState
                 ? 'وقتی گفت لاگین شدی، برگرد اینجا. اپ خودش وارد می‌شه.'
                 : 'When it says you are in, come back here. Sushi signs you in.'),
         const SizedBox(height: 20),
-        FilledButton.icon(
-          autofocus: true,
-          style: _sushiFill,
-          onPressed: _waiting ? null : () => unawaited(_openMainBotForAppCode()),
-          icon: const Icon(IconsaxPlusLinear.send_2),
-          label: Text(_waiting
-              ? (fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…')
-              : (fa ? 'باز کردن تلگرام' : 'Open Telegram')),
-        ),
+        if (_showQr && _qrPayloadUrl != null) ...[
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QrImageView(
+                data: _qrPayloadUrl!,
+                size: 200,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            fa
+                ? 'با دوربین گوشیت این کد رو اسکن کن تا تلگرام باز بشه. این صفحه رو باز نگه دار؛ اپ خودش وارد می‌شه.'
+                : 'Scan this with your phone to open Telegram. Keep this screen open — Sushi signs you in automatically.',
+            style: muted,
+            textAlign: TextAlign.center,
+          ),
+          if (_waiting) ...[
+            const SizedBox(height: 8),
+            Text(
+              fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          if (_telegramInstalled) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                setState(() => _showQr = false);
+                if (!_waiting) unawaited(_openMainBotForAppCode());
+              },
+              icon: const Icon(IconsaxPlusLinear.send_2, size: 18),
+              label: Text(fa
+                  ? 'باز کردن تلگرام روی همین دستگاه'
+                  : 'Open Telegram on this device'),
+            ),
+          ],
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  autofocus: true,
+                  style: _sushiFill,
+                  onPressed:
+                      _waiting ? null : () => unawaited(_openMainBotForAppCode()),
+                  icon: const Icon(IconsaxPlusLinear.send_2),
+                  label: Text(_waiting
+                      ? (fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…')
+                      : (fa ? 'باز کردن تلگرام' : 'Open Telegram')),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 52,
+                height: 52,
+                child: IconButton.outlined(
+                  tooltip: fa
+                      ? 'نمایش کد QR برای ورود از گوشی'
+                      : 'Show a QR code to sign in from your phone',
+                  style: IconButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ).copyWith(
+                    side: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.focused)) {
+                        return const BorderSide(color: _sushiSalmon, width: 3);
+                      }
+                      return BorderSide(color: theme.colorScheme.outline);
+                    }),
+                  ),
+                  onPressed: () => unawaited(_showQrForAppCode()),
+                  icon: const Icon(IconsaxPlusLinear.scan_barcode),
+                ),
+              ),
+            ],
+          ),
+        ],
         if (widget.onBack != null) ...[
           const SizedBox(height: 16),
           TextButton.icon(
@@ -381,6 +525,13 @@ class _OxplayerMainBotLoginPanelState
             overflow: TextOverflow.ellipsis,
             style: muted?.copyWith(color: theme.colorScheme.error) ??
                 TextStyle(color: theme.colorScheme.error),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => unawaited(
+              _showQr ? _showQrForAppCode() : _openMainBotForAppCode(),
+            ),
+            child: Text(fa ? 'تلاش دوباره' : 'Try again'),
           ),
         ],
       ],
