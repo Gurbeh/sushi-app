@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
@@ -14,12 +17,50 @@ import 'package:fladder/src/tdlib_bridge.g.dart';
 /// Go runtime fault (`fatal error: bulkBarrierPreWrite: unaligned arguments`), reproduced on both
 /// an x86_64 emulator and an arm64 device. gomobile's generated JNI bridge is not safe to enter from
 /// two threads at once for this client, so nothing may call it without going through here.
-Future<void> _chain = Future.value();
+///
+/// Two lanes, not two threads: the JNI single-entry rule above is unchanged — exactly one call runs
+/// at a time. [priority] only reorders what runs *next* when the current call finishes. The
+/// playback path (arm waiter → /play → startPlaybackSession → deliveryRef polling) takes the fast
+/// lane so a slow or dead API bot answering an unrelated /item can no longer sit in front of a
+/// user's tap for its full reply timeout (device log 2026-09-01: a 25s /item timeout delayed a
+/// play warmup by ~14s).
+final Queue<_QueuedCall> _highQueue = Queue<_QueuedCall>();
+final Queue<_QueuedCall> _normalQueue = Queue<_QueuedCall>();
+bool _draining = false;
 
-Future<T> _enqueue<T>(Future<T> Function() call) {
-  final result = _chain.then((_) => call());
-  _chain = result.then((_) {}, onError: (_) {});
-  return result;
+class _QueuedCall {
+  _QueuedCall(this.run);
+
+  /// Runs the wrapped call and settles its caller's completer; never throws (errors are forwarded
+  /// through the completer), so the drain loop can simply await it and move on.
+  final Future<void> Function() run;
+}
+
+Future<T> _enqueue<T>(Future<T> Function() call, {bool priority = false}) {
+  final completer = Completer<T>();
+  Future<void> run() async {
+    try {
+      completer.complete(await call());
+    } catch (e, st) {
+      completer.completeError(e, st);
+    }
+  }
+
+  (priority ? _highQueue : _normalQueue).add(_QueuedCall(run));
+  _drain();
+  return completer.future;
+}
+
+void _drain() {
+  if (_draining) return;
+  _draining = true;
+  Future<void>(() async {
+    while (_highQueue.isNotEmpty || _normalQueue.isNotEmpty) {
+      final next = _highQueue.isNotEmpty ? _highQueue.removeFirst() : _normalQueue.removeFirst();
+      await next.run();
+    }
+    _draining = false;
+  });
 }
 
 /// Set by sushi_initbot_transport.dart. Fired after enough consecutive [sushiSendTextAndWaitReply]
@@ -47,6 +88,7 @@ Future<String> sushiSendTextAndWaitReply({
   required String username,
   required String text,
   required int timeoutMs,
+  bool priority = false,
 }) async {
   final controller = OxplayerTdlibBridgeController.instance();
   sushiRequestCount++;
@@ -54,6 +96,7 @@ Future<String> sushiSendTextAndWaitReply({
     final reply = await _enqueue(
       () => controller.sendTextAndWaitReply(
           username: username, text: text, timeoutMs: timeoutMs),
+      priority: priority,
     );
     _consecutiveSendFailures = 0;
     return reply;
@@ -81,11 +124,12 @@ Future<String> sushiSendTextAndWaitReply({
 /// resolves as soon as the send completes, never blocking on a reply that is not coming. Counted in
 /// [sushiRequestCount] like every other wire call.
 Future<void> sushiSendTextFireAndForget(
-    {required String username, required String text}) {
+    {required String username, required String text, bool priority = false}) {
   final controller = OxplayerTdlibBridgeController.instance();
   sushiRequestCount++;
   return _enqueue(
-      () => controller.sendTextFireAndForget(username: username, text: text));
+      () => controller.sendTextFireAndForget(username: username, text: text),
+      priority: priority);
 }
 
 Future<void> sushiEnsureMainBotOnboarded(
@@ -102,14 +146,16 @@ Future<bool> sushiEnsureProviderBotsReady(List<OxTdlibProviderBot> bots) {
   return _enqueue(() => controller.ensureProviderBotsReady(bots));
 }
 
+// The playback path runs in the fast lane (see [_enqueue] doc): a user waiting on a tap must not
+// queue behind background /home or /item traffic.
 Future<void> sushiArmDeliveryWaiter(String locator) {
   final controller = OxplayerTdlibBridgeController.instance();
-  return _enqueue(() => controller.armDeliveryWaiter(locator));
+  return _enqueue(() => controller.armDeliveryWaiter(locator), priority: true);
 }
 
 Future<String> sushiStartPlaybackSession(OxTdlibPlaybackSource source) {
   final controller = OxplayerTdlibBridgeController.instance();
-  return _enqueue(() => controller.startPlaybackSession(source));
+  return _enqueue(() => controller.startPlaybackSession(source), priority: true);
 }
 
 Future<void> sushiStopPlaybackSession(String sessionUri) {
@@ -120,5 +166,5 @@ Future<void> sushiStopPlaybackSession(String sessionUri) {
 
 Future<OxTdlibDeliveryRef?> sushiDeliveryRefForLocator(String locator) {
   final controller = OxplayerTdlibBridgeController.instance();
-  return _enqueue(() => controller.deliveryRefForLocator(locator));
+  return _enqueue(() => controller.deliveryRefForLocator(locator), priority: true);
 }

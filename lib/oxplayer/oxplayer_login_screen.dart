@@ -256,11 +256,20 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
         _bootstrapError == null &&
         !showAccountGrid &&
         _path == _LoginPath.choose;
+    // Big screens / TV on the bot path: the panel splits into two side-by-side panes
+    // (logo + hint | QR + button), so it needs the wider content box.
+    final wideBot = _path == _LoginPath.bot &&
+        !_bootstrapping &&
+        _bootstrapError == null &&
+        (_isTv(context) ||
+            AdaptiveLayout.viewSizeOf(context) >= ViewSize.desktop);
     final maxContentWidth = showAccountGrid
         ? 1000.0
         : showingChooser
             ? 880.0
-            : 420.0;
+            : wideBot
+                ? 900.0
+                : 420.0;
 
     return PopScope(
       canPop: !interceptSystemBack,
@@ -357,8 +366,12 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _loginLogo(),
-                              const SizedBox(height: 24),
+                              // On the wide bot path the panel renders the logo itself,
+                              // inside its start-side pane.
+                              if (!wideBot) ...[
+                                _loginLogo(),
+                                const SizedBox(height: 24),
+                              ],
                               AnimatedFadeSize(
                                 child: showAccountGrid
                                     ? LoginUserGrid(
@@ -414,6 +427,8 @@ class _OxplayerLoginScreenState extends ConsumerState<OxplayerLoginScreen> {
                                               ),
                                             _LoginPath.bot => OxplayerMainBotLoginPanel(
                                                 onSuccess: _onLoginSuccess,
+                                                wide: wideBot,
+                                                logo: wideBot ? _loginLogo() : null,
                                                 onBack: () =>
                                                     setState(() => _path = _LoginPath.choose),
                                               ),

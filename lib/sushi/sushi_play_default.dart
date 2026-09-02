@@ -47,6 +47,32 @@ Future<ItemBaseModel> sushiHydrateForPlay(ItemBaseModel item, SushiCatalogContro
   return item;
 }
 
+/// Ordered, playable sibling episodes for [episode]'s series — this is what drives the
+/// player's next/previous-episode buttons (they read [PlaybackModel.nextVideo] /
+/// [PlaybackModel.previousVideo], which walk the queue). Returns an empty list when the
+/// series page can't be resolved from the catalog.
+Future<List<EpisodeModel>> sushiEpisodeQueueFor(
+  EpisodeModel episode,
+  SushiCatalogController catalog,
+) async {
+  final parentId = episode.parentId;
+  if (parentId == null || parentId.isEmpty) return const [];
+  final tmdbId = sushiTmdbIdFromItemId(parentId);
+  if (tmdbId == null) return const [];
+  final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
+  if (snap.page == null) return const [];
+  final series = sushiEnrichSeriesModel(episode.parentBaseModel, snap.page!);
+  return [
+    for (final e in series.availableEpisodes ?? const <EpisodeModel>[])
+      if (e.playAble) e,
+  ];
+}
+
+List<EpisodeModel> _playableEpisodes(Iterable<EpisodeModel>? episodes) => [
+      for (final e in episodes ?? const <EpisodeModel>[])
+        if (e.playAble) e,
+    ];
+
 Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   ItemBaseModel itemModel, {
   required SushiCatalogController catalog,
@@ -60,7 +86,11 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
     item = await sushiHydrateForPlay(item, catalog);
   }
 
+  // Ordered sibling episodes for the queue. Captured here when we already hold the hydrated
+  // series; the standalone-episode path fills it from the catalog further down.
+  var episodeQueue = const <EpisodeModel>[];
   if (item is SeriesModel) {
+    episodeQueue = _playableEpisodes(item.availableEpisodes);
     final episode = item.nextUp ??
         (item.availableEpisodes == null || item.availableEpisodes!.isEmpty
             ? null
@@ -82,6 +112,16 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
 
   if (item is! MovieModel && item is! EpisodeModel) return null;
 
+  final playing = item;
+  if (playing is EpisodeModel && episodeQueue.isEmpty) {
+    episodeQueue = await sushiEpisodeQueueFor(playing, catalog);
+  }
+  final List<ItemBaseModel> queue = playing is EpisodeModel &&
+          episodeQueue.length > 1 &&
+          episodeQueue.any((e) => e.id == playing.id)
+      ? List<ItemBaseModel>.of(episodeQueue)
+      : const <ItemBaseModel>[];
+
   if (sync != null) {
     final local = await sync.getSyncedItem(item.id);
     if (local != null && local.videoFile.existsSync()) {
@@ -89,6 +129,7 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
         item: item,
         media: Media(url: local.videoFile.path),
         mediaStreams: streams ?? item.streamModel,
+        queue: queue,
       );
     }
   }
@@ -107,6 +148,7 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
       item: item,
       media: Media(url: url),
       mediaStreams: streams ?? item.streamModel,
+      queue: queue,
     );
   } catch (e, st) {
     debugPrint('[sushi] play resolve failed: $e\n$st');

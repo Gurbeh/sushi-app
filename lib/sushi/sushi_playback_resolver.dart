@@ -29,8 +29,32 @@ Future<String> sushiResolvePlaybackUrl({
   bool preferHttpBridge = false,
   int mode = sushiModeStream,
 }) async {
+  final sw = Stopwatch()..start();
+  try {
+    final url = await _resolvePlaybackUrl(
+      fileId: fileId,
+      preferHttpBridge: preferHttpBridge,
+      mode: mode,
+      sw: sw,
+    );
+    _log('resolve OK fileId=$fileId totalMs=${sw.elapsedMilliseconds} url=$url');
+    return url;
+  } catch (e) {
+    _log('resolve FAILED fileId=$fileId totalMs=${sw.elapsedMilliseconds} error=$e');
+    rethrow;
+  }
+}
+
+Future<String> _resolvePlaybackUrl({
+  required int fileId,
+  required bool preferHttpBridge,
+  required int mode,
+  required Stopwatch sw,
+}) async {
   final locator = sushiLocatorForFile(fileId);
   final warmed = await sushiPlayWarmup.wait(fileId);
+  _log('resolve fileId=$fileId warmed=${warmed != null && warmed.messageId > 0} '
+      'warmupWaitMs=${sw.elapsedMilliseconds}');
   if (warmed != null && warmed.messageId > 0) {
     await sushiArmDeliveryWaiter(locator);
     try {
@@ -98,12 +122,27 @@ Future<String> _startSession({
   var delivered = playRes.delivered;
   // copyMessage's message_id is the *sender* numbering. Bot-login TDLib uses the receiver's.
   // A push that landed while /play was in flight is already in DeliveryRef — use that, don't 0/0.
+  final sessionRef = _deliveredFromSessionRef(await sushiDeliveryRefForLocator(locator), locator);
   if (delivered == null || delivered.messageId == 0) {
-    delivered = _deliveredFromSessionRef(await sushiDeliveryRefForLocator(locator), locator) ?? delivered;
+    delivered = sessionRef ?? delivered;
   }
 
+  // A /play reply's `botId` is the backend's provider-bot table id (e.g. 5), NOT the Telegram
+  // user id of the DM sender that the native resolver's guard checks against
+  // (resolveVideoFileByDMMessageID: `senderID != providerBotID` -> OX_DM_STALE). Passing it made
+  // every warm play fail — "dm message 1180 came from bot 8271796073, expected 5" (device log
+  // 2026-09-01) — and pay a full re-copy each time. Only a locally recorded DeliveryRef carries
+  // the real sender id; trust the bot id only when that ref confirms this exact message,
+  // otherwise send 0 and let native learn it from the message (`if providerBotID <= 0 {
+  // providerBotID = senderID }`).
+  final trustedBotId = (sessionRef != null &&
+          sessionRef.messageId > 0 &&
+          sessionRef.messageId == delivered?.messageId)
+      ? sessionRef.botId
+      : 0;
+
   final source = OxTdlibPlaybackSource(
-    providerBotId: delivered?.botId ?? 0,
+    providerBotId: trustedBotId,
     messageId: delivered?.messageId ?? 0,
     preferHttpBridge: preferHttpBridge,
     locator: locator,
@@ -111,7 +150,8 @@ Future<String> _startSession({
 
   _log(
     'startPlaybackSession fileId=$fileId providerBotId=${source.providerBotId} '
-    'messageId=${source.messageId} pending=${delivered == null} locator=$locator',
+    'serverBotId=${delivered?.botId ?? 0} messageId=${source.messageId} '
+    'pending=${delivered == null} locator=$locator',
   );
 
   try {

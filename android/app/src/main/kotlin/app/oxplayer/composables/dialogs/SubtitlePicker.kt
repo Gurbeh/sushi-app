@@ -56,6 +56,10 @@ private fun muxedFallbackSubtitleRows(internal: List<InternalTrack>): List<Subti
     }
 }
 
+// TODO(sushi, doc 15 §11): this native picker only lists Off + embedded/muxed tracks. The Sushi
+// "Automatic (online)" / "Online subtitles…" rows (sushi_online_subtitle_sheet.dart) are Flutter-only
+// and never reach the leanback / Android-TV player, which is forced onto this native backend. Porting
+// them needs a pigeon setSubtitleFromText + an ExoPlayer sideload path — see doc 15 §11 for the plan.
 @OptIn(UnstableApi::class)
 @Composable
 fun SubtitlePicker(

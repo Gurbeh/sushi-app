@@ -30,7 +30,11 @@ Future<SushiItemRes?> sushiFetchItem(
     final reply = await sushiSendTextAndWaitReply(
       username: sushiNextApiBot(assignment),
       text: requestText,
-      timeoutMs: 25000,
+      // 10s, not 25s: a healthy /item answers in well under a second (device log 2026-09-01), so a
+      // long ceiling here only means a dead API bot ties up its queue slot — and counts toward
+      // rotation — that much slower. The playback path no longer waits behind this (fast lane), but
+      // detail screens still should not hang 25s on a bad bot.
+      timeoutMs: 10000,
     );
     final env = SushiEnvelope.decode(reply);
     if (env.type == SushiEnvelope.msgTypeErr) {

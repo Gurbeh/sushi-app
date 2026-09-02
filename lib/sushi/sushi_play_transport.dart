@@ -32,6 +32,8 @@ Future<SushiPlayRes?> sushiPlay(
       username: sushiNextApiBot(assignment),
       text: requestText,
       timeoutMs: 15000,
+      // Playback path: jump the queue ahead of background /home and /item traffic.
+      priority: true,
     );
     final env = SushiEnvelope.decode(reply);
     if (env.type == SushiEnvelope.msgTypeErr) {
@@ -58,7 +60,9 @@ Future<void> sushiAck({required int fileId, required int messageId}) async {
   final assignment = await SushiAssignmentStore.load();
   if (assignment == null ||
       assignment.pending ||
-      assignment.apiSendTargets.isEmpty) return;
+      assignment.apiSendTargets.isEmpty) {
+    return;
+  }
 
   final corr = sushiNewCorrBase36();
   final requestText = sushiEncodeRequestText(
@@ -66,7 +70,7 @@ Future<void> sushiAck({required int fileId, required int messageId}) async {
 
   try {
     await sushiSendTextFireAndForget(
-        username: sushiNextApiBot(assignment), text: requestText);
+        username: sushiNextApiBot(assignment), text: requestText, priority: true);
   } catch (e) {
     debugPrint('[sushi] ack failed (non-fatal): $e');
   }

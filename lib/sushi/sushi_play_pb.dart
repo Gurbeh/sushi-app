@@ -17,6 +17,12 @@ const sushiModeDownload = 2;
 class SushiDelivered {
   const SushiDelivered({required this.botId, required this.messageId, required this.locator});
 
+  /// When this instance comes from a `/play` reply (see [decode]) this is the backend's internal
+  /// `bots.id` (a small FK into the deliveries → bots table), NOT the Telegram user id of the DM
+  /// sender. It must never be passed to the native resolver as `providerBotId`: that field is
+  /// checked against the message's real Telegram sender id and a server `bots.id` there fails every
+  /// warm play as OX_DM_STALE (device log 2026-09-01). Only when this instance is built from a
+  /// locally recorded `OxTdlibDeliveryRef` is [botId] a real Telegram user id and safe to trust.
   final int botId;
   final int messageId;
   final String locator;

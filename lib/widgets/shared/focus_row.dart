@@ -122,9 +122,20 @@ class _FocusRowState extends State<FocusRow> {
   }
 }
 
+/// Row-major order: group nodes into visual rows (tops within [_rowTolerance]px), then
+/// left-to-right within each row. For a single row this is identical to a pure horizontal
+/// sort, so a [Row] is unaffected; a [Wrap] that spills onto a second line still traverses
+/// predictably with a d-pad (finish row 1, then row 2) instead of zig-zagging by x only.
+const double _rowTolerance = 24;
+
+int _readingOrderCompare(FocusNode a, FocusNode b) {
+  final dy = a.rect.top - b.rect.top;
+  if (dy.abs() > _rowTolerance) return dy < 0 ? -1 : 1;
+  return a.rect.left.compareTo(b.rect.left);
+}
+
 List<FocusNode> _childNodes(FocusNode node) =>
-    node.descendants.where((n) => n.canRequestFocus && n.context != null).toList()
-      ..sort((a, b) => a.rect.left.compareTo(b.rect.left));
+    node.descendants.where((n) => n.canRequestFocus && n.context != null).toList()..sort(_readingOrderCompare);
 
 class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
   final VoidCallback? onVertical;
@@ -141,7 +152,7 @@ class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
     final nodes = parent == null
         ? <FocusNode>[]
         : parent.descendants.where((n) => n.canRequestFocus && n.context != null).toList()
-      ..sort((a, b) => a.rect.left.compareTo(b.rect.left));
+      ..sort(_readingOrderCompare);
 
     if (nodes.isEmpty) return super.inDirection(currentNode, direction);
     final index = nodes.indexOf(currentNode);

@@ -514,8 +514,14 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
         val wantedAudioIndex = indexOfAudioTrack - 1
         // playableData.audioTracks[0] is the Jellyfin "Off" row; real streams start at index 1.
         fun serverIndexForInternal(internalIdx: Int) {
+            // A negative index is the "Off" sentinel — Sushi titles with no per-track metadata
+            // send every audio stream as index -1 (see sushiBuildMediaStreams). Persisting that
+            // back as the selected track makes the next onTracksChanged pass hit
+            // "disable_audio_negative_index" and mute a stream that is actually playing, so only
+            // remember a real, mapped server index here. The fallback stays idempotent: the
+            // selected index is left alone and we simply re-select the same Exo track next pass.
             playableData.audioTracks.getOrNull(internalIdx + 1)?.index?.let {
-                VideoPlayerObject.setAudioTrackIndex(it.toInt(), true)
+                if (it >= 0) VideoPlayerObject.setAudioTrackIndex(it.toInt(), true)
             }
         }
         val action = when {

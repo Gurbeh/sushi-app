@@ -396,10 +396,13 @@ class OverviewHeader extends ConsumerWidget {
                   ensureVisibleAlignment: 1.0,
                   child: OxplayerConfig.isEnabled &&
                           AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
+                      // Still a single logical focus group (d-pad left/right walks every
+                      // button in reading order), but a [Wrap] so the row after the play +
+                      // subtitle panel spills onto the next line instead of overflowing.
+                      ? Wrap(
                           spacing: 8,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             if (mainButton != null) mainButton!,
                             if (mediaStreamHelper != null)
