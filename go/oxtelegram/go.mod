@@ -46,3 +46,5 @@ require (
 )
 
 tool golang.org/x/mobile/cmd/gobind
+
+replace github.com/gotd/td => ./third_party/gotd-td
