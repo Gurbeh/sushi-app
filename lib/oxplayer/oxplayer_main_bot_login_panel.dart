@@ -31,10 +31,22 @@ import 'package:fladder/theme.dart';
 /// (ADR 0013). No paste.
 class OxplayerMainBotLoginPanel extends ConsumerStatefulWidget {
   const OxplayerMainBotLoginPanel(
-      {required this.onSuccess, this.onBack, super.key});
+      {required this.onSuccess,
+      this.onBack,
+      this.wide = false,
+      this.logo,
+      super.key});
 
   final Future<void> Function() onSuccess;
   final VoidCallback? onBack;
+
+  /// Big screens / TV: render as two side-by-side panes — logo + hint on the start
+  /// side, QR + Open-Telegram action on the end side — instead of one stacked column.
+  final bool wide;
+
+  /// Shown at the top of the start-side pane when [wide]. The screen passes its own
+  /// (hold-to-demo–wrapped) logo so that gesture survives this layout.
+  final Widget? logo;
 
   @override
   ConsumerState<OxplayerMainBotLoginPanel> createState() =>
@@ -347,27 +359,9 @@ class _OxplayerMainBotLoginPanelState
     final theme = Theme.of(context);
 
     if (_finishing || _starting) {
-      if (SushiConfig.isEnabled) {
-        // The user already acted (opened Telegram / replied with a token); a plain "Signing
-        // you in…" spinner, not the animated "Connecting to Telegram…" takeover.
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(
-                Localizations.localeOf(context).languageCode == 'fa'
-                    ? 'در حال ورود…'
-                    : 'Signing you in…',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        );
-      }
+      // Post-auth: the token is in, now bringing the bot session up + running the
+      // initbot handshake before Home. This is a genuine multi-second wait the user
+      // opted into, so use the typewriter "setting up" experience, not a bare spinner.
       return const OxplayerTdlibConnectingExperience();
     }
 
@@ -392,150 +386,195 @@ class _OxplayerMainBotLoginPanelState
     final fa = Localizations.localeOf(context).languageCode == 'fa';
     final muted = theme.textTheme.bodyMedium
         ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+
+    if (widget.wide) {
+      // Big screens / TV: logo + numbered hint on the start side, QR + Open-Telegram
+      // action on the end side, instead of one tall stacked column.
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.logo != null) ...[
+                  widget.logo!,
+                  const SizedBox(height: 24),
+                ],
+                ..._sushiIntro(theme, fa),
+              ],
+            ),
+          ),
+          const SizedBox(width: 40),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _sushiActions(theme, fa, muted),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          fa ? 'ورود با بات خودت' : 'Sign in with a bot you own',
-          style: theme.textTheme.titleLarge,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        _sushiStep(
-            theme,
-            fa ? '۱' : '1',
-            fa
-                ? 'دکمهٔ نارنجی رو بزن، یا با آیکن QR از گوشیت وارد شو.'
-                : 'Tap Open Telegram — or use the QR icon to sign in from your phone.'),
-        _sushiStep(
-            theme,
-            fa ? '۲' : '2',
-            fa
-                ? 'اگه بات نداری تو BotFather بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن.'
-                : 'If you need a bot: create one in BotFather, turn on Bot-to-Bot, reply with the token there.'),
-        _sushiStep(
-            theme,
-            fa ? '۳' : '3',
-            fa
-                ? 'وقتی گفت لاگین شدی، برگرد اینجا. اپ خودش وارد می‌شه.'
-                : 'When it says you are in, come back here. Sushi signs you in.'),
+        ..._sushiIntro(theme, fa),
         const SizedBox(height: 20),
-        if (_showQr && _qrPayloadUrl != null) ...[
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: QrImageView(
-                data: _qrPayloadUrl!,
-                size: 200,
-                backgroundColor: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            fa
-                ? 'با دوربین گوشیت این کد رو اسکن کن تا تلگرام باز بشه. این صفحه رو باز نگه دار؛ اپ خودش وارد می‌شه.'
-                : 'Scan this with your phone to open Telegram. Keep this screen open — Sushi signs you in automatically.',
-            style: muted,
-            textAlign: TextAlign.center,
-          ),
-          if (_waiting) ...[
-            const SizedBox(height: 8),
-            Text(
-              fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          if (_telegramInstalled) ...[
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () {
-                setState(() => _showQr = false);
-                if (!_waiting) unawaited(_openMainBotForAppCode());
-              },
-              icon: const Icon(IconsaxPlusLinear.send_2, size: 18),
-              label: Text(fa
-                  ? 'باز کردن تلگرام روی همین دستگاه'
-                  : 'Open Telegram on this device'),
-            ),
-          ],
-        ] else ...[
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  autofocus: true,
-                  style: _sushiFill,
-                  onPressed:
-                      _waiting ? null : () => unawaited(_openMainBotForAppCode()),
-                  icon: const Icon(IconsaxPlusLinear.send_2),
-                  label: Text(_waiting
-                      ? (fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…')
-                      : (fa ? 'باز کردن تلگرام' : 'Open Telegram')),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 52,
-                height: 52,
-                child: IconButton.outlined(
-                  tooltip: fa
-                      ? 'نمایش کد QR برای ورود از گوشی'
-                      : 'Show a QR code to sign in from your phone',
-                  style: IconButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                  ).copyWith(
-                    side: WidgetStateProperty.resolveWith((states) {
-                      if (states.contains(WidgetState.focused)) {
-                        return const BorderSide(color: _sushiSalmon, width: 3);
-                      }
-                      return BorderSide(color: theme.colorScheme.outline);
-                    }),
-                  ),
-                  onPressed: () => unawaited(_showQrForAppCode()),
-                  icon: const Icon(IconsaxPlusLinear.scan_barcode),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (widget.onBack != null) ...[
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: widget.onBack,
-            icon: const Icon(IconsaxPlusLinear.arrow_left_2, size: 18),
-            label: Text(fa
-                ? 'با اکانت تلگرام وارد شو'
-                : 'Use my Telegram account instead'),
-          ),
-        ],
-        if (_error != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            _error!,
-            textAlign: TextAlign.center,
-            maxLines: 5,
-            overflow: TextOverflow.ellipsis,
-            style: muted?.copyWith(color: theme.colorScheme.error) ??
-                TextStyle(color: theme.colorScheme.error),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => unawaited(
-              _showQr ? _showQrForAppCode() : _openMainBotForAppCode(),
-            ),
-            child: Text(fa ? 'تلاش دوباره' : 'Try again'),
-          ),
-        ],
+        ..._sushiActions(theme, fa, muted),
       ],
     );
+  }
+
+  /// Title + the three numbered setup steps — the "hint" half of the panel.
+  List<Widget> _sushiIntro(ThemeData theme, bool fa) {
+    return [
+      Text(
+        fa ? 'ورود با بات خودت' : 'Sign in with a bot you own',
+        style: theme.textTheme.titleLarge,
+        textAlign: widget.wide ? TextAlign.start : TextAlign.center,
+      ),
+      const SizedBox(height: 12),
+      _sushiStep(
+          theme,
+          fa ? '۱' : '1',
+          fa
+              ? 'دکمهٔ نارنجی رو بزن، یا با آیکن QR از گوشیت وارد شو.'
+              : 'Tap Open Telegram — or use the QR icon to sign in from your phone.'),
+      _sushiStep(
+          theme,
+          fa ? '۲' : '2',
+          fa
+              ? 'اگه بات نداری تو BotFather بساز، Bot-to-Bot رو روشن کن، توکن رو همون‌جا ریپلای کن.'
+              : 'If you need a bot: create one in BotFather, turn on Bot-to-Bot, reply with the token there.'),
+      _sushiStep(
+          theme,
+          fa ? '۳' : '3',
+          fa
+              ? 'وقتی گفت لاگین شدی، برگرد اینجا. اپ خودش وارد می‌شه.'
+              : 'When it says you are in, come back here. Sushi signs you in.'),
+    ];
+  }
+
+  /// QR / Open-Telegram controls, the "use my account instead" back link and any
+  /// error — the interactive half of the panel.
+  List<Widget> _sushiActions(ThemeData theme, bool fa, TextStyle? muted) {
+    return [
+      if (_showQr && _qrPayloadUrl != null) ...[
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: QrImageView(
+              data: _qrPayloadUrl!,
+              size: 200,
+              backgroundColor: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          fa
+              ? 'با دوربین گوشیت این کد رو اسکن کن تا تلگرام باز بشه. این صفحه رو باز نگه دار؛ اپ خودش وارد می‌شه.'
+              : 'Scan this with your phone to open Telegram. Keep this screen open — Sushi signs you in automatically.',
+          style: muted,
+          textAlign: TextAlign.center,
+        ),
+        if (_waiting) ...[
+          const SizedBox(height: 8),
+          Text(
+            fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (_telegramInstalled) ...[
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () {
+              setState(() => _showQr = false);
+              if (!_waiting) unawaited(_openMainBotForAppCode());
+            },
+            icon: const Icon(IconsaxPlusLinear.send_2, size: 18),
+            label: Text(fa
+                ? 'باز کردن تلگرام روی همین دستگاه'
+                : 'Open Telegram on this device'),
+          ),
+        ],
+      ] else ...[
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                autofocus: true,
+                style: _sushiFill,
+                onPressed:
+                    _waiting ? null : () => unawaited(_openMainBotForAppCode()),
+                icon: const Icon(IconsaxPlusLinear.send_2),
+                label: Text(_waiting
+                    ? (fa ? 'منتظر تلگرام…' : 'Waiting for Telegram…')
+                    : (fa ? 'باز کردن تلگرام' : 'Open Telegram')),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: IconButton.outlined(
+                tooltip: fa
+                    ? 'نمایش کد QR برای ورود از گوشی'
+                    : 'Show a QR code to sign in from your phone',
+                style: IconButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ).copyWith(
+                  side: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.focused)) {
+                      return const BorderSide(color: _sushiSalmon, width: 3);
+                    }
+                    return BorderSide(color: theme.colorScheme.outline);
+                  }),
+                ),
+                onPressed: () => unawaited(_showQrForAppCode()),
+                icon: const Icon(IconsaxPlusLinear.scan_barcode),
+              ),
+            ),
+          ],
+        ),
+      ],
+      if (widget.onBack != null) ...[
+        const SizedBox(height: 16),
+        TextButton.icon(
+          onPressed: widget.onBack,
+          icon: const Icon(IconsaxPlusLinear.arrow_left_2, size: 18),
+          label: Text(fa
+              ? 'با اکانت تلگرام وارد شو'
+              : 'Use my Telegram account instead'),
+        ),
+      ],
+      if (_error != null) ...[
+        const SizedBox(height: 12),
+        Text(
+          _error!,
+          textAlign: TextAlign.center,
+          maxLines: 5,
+          overflow: TextOverflow.ellipsis,
+          style: muted?.copyWith(color: theme.colorScheme.error) ??
+              TextStyle(color: theme.colorScheme.error),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => unawaited(
+            _showQr ? _showQrForAppCode() : _openMainBotForAppCode(),
+          ),
+          child: Text(fa ? 'تلاش دوباره' : 'Try again'),
+        ),
+      ],
+    ];
   }
 
   Widget _sushiStep(ThemeData theme, String n, String text) {

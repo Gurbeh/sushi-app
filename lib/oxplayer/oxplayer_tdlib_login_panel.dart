@@ -10,6 +10,7 @@ import 'package:fladder/oxplayer/oxplayer_dpad_text_field.dart';
 import 'package:fladder/oxplayer/oxplayer_jellyfin_auth.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/oxplayer/oxplayer_tdlib_connecting_experience.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_qr_login_panel.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/sushi/sushi_config.dart';
@@ -66,7 +67,6 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
   bool _busy = false;
   /// Sync gate — [setState] `_busy` alone races keyboard Done + Continue tap → double SMS.
   bool _submitLocked = false;
-  bool _exchangingWithOxApi = false;
   bool _passwordVisible = false;
   /// Stay on 2FA UI if native briefly emits failed (wrong password) instead of waitingForPassword.
   bool _lockOnTwoFactor = false;
@@ -313,26 +313,18 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
 
   /// Sushi path: no POST /auth/telegram. Persist Assignment (stub until sendMessage wired).
   Future<void> _exchangeWithSushiInitbot() async {
-    setState(() {
-      _exchangingWithOxApi = true;
-      _error = null;
-    });
+    setState(() => _error = null);
     try {
       await sushiRunInitbotAfterTdlibReady();
       await sushiEnsureLocalAccount(ref);
       await widget.onSuccess();
     } catch (e) {
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
-    } finally {
-      if (mounted) setState(() => _exchangingWithOxApi = false);
     }
   }
 
   Future<void> _exchangeWithOxApi() async {
-    setState(() {
-      _exchangingWithOxApi = true;
-      _error = null;
-    });
+    setState(() => _error = null);
     try {
       final result = await _controller.authenticateWithOxApi();
       final response = await oxplayerAuthenticateFromLoginAttemptPoll(
@@ -345,11 +337,9 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
       }
       await widget.onSuccess();
     } catch (e) {
-      // Keep _oxExchangeStarted so the ready UI can show the error + Try again
-      // instead of an infinite spinner (ready + !_oxExchangeStarted).
+      // Keep _oxExchangeStarted so the ready UI shows the error + Try again
+      // instead of the "setting up" animation looping forever.
       if (mounted) setState(() => _error = oxTdlibAuthUserMessage(e));
-    } finally {
-      if (mounted) setState(() => _exchangingWithOxApi = false);
     }
   }
 
@@ -760,46 +750,43 @@ class _OxplayerTdlibLoginPanelState extends ConsumerState<OxplayerTdlibLoginPane
         buttonLabel = 'Confirm password';
         break;
       case OxTdlibAuthStateKind.ready:
+        // Authenticated — now running the OX/initbot exchange + local account setup
+        // before Home. A real multi-second wait the user opted into, so use the
+        // typewriter "setting up" experience rather than a checkmark + bare spinner.
+        // On error, fall back to an actionable retry.
+        if (_error == null) {
+          return const OxplayerTdlibConnectingExperience();
+        }
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                _error != null ? IconsaxPlusBold.warning_2 : IconsaxPlusBold.tick_circle,
-                size: 48,
-                color: _error != null ? theme.colorScheme.error : theme.colorScheme.primary,
+              Icon(IconsaxPlusBold.warning_2, size: 48, color: theme.colorScheme.error),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
               ),
-              if (_exchangingWithOxApi) ...[
-                const SizedBox(height: 16),
-                const CircularProgressIndicator(),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    if (_blockedByBotSession) {
-                      setState(() {
-                        _error = null;
-                        _blockedByBotSession = false;
-                      });
-                      unawaited(_controller.resetForPhoneLogin());
-                      return;
-                    }
-                    _oxExchangeStarted = true;
-                    unawaited(_exchangeWithOxApi());
-                  },
-                  child: Text(_blockedByBotSession ? 'Log out and use phone number' : 'Try again'),
-                ),
-              ],
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  if (_blockedByBotSession) {
+                    setState(() {
+                      _error = null;
+                      _blockedByBotSession = false;
+                    });
+                    unawaited(_controller.resetForPhoneLogin());
+                    return;
+                  }
+                  _oxExchangeStarted = true;
+                  unawaited(_exchangeWithOxApi());
+                },
+                child: Text(_blockedByBotSession ? 'Log out and use phone number' : 'Try again'),
+              ),
             ],
           ),
         );
