@@ -1,0 +1,10 @@
+# graphify: keep the knowledge graph scoped to first-party code.
+# gitignore-style syntax, additive to .gitignore (build/, .dart_tool/,
+# node_modules/, Pods/, .gradle/ etc. are already excluded there).
+
+# Vendored third-party source. The gotd fork lives here
+# (go/oxtelegram/third_party/gotd-td/SUSHI_FORK.md); our patches are small and
+# tracked in git, but indexing the whole dependency tree (~3.3k files) floods
+# every query. Remove this line, or add a "!" negation for a subpath, if you
+# ever need part of it in the graph.
+go/oxtelegram/third_party/
