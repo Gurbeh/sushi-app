@@ -145,6 +145,42 @@ Future<void> sushiContinueRemember(ItemBaseModel item, Duration position, Durati
   await _writeAll(next.take(_maxItems).toList());
 }
 
+/// Menu-driven "Add to Continue Watching" (poster overflow menu on the home rows). Unlike
+/// [sushiContinueRemember] — which is playback telling the store where the user stopped — this
+/// just pins the title to the top of the rail at 0% progress. Re-adding an existing title moves
+/// it to the top and resets its progress.
+Future<void> sushiContinueAdd(ItemBaseModel item) async {
+  final id = sushiContinueIdentity(item);
+  if (id == null) return;
+  final entry = SushiContinueEntry(
+    tmdbId: id.tmdbId,
+    kind: id.kind,
+    title: id.title,
+    year: id.year,
+    rating: id.rating,
+    poster: id.poster,
+    positionMs: 0,
+    durationMs: 0,
+    atMs: DateTime.now().millisecondsSinceEpoch,
+  );
+  final existing = await _readAll();
+  final next = [
+    entry,
+    ...existing.where((e) => e.tmdbId != entry.tmdbId || e.kind != entry.kind),
+  ];
+  await _writeAll(next.take(_maxItems).toList());
+}
+
+/// Menu-driven "Remove from Continue Watching" — drops the matching entry, if any.
+Future<void> sushiContinueForget(ItemBaseModel item) async {
+  final id = sushiContinueIdentity(item);
+  if (id == null) return;
+  final existing = await _readAll();
+  final next = existing.where((e) => e.tmdbId != id.tmdbId || e.kind != id.kind).toList();
+  if (next.length == existing.length) return;
+  await _writeAll(next);
+}
+
 Future<List<ItemBaseModel>> sushiContinueLoad() async {
   final entries = await _readAll();
   return [for (final e in entries) e.toItem()];

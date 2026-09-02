@@ -21,9 +21,11 @@ import 'package:fladder/oxplayer/oxplayer_watchlist_action.dart';
 import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
 import 'package:fladder/oxplayer/oxplayer_share_action.dart';
 import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
+import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -111,6 +113,7 @@ enum ItemActions {
   mediaInfo,
   identify,
   download,
+  continueWatching,
 }
 
 extension ItemBaseModelExtensions on ItemBaseModel {
@@ -131,6 +134,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     WidgetRef ref, {
     List<ItemAction> otherActions = const [],
     Set<ItemActions> exclude = const {},
+    bool sushiContinueToggle = false,
     Function(UserData? newData)? onUserDataChanged,
     Function(ItemBaseModel item)? onItemUpdated,
     Function(ItemBaseModel item)? onDeleteSuccesFully,
@@ -161,6 +165,16 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       onUserDataChanged?.call(newData);
       if (oxEnabled) oxplayerSyncPlaybackUserData(ref, id, newData);
     }
+    // Sushi "Add / Remove Continue Watching" — only on the home rows that opt in (the continue
+    // rail is client-owned, docs/12 §2). "In" it just means the store's entry list, which the
+    // dashboard already mirrors in `resumeVideo`; compare id *and* runtime type since a movie and
+    // a series can share a TMDB id and both map to `sushi_tmdb_<id>`.
+    final sushiShowContinueToggle = sushiContinueToggle &&
+        !exclude.contains(ItemActions.continueWatching) &&
+        SushiConfig.isEnabled &&
+        (this is MovieModel || this is SeriesModel);
+    final sushiInContinue = sushiShowContinueToggle &&
+        ref.read(dashboardProvider).resumeVideo.any((e) => e.id == id && e.runtimeType == runtimeType);
     final ItemAction? parentAction = switch (this) {
       EpisodeModel _ => !exclude.contains(ItemActions.openShow)
           ? ItemActionButton(
@@ -332,6 +346,23 @@ extension ItemBaseModelExtensions on ItemBaseModel {
                 ? context.localized.removeAsFavorite
                 : context.localized.addAsFavorite,
           ),
+        ),
+      if (sushiShowContinueToggle)
+        ItemActionButton(
+          icon: Icon(sushiInContinue ? IconsaxPlusLinear.play_remove : IconsaxPlusLinear.video_play),
+          label: Text(sushiInContinue ? 'Remove from Continue Watching' : 'Add to Continue Watching'),
+          action: () async {
+            if (sushiInContinue) {
+              await sushiContinueForget(this);
+            } else {
+              await sushiContinueAdd(this);
+            }
+            await ref.read(dashboardProvider.notifier).reloadSushiContinue();
+            FladderSnack.show(
+              sushiInContinue ? 'Removed from Continue Watching' : 'Added to Continue Watching',
+              context: context,
+            );
+          },
         ),
       ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
       ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),

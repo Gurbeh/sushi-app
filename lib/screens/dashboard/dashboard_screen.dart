@@ -294,6 +294,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: context.localized.dashboardContinueWatching,
+                      sushiContinueToggle: SushiConfig.isEnabled,
                       posters: resumeVideo,
                     ),
                   if (resumeAudio.isNotEmpty &&
@@ -335,6 +336,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'New',
+                      sushiContinueToggle: true,
                       posters: sushiRails.slider,
                     ),
                   if (sushiRails.mostWatched.isNotEmpty)
@@ -342,6 +344,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Most watched',
+                      sushiContinueToggle: true,
                       posters: sushiRails.mostWatched,
                     ),
                   if (sushiRails.trending.isNotEmpty)
@@ -349,6 +352,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Trending',
+                      sushiContinueToggle: true,
                       posters: sushiRails.trending,
                     ),
                   if (sushiRails.seriesMostWatched.isNotEmpty)
@@ -356,6 +360,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Series · Most watched',
+                      sushiContinueToggle: true,
                       posters: sushiRails.seriesMostWatched,
                     ),
                   if (sushiRails.seriesTrending.isNotEmpty)
@@ -363,6 +368,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Series · Trending',
+                      sushiContinueToggle: true,
                       posters: sushiRails.seriesTrending,
                     ),
                   ...oxplayerDashboardRecentlyAddedRows(

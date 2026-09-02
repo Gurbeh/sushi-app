@@ -38,6 +38,7 @@ class TVPosterRow extends ConsumerStatefulWidget {
   final Function(ItemBaseModel focused)? onFocused;
   final bool primaryPosters;
   final bool autoFocus;
+  final bool sushiContinueToggle;
 
   const TVPosterRow({
     required this.posters,
@@ -48,6 +49,7 @@ class TVPosterRow extends ConsumerStatefulWidget {
     this.onFocused,
     this.primaryPosters = false,
     this.autoFocus = false,
+    this.sushiContinueToggle = false,
     super.key,
   });
 
@@ -138,6 +140,7 @@ class _TVPosterRowState extends ConsumerState<TVPosterRow> {
                 width: _itemWidth(index, posterHeight),
                 selected: isSelected,
                 focused: isFocused,
+                sushiContinueToggle: widget.sushiContinueToggle,
                 onFocusChanged: (focused) {
                   if (focused) {
                     setState(() => _selectedIndex = index);
@@ -174,6 +177,7 @@ class _TVPosterItem extends ConsumerWidget {
   final bool focused;
   final Function(bool focused)? onFocusChanged;
   final bool primaryPosters;
+  final bool sushiContinueToggle;
   final VoidCallback onTap;
 
   const _TVPosterItem({
@@ -184,6 +188,7 @@ class _TVPosterItem extends ConsumerWidget {
     required this.focused,
     this.onFocusChanged,
     required this.primaryPosters,
+    this.sushiContinueToggle = false,
     required this.onTap,
   });
 
@@ -298,6 +303,7 @@ class _TVPosterItem extends ConsumerWidget {
         ref: ref,
         poster: poster,
         scrollController: scrollController,
+        sushiContinueToggle: sushiContinueToggle,
       ),
     );
   }
@@ -312,6 +318,7 @@ class _TVPosterItem extends ConsumerWidget {
           .generateActions(
             context,
             ref,
+            sushiContinueToggle: sushiContinueToggle,
           )
           .popupMenuItems(useIcons: true),
     );

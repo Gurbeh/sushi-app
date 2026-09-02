@@ -41,6 +41,7 @@ class PosterImage extends ConsumerWidget {
   final Function(bool focus)? onFocusChanged;
   final bool showSyncStatus;
   final bool oxDetailBadges;
+  final bool sushiContinueToggle;
 
   const PosterImage({
     required this.poster,
@@ -57,6 +58,7 @@ class PosterImage extends ConsumerWidget {
     this.onFocusChanged,
     this.showSyncStatus = false,
     this.oxDetailBadges = false,
+    this.sushiContinueToggle = false,
     super.key,
   });
 
@@ -179,6 +181,7 @@ class PosterImage extends ConsumerWidget {
                           ref,
                           exclude: excludeActions,
                           otherActions: otherActions,
+                          sushiContinueToggle: sushiContinueToggle,
                           onUserDataChanged: onUserDataChanged,
                           onDeleteSuccesFully: onItemRemoved,
                           onItemUpdated: onItemUpdated,
@@ -206,6 +209,7 @@ class PosterImage extends ConsumerWidget {
         scrollController: scrollController,
         excludeActions: excludeActions,
         otherActions: otherActions,
+        sushiContinueToggle: sushiContinueToggle,
         onUserDataChanged: onUserDataChanged,
         onDeleteSuccesFully: onItemRemoved,
         onItemUpdated: onItemUpdated,
@@ -225,6 +229,7 @@ class PosterImage extends ConsumerWidget {
             ref,
             exclude: excludeActions,
             otherActions: otherActions,
+            sushiContinueToggle: sushiContinueToggle,
             onUserDataChanged: onUserDataChanged,
             onDeleteSuccesFully: onItemRemoved,
             onItemUpdated: onItemUpdated,

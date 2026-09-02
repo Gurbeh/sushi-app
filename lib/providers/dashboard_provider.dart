@@ -229,6 +229,13 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     unawaited(ref.read(sushiCatalogControllerProvider).prefetchVisibleHome(home));
   }
 
+  /// Re-reads the client-owned continue-watching store into [state] — no `/home` bot round-trip.
+  /// Driven by the poster menu's "Add / Remove Continue Watching" toggle on the home rows.
+  Future<void> reloadSushiContinue() async {
+    if (!SushiConfig.isEnabled) return;
+    state = state.copyWith(resumeVideo: await sushiContinueLoad());
+  }
+
   void applyOxHomeFeed(OxHomeFeedDashboard feed) {
     state = state.copyWith(
       nextUp: feed.nextUp,
