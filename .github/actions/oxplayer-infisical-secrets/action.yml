@@ -10,10 +10,12 @@ inputs:
     default: http://100.67.35.80:8080
   infisical-client-id:
     description: Universal Auth client id (oxplayer-client-ci-identity)
-    required: true
+    required: false
+    default: ""
   infisical-client-secret:
     description: Universal Auth client secret
-    required: true
+    required: false
+    default: ""
   infisical-project-slug:
     description: Infisical project slug
     required: false
@@ -28,7 +30,8 @@ inputs:
     default: /core/client-ci
   tailscale-authkey:
     description: Tailscale auth key (reusable, ephemeral, tag:github-ci)
-    required: true
+    required: false
+    default: ""
   connect-tailscale:
     description: Join Tailscale before Infisical fetch
     required: false
@@ -36,10 +39,21 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Infisical bootstrap check
+      id: boot
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.tailscale-authkey }}" ] && [ -n "${{ inputs.infisical-client-id }}" ] && [ -n "${{ inputs.infisical-client-secret }}" ]; then
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+          echo "Infisical bootstrap secrets empty — using GitHub Actions secrets already in env"
+        fi
+
     # macOS: brew binary — tailscale/github-action@v3 compiles from source and often
     # times out on proxy.golang.org during go mod download.
     - name: Connect Tailscale (macOS)
-      if: inputs.connect-tailscale == 'true' && runner.os == 'macOS'
+      if: steps.boot.outputs.enabled == 'true' && inputs.connect-tailscale == 'true' && runner.os == 'macOS'
       shell: bash
       run: |
         set -euo pipefail
@@ -56,14 +70,14 @@ runs:
         TS_AUTHKEY: ${{ inputs.tailscale-authkey }}
 
     - name: Connect Tailscale (Linux / Windows)
-      if: inputs.connect-tailscale == 'true' && runner.os != 'macOS'
+      if: steps.boot.outputs.enabled == 'true' && inputs.connect-tailscale == 'true' && runner.os != 'macOS'
       uses: tailscale/github-action@v3
       with:
         authkey: ${{ inputs.tailscale-authkey }}
         version: 1.78.1
 
     - name: Wait for Infisical API
-      if: inputs.connect-tailscale == 'true'
+      if: steps.boot.outputs.enabled == 'true' && inputs.connect-tailscale == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -81,6 +95,7 @@ runs:
         exit 1
 
     - name: Fetch secrets from Infisical
+      if: steps.boot.outputs.enabled == 'true'
       uses: Infisical/secrets-action@v1.0.12
       with:
         method: universal

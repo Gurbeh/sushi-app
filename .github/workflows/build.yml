@@ -4,7 +4,8 @@
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
 # OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols.
 # Sushi: Android is APK-only — no Google Play Console / AAB / R2 mirror.
-# Bootstrap GitHub secrets: INFISICAL_API_URL, INFISICAL_MACHINE_CLIENT_ID, INFISICAL_MACHINE_CLIENT_SECRET, TS_CI_AUTHKEY
+# Bootstrap: Infisical via Tailscale (INFISICAL_*, TS_CI_AUTHKEY) OR GitHub-native
+# client-ci secrets (BOT_USERNAME, TELEGRAM_API_*, ANDROID_KEYSTORE_*, SENTRY_DSN, …).
 name: Build OXPlayer
 
 on:
@@ -40,6 +41,27 @@ concurrency:
 
 env:
   NIGHTLY_TAG: nightly
+  BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
+  OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL }}
+  OXPLAYER_API_BASE_IRAN: ${{ secrets.OXPLAYER_API_BASE_IRAN }}
+  OXPLAYER_STREAM_BASE_IRAN: ${{ secrets.OXPLAYER_STREAM_BASE_IRAN }}
+  TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+  TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+  TELEGRAM_HOSTED_WEBAPP_HTTPS_URL: ${{ secrets.TELEGRAM_HOSTED_WEBAPP_HTTPS_URL }}
+  TELEGRAM_WEBAPP_BOT_USERNAME: ${{ secrets.TELEGRAM_WEBAPP_BOT_USERNAME }}
+  SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+  SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+  ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+  ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+  ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+  ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+  ANDROID_DIRECT_KEYSTORE_BASE64: ${{ secrets.ANDROID_DIRECT_KEYSTORE_BASE64 }}
+  ANDROID_DIRECT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DIRECT_KEYSTORE_PASSWORD }}
+  ANDROID_DIRECT_KEY_ALIAS: ${{ secrets.ANDROID_DIRECT_KEY_ALIAS }}
+  ANDROID_DIRECT_KEY_PASSWORD: ${{ secrets.ANDROID_DIRECT_KEY_PASSWORD }}
+  CONSOLE_FIREBASE: ${{ secrets.CONSOLE_FIREBASE }}
 
 jobs:
   check-trigger:
