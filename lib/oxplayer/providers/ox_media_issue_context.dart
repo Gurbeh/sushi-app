@@ -25,7 +25,7 @@ Future<OxMediaIssueContext> oxMediaIssueContext(
   OxMediaIssueTarget target,
 ) async {
   if (!OxplayerConfig.isEnabled) {
-    throw StateError('OXPlayer is disabled');
+    throw StateError('Sushi is disabled');
   }
 
   if (ref.read(userProvider)?.seerrCredentials?.isConfigured != true) {

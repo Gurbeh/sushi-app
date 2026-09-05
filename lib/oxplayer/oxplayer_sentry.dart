@@ -100,7 +100,7 @@ abstract final class OxplayerSentry {
   static Future<void> sendTestMessage({String source = 'error_logs_hold'}) async {
     if (!Sentry.isEnabled) return;
     await Sentry.captureMessage(
-      'OXPlayer client Sentry test',
+      'Sushi client Sentry test',
       withScope: (scope) {
         scope
           ..setTag('source', source)

@@ -15,7 +15,7 @@ AppDir:
   path: ./AppDir
   app_info:
     id: app.oxplayer
-    name: OXPlayer
+    name: Sushi
     icon: sushi_icon_desktop
     version: latest
     exec: fladder
@@ -27,5 +27,5 @@ AppDir:
       - icons/production/sushi_icon_desktop.png
 AppImage:
   arch: x86_64
-  update-information: gh-releases-zsync|PLACEHOLDER_OWNER|PLACEHOLDER_REPO|latest|OXPlayer_x86_64.AppImage.zsync
-  file_name: OXPlayer_x86_64.AppImage
+  update-information: gh-releases-zsync|PLACEHOLDER_OWNER|PLACEHOLDER_REPO|latest|Sushi_x86_64.AppImage.zsync
+  file_name: Sushi_x86_64.AppImage

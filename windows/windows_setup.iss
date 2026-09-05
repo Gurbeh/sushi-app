@@ -6,13 +6,10 @@
 
 [Setup]
 AppId={{D573EDD5-117A-47AD-88AC-62C8EBD11DC7}
-AppName="OXPlayer"
+AppName="Sushi"
 AppVersion={#FLADDER_VERSION}
-AppPublisher="DonutWare"
-AppPublisherURL="https://github.com/DonutWare/Fladder"
-AppSupportURL="https://github.com/DonutWare/Fladder"
-AppUpdatesURL="https://github.com/DonutWare/Fladder"
-DefaultDirName={localappdata}\Programs\OXPlayer
+AppPublisher="Gurbeh"
+DefaultDirName={localappdata}\Programs\Sushi
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
@@ -25,7 +22,7 @@ WizardStyle=modern
 
 SetupLogging=yes
 UninstallLogging=yes
-UninstallDisplayName="OXPlayer"
+UninstallDisplayName="Sushi"
 UninstallDisplayIcon={app}\fladder.exe
 SetupIconFile="{#SourcePath}\windows\runner\resources\app_icon.ico"
 LicenseFile="{#SourcePath}\LICENSE"
@@ -41,11 +38,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{#SourcePath}\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\OXPlayer"; Filename: "{app}\fladder.exe"
-Name: "{autodesktop}\OXPlayer"; Filename: "{app}\fladder.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Sushi"; Filename: "{app}\fladder.exe"
+Name: "{autodesktop}\Sushi"; Filename: "{app}\fladder.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\oxplayer"; ValueType: string; ValueName: ""; ValueData: "URL:OXPlayer Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\oxplayer"; ValueType: string; ValueName: ""; ValueData: "URL:Sushi Protocol"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\oxplayer"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\oxplayer\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\fladder.exe,0"
 Root: HKCU; Subkey: "Software\Classes\oxplayer\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\fladder.exe"" ""%1"""
@@ -53,7 +50,7 @@ Root: HKCU; Subkey: "Software\Classes\oxplayer\shell\open\command"; ValueType: s
 [Run]
 ; Do not use skipifsilent — in-app updates run Setup with /VERYSILENT and must
 ; relaunch the app when install finishes. Interactive installs still show the checkbox.
-Filename: "{app}\fladder.exe"; Description: "{cm:LaunchProgram,OXPlayer}"; Flags: nowait postinstall
+Filename: "{app}\fladder.exe"; Description: "{cm:LaunchProgram,Sushi}"; Flags: nowait postinstall
 
 [Code]
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

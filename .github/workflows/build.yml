@@ -7,7 +7,7 @@
 # After Create Release, every binary goes to @sushiMovieNews (APP_CHANNEL) via local Bot API.
 # Bootstrap: Infisical via Tailscale (INFISICAL_*, TS_CI_AUTHKEY) OR GitHub-native
 # client-ci secrets (BOT_USERNAME, TELEGRAM_API_*, ANDROID_KEYSTORE_*, SENTRY_DSN, …).
-name: Build OXPlayer
+name: Build Sushi
 
 on:
   push:
@@ -249,7 +249,7 @@ jobs:
         shell: bash
         run: |
           if grep -q 'applicationId = "app.sushi"' android/app/build.gradle; then
-            echo "Sushi applicationId — keep committed google-services.json (do not overwrite with OXPlayer CONSOLE_FIREBASE)"
+            echo "Sushi applicationId — keep committed google-services.json (do not overwrite with Sushi CONSOLE_FIREBASE)"
             mkdir -p android/app/src/direct
             cp android/app/src/production/google-services.json android/app/src/direct/google-services.json
             exit 0
@@ -766,8 +766,8 @@ jobs:
         with:
           name: oxplayer-linux-appimage
           path: |
-            OXPlayer_x86_64.AppImage
-            OXPlayer_x86_64.AppImage.zsync
+            Sushi_x86_64.AppImage
+            Sushi_x86_64.AppImage.zsync
 
   build-linux-flatpak:
     needs: [fetch-info, build-linux]
@@ -788,13 +788,13 @@ jobs:
 
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: OXPlayer-Linux.flatpak
+          bundle: Sushi-Linux.flatpak
           manifest-path: flatpak/nl.jknaapen.fladder.yaml
 
       - uses: actions/upload-artifact@v5
         with:
           name: oxplayer-linux-flatpak
-          path: OXPlayer-Linux.flatpak
+          path: Sushi-Linux.flatpak
 
   create_release:
     name: Create Release
@@ -878,9 +878,9 @@ jobs:
         run: |
           SUF="${{ needs.build-android.outputs.artifact_suffix }}"
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "OXPlayer-Android-${V}-armeabi-v7a.apk" || true
-          mv "oxplayer-android/${SUF}-arm64-v8a.apk" "OXPlayer-Android-${V}-arm64-v8a.apk" || true
-          mv "oxplayer-android/${SUF}-x86_64.apk" "OXPlayer-Android-${V}-x86_64.apk" || true
+          mv "oxplayer-android/${SUF}-armeabi-v7a.apk" "Sushi-Android-${V}-armeabi-v7a.apk" || true
+          mv "oxplayer-android/${SUF}-arm64-v8a.apk" "Sushi-Android-${V}-arm64-v8a.apk" || true
+          mv "oxplayer-android/${SUF}-x86_64.apk" "Sushi-Android-${V}-x86_64.apk" || true
 
       - uses: actions/download-artifact@v5
         with:
@@ -892,7 +892,7 @@ jobs:
         run: |
           V="${{ steps.version.outputs.version }}"
           cd oxplayer-windows-portable
-          zip -r "../OXPlayer-Windows-${V}.zip" .
+          zip -r "../Sushi-Windows-${V}.zip" .
 
       - uses: actions/download-artifact@v5
         with:
@@ -903,7 +903,7 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-windows-installer/fladder_setup.exe" "OXPlayer-Windows-${V}-Setup.exe"
+          mv "oxplayer-windows-installer/fladder_setup.exe" "Sushi-Windows-${V}-Setup.exe"
 
       - uses: actions/download-artifact@v5
         with:
@@ -914,7 +914,7 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-iOS/iOS.ipa" "OXPlayer-iOS-${V}.ipa"
+          mv "oxplayer-iOS/iOS.ipa" "Sushi-iOS-${V}.ipa"
 
       - uses: actions/download-artifact@v5
         with:
@@ -925,7 +925,7 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-macOS/macOS.dmg" "OXPlayer-macOS-${V}.dmg"
+          mv "oxplayer-macOS/macOS.dmg" "Sushi-macOS-${V}.dmg"
 
       - uses: actions/download-artifact@v5
         with:
@@ -937,7 +937,7 @@ jobs:
         run: |
           V="${{ steps.version.outputs.version }}"
           cd oxplayer-linux
-          zip -r "../OXPlayer-Linux-${V}.zip" .
+          zip -r "../Sushi-Linux-${V}.zip" .
 
       - uses: actions/download-artifact@v5
         if: needs.fetch-info.outputs.build_type == 'release'
@@ -950,7 +950,7 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-linux-flatpak/OXPlayer-Linux.flatpak" "OXPlayer-Linux-${V}.flatpak"
+          mv "oxplayer-linux-flatpak/Sushi-Linux.flatpak" "Sushi-Linux-${V}.flatpak"
 
       - uses: actions/download-artifact@v5
         with:
@@ -961,8 +961,8 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
-          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
-          mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
+          mv "oxplayer-linux-appimage/Sushi_x86_64.AppImage" "Sushi-Linux-${V}.AppImage"
+          mv "oxplayer-linux-appimage/Sushi_x86_64.AppImage.zsync" "Sushi-Linux-${V}.AppImage.zsync"
 
       - name: Prepare GitHub release body file
         shell: bash
@@ -986,28 +986,28 @@ jobs:
           V="${{ steps.version.outputs.version }}"
           if [[ "${{ needs.fetch-info.outputs.build_type }}" == "nightly" ]]; then
             TAG="${{ env.NIGHTLY_TAG }}"
-            TITLE="OXPlayer nightly — ${V}"
+            TITLE="Sushi nightly — ${V}"
             EXTRA_FLAGS=(--prerelease --notes-file gh-release-body.md)
           else
             TAG="${{ github.ref_name }}"
-            TITLE="OXPlayer ${V}"
+            TITLE="Sushi ${V}"
             EXTRA_FLAGS=(--latest --generate-notes)
           fi
 
           FILES=(
-            "OXPlayer-Android-${V}-arm64-v8a.apk"
-            "OXPlayer-Android-${V}-armeabi-v7a.apk"
-            "OXPlayer-Android-${V}-x86_64.apk"
-            "OXPlayer-Windows-${V}-Setup.exe"
-            "OXPlayer-Windows-${V}.zip"
-            "OXPlayer-iOS-${V}.ipa"
-            "OXPlayer-macOS-${V}.dmg"
-            "OXPlayer-Linux-${V}.zip"
-            "OXPlayer-Linux-${V}.AppImage"
-            "OXPlayer-Linux-${V}.AppImage.zsync"
+            "Sushi-Android-${V}-arm64-v8a.apk"
+            "Sushi-Android-${V}-armeabi-v7a.apk"
+            "Sushi-Android-${V}-x86_64.apk"
+            "Sushi-Windows-${V}-Setup.exe"
+            "Sushi-Windows-${V}.zip"
+            "Sushi-iOS-${V}.ipa"
+            "Sushi-macOS-${V}.dmg"
+            "Sushi-Linux-${V}.zip"
+            "Sushi-Linux-${V}.AppImage"
+            "Sushi-Linux-${V}.AppImage.zsync"
           )
           if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
-            FILES+=("OXPlayer-Linux-${V}.flatpak")
+            FILES+=("Sushi-Linux-${V}.flatpak")
           fi
 
           for f in "${FILES[@]}"; do
@@ -1046,7 +1046,7 @@ jobs:
         if: steps.gh_release.outcome != 'success'
         with:
           tag_name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && env.NIGHTLY_TAG || github.ref_name }}
-          name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && format('OXPlayer nightly — {0}', steps.version.outputs.version) || format('OXPlayer {0}', steps.version.outputs.version) }}
+          name: ${{ needs.fetch-info.outputs.build_type == 'nightly' && format('Sushi nightly — {0}', steps.version.outputs.version) || format('Sushi {0}', steps.version.outputs.version) }}
           body_path: gh-release-body.md
           draft: false
           prerelease: ${{ needs.fetch-info.outputs.build_type == 'nightly' }}
@@ -1054,17 +1054,17 @@ jobs:
           generate_release_notes: ${{ needs.fetch-info.outputs.build_type == 'release' }}
           fail_on_unmatched_files: true
           files: |
-            OXPlayer-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
-            OXPlayer-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
-            OXPlayer-Android-${{ steps.version.outputs.version }}-x86_64.apk
-            OXPlayer-Windows-${{ steps.version.outputs.version }}-Setup.exe
-            OXPlayer-Windows-${{ steps.version.outputs.version }}.zip
-            OXPlayer-iOS-${{ steps.version.outputs.version }}.ipa
-            OXPlayer-macOS-${{ steps.version.outputs.version }}.dmg
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.zip
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage
-            OXPlayer-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
-            ${{ needs.fetch-info.outputs.build_type == 'release' && format('OXPlayer-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
+            Sushi-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
+            Sushi-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+            Sushi-Android-${{ steps.version.outputs.version }}-x86_64.apk
+            Sushi-Windows-${{ steps.version.outputs.version }}-Setup.exe
+            Sushi-Windows-${{ steps.version.outputs.version }}.zip
+            Sushi-iOS-${{ steps.version.outputs.version }}.ipa
+            Sushi-macOS-${{ steps.version.outputs.version }}.dmg
+            Sushi-Linux-${{ steps.version.outputs.version }}.zip
+            Sushi-Linux-${{ steps.version.outputs.version }}.AppImage
+            Sushi-Linux-${{ steps.version.outputs.version }}.AppImage.zsync
+            ${{ needs.fetch-info.outputs.build_type == 'release' && format('Sushi-Linux-{0}.flatpak', steps.version.outputs.version) || '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -1127,19 +1127,19 @@ jobs:
 
           V="${VERSION}"
           files=(
-            "OXPlayer-Android-${V}-arm64-v8a.apk"
-            "OXPlayer-Android-${V}-armeabi-v7a.apk"
-            "OXPlayer-Android-${V}-x86_64.apk"
-            "OXPlayer-Windows-${V}-Setup.exe"
-            "OXPlayer-Windows-${V}.zip"
-            "OXPlayer-iOS-${V}.ipa"
-            "OXPlayer-macOS-${V}.dmg"
-            "OXPlayer-Linux-${V}.zip"
-            "OXPlayer-Linux-${V}.AppImage"
-            "OXPlayer-Linux-${V}.AppImage.zsync"
+            "Sushi-Android-${V}-arm64-v8a.apk"
+            "Sushi-Android-${V}-armeabi-v7a.apk"
+            "Sushi-Android-${V}-x86_64.apk"
+            "Sushi-Windows-${V}-Setup.exe"
+            "Sushi-Windows-${V}.zip"
+            "Sushi-iOS-${V}.ipa"
+            "Sushi-macOS-${V}.dmg"
+            "Sushi-Linux-${V}.zip"
+            "Sushi-Linux-${V}.AppImage"
+            "Sushi-Linux-${V}.AppImage.zsync"
           )
           if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
-            files+=("OXPlayer-Linux-${V}.flatpak")
+            files+=("Sushi-Linux-${V}.flatpak")
           fi
 
           export APP_BOT_API_BASE="http://127.0.0.1:8081"

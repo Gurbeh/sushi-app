@@ -3,12 +3,12 @@
   <id>nl.jknaapen.fladder</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
-  <name>OXPlayer</name>
+  <name>Sushi</name>
   <summary>Telegram media library client</summary>
   
   <description>
     <p>
-      OXPlayer is a cross-platform client focused on your Telegram media library.
+      Sushi is a cross-platform client focused on your Telegram media library.
       Sign in with Telegram, browse catalogued media, and stream with a Flutter UI.
     </p>
     <p>Features:</p>

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:fladder/oxplayer/oxplayer_brand.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation.dart';
 import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
@@ -180,7 +181,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               label: Text(context.localized.about),
               subLabel: Text(
                 OxplayerConfig.isEnabled
-                    ? 'OXPlayer v${applicationInfo.version}'
+                    ? '${OxplayerBrand.appName} v${applicationInfo.version}'
                     : context.localized.aboutCreatedBy,
               ),
               selected: containsRoute(const AboutSettingsRoute()),

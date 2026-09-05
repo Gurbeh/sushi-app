@@ -11,7 +11,7 @@ import 'package:fladder/util/theme_extensions.dart';
 class FladderLogo extends ConsumerWidget {
   const FladderLogo({super.key});
 
-  /// [String.capitalize] lowercases the rest of the string, which breaks "OXPlayer".
+  /// [String.capitalize] lowercases the rest of the string, which breaks "Sushi".
   static String _logoAppName(String applicationName) {
     if (applicationName == OxplayerBrand.appName) return applicationName;
     return applicationName.capitalize();

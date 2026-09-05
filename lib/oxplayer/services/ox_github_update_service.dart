@@ -196,23 +196,23 @@ abstract final class OxGitHubUpdateService {
 
   static Future<String?> _r2LatestUrlForPlatform() async {
     if (Platform.isWindows) {
-      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Windows-Setup.exe';
+      return '$_releasesCdnOrigin/releases/latest/Sushi-Windows-Setup.exe';
     }
     if (Platform.isMacOS) {
-      return '$_releasesCdnOrigin/releases/latest/OXPlayer-macOS.dmg';
+      return '$_releasesCdnOrigin/releases/latest/Sushi-macOS.dmg';
     }
     if (Platform.isLinux) {
-      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Linux.AppImage';
+      return '$_releasesCdnOrigin/releases/latest/Sushi-Linux.AppImage';
     }
     if (Platform.isAndroid) {
       final abis = await _androidSupportedAbis();
       const published = {'arm64-v8a', 'armeabi-v7a', 'x86_64'};
       for (final abi in abis) {
         if (published.contains(abi)) {
-          return '$_releasesCdnOrigin/releases/latest/OXPlayer-Android-$abi.apk';
+          return '$_releasesCdnOrigin/releases/latest/Sushi-Android-$abi.apk';
         }
       }
-      return '$_releasesCdnOrigin/releases/latest/OXPlayer-Android-arm64-v8a.apk';
+      return '$_releasesCdnOrigin/releases/latest/Sushi-Android-arm64-v8a.apk';
     }
     return null;
   }
@@ -220,27 +220,27 @@ abstract final class OxGitHubUpdateService {
   static Future<List<RegExp>> _downloadPatternsForPlatform() async {
     if (Platform.isWindows) {
       return [
-        RegExp(r'^OXPlayer-Windows-.+-Setup\.exe$'),
-        RegExp(r'^OXPlayer-Windows-.+\.zip$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Windows-.+-Setup\.exe$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Windows-.+\.zip$'),
       ];
     }
     if (Platform.isMacOS) {
-      return [RegExp(r'^OXPlayer-macOS-.+\.dmg$')];
+      return [RegExp(r'^(?:Sushi|OXPlayer)-macOS-.+\.dmg$')];
     }
     if (Platform.isLinux) {
       return [
-        RegExp(r'^OXPlayer-Linux-.+\.AppImage$'),
-        RegExp(r'^OXPlayer-Linux-.+\.flatpak$'),
-        RegExp(r'^OXPlayer-Linux-.+\.zip$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Linux-.+\.AppImage$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Linux-.+\.flatpak$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Linux-.+\.zip$'),
       ];
     }
     if (Platform.isAndroid) {
       final abis = await _androidSupportedAbis();
       return [
         for (final abi in abis)
-          RegExp('^OXPlayer-Android-.+-${RegExp.escape(abi)}\\.apk\$'),
+          RegExp('^(?:Sushi|OXPlayer)-Android-.+-${RegExp.escape(abi)}\\.apk\$'),
         // Fallback if ABI detection fails or reports an architecture we don't publish.
-        RegExp(r'^OXPlayer-Android-.+-arm64-v8a\.apk$'),
+        RegExp(r'^(?:Sushi|OXPlayer)-Android-.+-arm64-v8a\.apk$'),
       ];
     }
     return const [];

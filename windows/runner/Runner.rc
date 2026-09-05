@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "DonutWare" "\0"
-            VALUE "FileDescription", "OXPlayer" "\0"
+            VALUE "CompanyName", "Gurbeh" "\0"
+            VALUE "FileDescription", "Sushi" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "nl.jknaapen.fladder" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 DonutWare. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Gurbeh. All rights reserved." "\0"
             VALUE "OriginalFilename", "fladder.exe" "\0"
-            VALUE "ProductName", "OXPlayer" "\0"
+            VALUE "ProductName", "Sushi" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

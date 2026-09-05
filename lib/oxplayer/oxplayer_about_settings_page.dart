@@ -2,7 +2,6 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/oxplayer/oxplayer_developer_mode_store.dart';
 import 'package:fladder/oxplayer/oxplayer_ox_login_kind_store.dart';
@@ -14,13 +13,9 @@ import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
 import 'package:fladder/screens/shared/fladder_logo.dart';
-import 'package:fladder/screens/shared/media/external_urls.dart';
 import 'package:fladder/util/application_info.dart';
 import 'package:fladder/util/list_padding.dart';
 import 'package:fladder/util/localization_helper.dart';
-
-const _oxplayerWebsite = 'https://oxplayer.app';
-const _oxplayerWebsiteLabel = 'oxplayer.app';
 
 class OxplayerAboutSettingsPage extends ConsumerStatefulWidget {
   const OxplayerAboutSettingsPage({super.key});
@@ -112,28 +107,6 @@ class _OxplayerAboutSettingsPageState extends ConsumerState<OxplayerAboutSetting
             indent: 16,
             endIndent: 16,
           ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton.filledTonal(
-              style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(12),
-                minimumSize: const Size(64, 64),
-              ),
-              onPressed: () => launchUrl(context, _oxplayerWebsite),
-              icon: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(IconsaxPlusLinear.global),
-                  Text(
-                    _oxplayerWebsiteLabel,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,

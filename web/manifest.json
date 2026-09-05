@@ -1,11 +1,11 @@
 {
-    "name": "OXPlayer",
-    "short_name": "OXPlayer",
+    "name": "Sushi",
+    "short_name": "Sushi",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#5B364D",
     "theme_color": "#5B364D",
-    "description": "OXPlayer — your Telegram media library.",
+    "description": "Sushi — your Telegram media library.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

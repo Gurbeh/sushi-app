@@ -117,3 +117,6 @@ ios/Flutter/ephemeral/
 **/Pods/
 .release-out.log
 custom_lint.log
+
+# Local UI-inspection scratch dumps (adb screencap / uiautomator)
+.tmp-*

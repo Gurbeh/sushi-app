@@ -1,11 +1,11 @@
 {
 	"name": "DonutWare Repository",
-	"subtitle": "OXPlayer builds and related apps.",
+	"subtitle": "Sushi builds and related apps.",
 	"iconURL": "https://avatars.githubusercontent.com/u/42371342",
 	"tintColor": "#3A2101",
 	"apps": [
 	  {
-	    "name": "OXPlayer",
+	    "name": "Sushi",
 	    "bundleIdentifier": "app.oxplayer",
 	    "developerName": "DonutWare",
 	    "localizedDescription": "Telegram media library client built with Flutter.",

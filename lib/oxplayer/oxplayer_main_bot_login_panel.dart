@@ -618,7 +618,7 @@ class _OxplayerMainBotLoginPanelState
         ),
         const SizedBox(height: 6),
         Text(
-          "Approve sign-in in Telegram — OXPlayer never sees your Telegram account.",
+          "Approve sign-in in Telegram — Sushi never sees your Telegram account.",
           style: theme.textTheme.bodyMedium
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           textAlign: TextAlign.center,
