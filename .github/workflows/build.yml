@@ -4,7 +4,7 @@
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
 # OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols.
 # Sushi: Android is APK-only — no Google Play Console / AAB / R2 / web / GitHub Pages.
-# After Create Release, arm64+armeabi APKs go to the Sushi Telegram channel (APP_CHANNEL).
+# After Create Release, every binary goes to @sushiMovieNews (APP_CHANNEL) via local Bot API.
 # Bootstrap: Infisical via Tailscale (INFISICAL_*, TS_CI_AUTHKEY) OR GitHub-native
 # client-ci secrets (BOT_USERNAME, TELEGRAM_API_*, ANDROID_KEYSTORE_*, SENTRY_DSN, …).
 name: Build OXPlayer
@@ -1082,22 +1082,65 @@ jobs:
           echo "::error::Create Release failed (gh + softprops)"
           exit 1
 
-      # Sushi has no website. Distribution is the Telegram channel (ADR 0002).
-      # Bot API sendDocument cap is 50 MiB — arm64/armeabi APKs fit; Windows does not.
-      - name: Post Android APKs to Sushi Telegram channel
+      # Sushi has no website. Distribution is @sushiMovieNews (ADR 0002).
+      # Cloud Bot API is 50 MiB; local telegram-bot-api raises that to 2000 MiB.
+      - name: Post release binaries to Sushi Telegram channel
         if: success()
         env:
           APP_BOT_TOKEN: ${{ secrets.APP_BOT_TOKEN }}
           APP_CHANNEL: ${{ secrets.APP_CHANNEL }}
           VERSION: ${{ steps.version.outputs.version }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "${APP_BOT_TOKEN:-}" ] || [ -z "${APP_CHANNEL:-}" ]; then
-            echo "::error::APP_BOT_TOKEN / APP_CHANNEL GitHub secrets missing — copy MAIN_BOTS token and CHANNELS clone id from Infisical sushi /bots"
+            echo "::error::APP_BOT_TOKEN / APP_CHANNEL GitHub secrets missing"
             exit 1
           fi
+          if [ -z "${TELEGRAM_API_ID:-}" ] || [ -z "${TELEGRAM_API_HASH:-}" ]; then
+            echo "::error::TELEGRAM_API_ID / TELEGRAM_API_HASH required for local telegram-bot-api"
+            exit 1
+          fi
+
+          docker run -d --name telegram-bot-api \
+            -p 8081:8081 \
+            -e TELEGRAM_API_ID \
+            -e TELEGRAM_API_HASH \
+            -e TELEGRAM_LOCAL=1 \
+            aiogram/telegram-bot-api:latest
+
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:8081/bot${APP_BOT_TOKEN}/getMe" | jq -e '.ok == true' >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "1" ]; then
+            echo "::error::local telegram-bot-api did not become ready"
+            docker logs telegram-bot-api || true
+            exit 1
+          fi
+
           V="${VERSION}"
-          bash scripts/post-release-to-telegram.sh \
-            "OXPlayer-Android-${V}-arm64-v8a.apk" \
+          files=(
+            "OXPlayer-Android-${V}-arm64-v8a.apk"
             "OXPlayer-Android-${V}-armeabi-v7a.apk"
+            "OXPlayer-Android-${V}-x86_64.apk"
+            "OXPlayer-Windows-${V}-Setup.exe"
+            "OXPlayer-Windows-${V}.zip"
+            "OXPlayer-iOS-${V}.ipa"
+            "OXPlayer-macOS-${V}.dmg"
+            "OXPlayer-Linux-${V}.zip"
+            "OXPlayer-Linux-${V}.AppImage"
+            "OXPlayer-Linux-${V}.AppImage.zsync"
+          )
+          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
+            files+=("OXPlayer-Linux-${V}.flatpak")
+          fi
+
+          export APP_BOT_API_BASE="http://127.0.0.1:8081"
+          bash scripts/post-release-to-telegram.sh "${files[@]}"
