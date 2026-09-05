@@ -245,6 +245,10 @@ jobs:
       - name: Materialize Firebase client config (CONSOLE_FIREBASE)
         shell: bash
         run: |
+          if grep -q 'applicationId = "app.sushi"' android/app/build.gradle; then
+            echo "Sushi applicationId — keep committed google-services.json (do not overwrite with OXPlayer CONSOLE_FIREBASE)"
+            exit 0
+          fi
           if [ -z "${CONSOLE_FIREBASE:-}" ]; then
             echo "CONSOLE_FIREBASE not set — skipping Firebase client config sync"
           else
@@ -494,16 +498,16 @@ jobs:
           done
           exit 1
 
+      - uses: actions/upload-artifact@v5
+        with:
+          name: oxplayer-windows-portable
+          path: build\windows\x64\runner\Release\
+
       - name: Compile Inno Setup installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: windows/windows_setup.iss
           options: /O+ /DFLADDER_VERSION="${{ needs.fetch-info.outputs.version_name }}"
-
-      - uses: actions/upload-artifact@v5
-        with:
-          name: oxplayer-windows-portable
-          path: build\windows\x64\runner\Release\
 
       - uses: actions/upload-artifact@v5
         with:
