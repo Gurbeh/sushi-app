@@ -247,6 +247,8 @@ jobs:
         run: |
           if grep -q 'applicationId = "app.sushi"' android/app/build.gradle; then
             echo "Sushi applicationId — keep committed google-services.json (do not overwrite with OXPlayer CONSOLE_FIREBASE)"
+            mkdir -p android/app/src/direct
+            cp android/app/src/production/google-services.json android/app/src/direct/google-services.json
             exit 0
           fi
           if [ -z "${CONSOLE_FIREBASE:-}" ]; then
