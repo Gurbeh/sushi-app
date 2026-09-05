@@ -3,7 +3,8 @@
 # Main push skips nightly when commit is release-related (bump / prepare / Release X.Y.Z) so tag alone builds.
 # Build workflow on PRs only when pubspec.yaml, build.yml, or .fvmrc change (same as Fladder).
 # OX additions: oxplayer-flutter-env, Infisical /core/client-ci, Sentry symbols.
-# Sushi: Android is APK-only — no Google Play Console / AAB / R2 mirror.
+# Sushi: Android is APK-only — no Google Play Console / AAB / R2 / web / GitHub Pages.
+# After Create Release, arm64+armeabi APKs go to the Sushi Telegram channel (APP_CHANNEL).
 # Bootstrap: Infisical via Tailscale (INFISICAL_*, TS_CI_AUTHKEY) OR GitHub-native
 # client-ci secrets (BOT_USERNAME, TELEGRAM_API_*, ANDROID_KEYSTORE_*, SENTRY_DSN, …).
 name: Build OXPlayer
@@ -62,6 +63,8 @@ env:
   ANDROID_DIRECT_KEY_ALIAS: ${{ secrets.ANDROID_DIRECT_KEY_ALIAS }}
   ANDROID_DIRECT_KEY_PASSWORD: ${{ secrets.ANDROID_DIRECT_KEY_PASSWORD }}
   CONSOLE_FIREBASE: ${{ secrets.CONSOLE_FIREBASE }}
+  APP_CHANNEL: ${{ secrets.APP_CHANNEL }}
+  APP_BOT_TOKEN: ${{ secrets.APP_BOT_TOKEN }}
 
 jobs:
   check-trigger:
@@ -204,7 +207,7 @@ jobs:
           keyAlias=${ANDROID_KEY_ALIAS}
           EOF
 
-          # Isolated key for the `direct` flavor (GitHub/website APK) — optional so this
+          # Isolated key for the `direct` flavor (sideload / Telegram-channel APK) — optional so this
           # step doesn't break existing releases before ANDROID_DIRECT_* is added to Infisical.
           # Falls back to signing `direct` release builds with the Play key above until then.
           if [ -n "${ANDROID_DIRECT_KEYSTORE_BASE64:-}" ] && \
@@ -219,7 +222,7 @@ jobs:
           keyAlias=${ANDROID_DIRECT_KEY_ALIAS}
           EOF
           else
-            echo "::warning::ANDROID_DIRECT_* signing secrets not set in Infisical — 'direct' flavor (GitHub/website APK) is signed with the Play upload key instead of its own isolated key."
+            echo "::warning::ANDROID_DIRECT_* signing secrets not set in Infisical — 'direct' flavor (Telegram-channel APK) is signed with the Play upload key instead of its own isolated key."
           fi
 
       - uses: actions/setup-java@v5
@@ -793,49 +796,6 @@ jobs:
           name: oxplayer-linux-flatpak
           path: OXPlayer-Linux.flatpak
 
-  # Temporarily disabled — Flutter web app paused (Coming soon on marketing site).
-  build-web:
-    if: false
-    needs: [fetch-info]
-    runs-on: ubuntu-latest
-    env:
-      SENTRY_ENVIRONMENT: production
-      REQUIRE_SENTRY_DSN: "true"
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: ./.github/actions/oxplayer-infisical-secrets
-        with:
-          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
-          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
-          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
-          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: ${{ needs.fetch-info.outputs.flutter_version }}
-          cache: true
-          cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
-          cache-path: "${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:"
-
-      - run: flutter pub get
-
-      - uses: ./.github/actions/oxplayer-flutter-env
-
-      - name: Build web app
-        run: |
-          flutter build web --release \
-            --base-href / \
-            --no-web-resources-cdn \
-            --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
-            --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
-
-      - uses: actions/upload-artifact@v5
-        with:
-          name: oxplayer-web
-          path: build/web
-
   create_release:
     name: Create Release
     needs:
@@ -846,7 +806,6 @@ jobs:
       - build-macos
       - build-linux
       - build-linux-flatpak
-      # build-web temporarily disabled
     runs-on: ubuntu-latest
     if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
     permissions:
@@ -1005,8 +964,6 @@ jobs:
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage" "OXPlayer-Linux-${V}.AppImage"
           mv "oxplayer-linux-appimage/OXPlayer_x86_64.AppImage.zsync" "OXPlayer-Linux-${V}.AppImage.zsync"
 
-      # Web artifact staging skipped while build-web is disabled.
-
       - name: Prepare GitHub release body file
         shell: bash
         run: |
@@ -1125,139 +1082,22 @@ jobs:
           echo "::error::Create Release failed (gh + softprops)"
           exit 1
 
-  # Temporarily disabled — Flutter web app paused.
-  release_web:
-    name: Release Web (Docker)
-    needs:
-      - fetch-info
-      - create_release
-      - build-web
-    runs-on: ubuntu-latest
-    if: false
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/download-artifact@v5
-        with:
-          name: oxplayer-web
-          path: build/web
-
-      - name: Deploy to ghcr.io
-        uses: mr-smithers-excellent/docker-build-push@v6
-        with:
-          image: oxplayer
-          addLatest: true
-          multiPlatform: true
-          platform: linux/amd64,linux/arm64,linux/arm/v7
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Deploy rootless image to ghcr.io
-        uses: mr-smithers-excellent/docker-build-push@v6
-        with:
-          dockerfile: Dockerfile-rootless
-          image: oxplayer-rootless
-          addLatest: true
-          multiPlatform: true
-          platform: linux/amd64,linux/arm64,linux/arm/v7
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-  # Temporarily disabled — Flutter web app paused (Coming soon).
-  deploy-web-hetzner:
-    name: Deploy Web · Hetzner
-    needs: [fetch-info, create_release]
-    if: false
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: ./.github/actions/oxplayer-infisical-secrets
-        with:
-          infisical-domain: ${{ secrets.INFISICAL_API_URL }}
-          infisical-client-id: ${{ secrets.INFISICAL_MACHINE_CLIENT_ID }}
-          infisical-client-secret: ${{ secrets.INFISICAL_MACHINE_CLIENT_SECRET }}
-          tailscale-authkey: ${{ secrets.TS_CI_AUTHKEY }}
-
-      - name: Trigger oxplayer-be static web deploy
-        id: dispatch
+      # Sushi has no website. Distribution is the Telegram channel (ADR 0002).
+      # Bot API sendDocument cap is 50 MiB — arm64/armeabi APKs fit; Windows does not.
+      - name: Post Android APKs to Sushi Telegram channel
+        if: success()
         env:
-          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
-          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
-          VERSION: ${{ needs.fetch-info.outputs.version_name }}
-          BE_REPO: Aryan-mor/oxplayer-be
+          APP_BOT_TOKEN: ${{ secrets.APP_BOT_TOKEN }}
+          APP_CHANNEL: ${{ secrets.APP_CHANNEL }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
           set -euo pipefail
-          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
-          if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::Missing OXPLAYER_BE_DISPATCH_TOKEN — set in Infisical /core/client-ci or Gurbeh/oxplayer-client GitHub Secrets (PAT with repo + workflow on oxplayer-be). See docs/RELEASE.md § Web (Hetzner)."
+          if [ -z "${APP_BOT_TOKEN:-}" ] || [ -z "${APP_CHANNEL:-}" ]; then
+            echo "::error::APP_BOT_TOKEN / APP_CHANNEL GitHub secrets missing — copy MAIN_BOTS token and CHANNELS clone id from Infisical sushi /bots"
             exit 1
           fi
-          export GH_TOKEN
-          echo "dispatch_before=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          echo "Dispatch deploy-client-web v${VERSION} → ${BE_REPO}"
-          gh api "repos/${BE_REPO}/dispatches" \
-            -f event_type=deploy-client-web \
-            -f "client_payload[version]=${VERSION}"
-
-      - name: Wait for oxplayer-be web deploy
-        env:
-          GH_TOKEN_GITHUB: ${{ secrets.OXPLAYER_BE_DISPATCH_TOKEN }}
-          GH_TOKEN_INFISICAL: ${{ env.OXPLAYER_BE_DISPATCH_TOKEN }}
-          BE_REPO: Aryan-mor/oxplayer-be
-          DISPATCH_BEFORE: ${{ steps.dispatch.outputs.dispatch_before }}
-        run: |
-          set -euo pipefail
-          GH_TOKEN="${GH_TOKEN_INFISICAL:-${GH_TOKEN_GITHUB:-}}"
-          export GH_TOKEN
-
-          run_id=""
-          for attempt in $(seq 1 24); do
-            if run_id="$(gh run list --repo "${BE_REPO}" \
-              --workflow="Deploy · Web (Hetzner static)" \
-              --event repository_dispatch \
-              --limit 5 \
-              --json databaseId,createdAt \
-              --jq "[.[] | select(.createdAt >= \"${DISPATCH_BEFORE}\")] | .[0].databaseId // empty" 2>/dev/null)"; then
-              if [ -n "${run_id}" ]; then
-                echo "Web deploy run: ${run_id}"
-                break
-              fi
-            else
-              echo "Attempt ${attempt}/24: gh run list failed (API flake); retrying..."
-            fi
-            echo "Attempt ${attempt}/24: waiting for web deploy workflow..."
-            sleep 10
-          done
-          if [ -z "${run_id}" ]; then
-            echo "::error::Timed out waiting for Deploy · Web (Hetzner static) on ${BE_REPO}"
-            exit 1
-          fi
-
-          # gh run watch often 503s during GitHub incidents; poll conclusion with retries.
-          for watch_attempt in $(seq 1 40); do
-            if gh run watch "${run_id}" --repo "${BE_REPO}" --exit-status; then
-              echo "Web deploy succeeded: ${run_id}"
-              exit 0
-            fi
-            watch_rc=$?
-            conclusion="$(gh run view "${run_id}" --repo "${BE_REPO}" --json conclusion --jq .conclusion 2>/dev/null || true)"
-            if [ "${conclusion}" = "success" ]; then
-              echo "Web deploy succeeded (watch flake, conclusion=success): ${run_id}"
-              exit 0
-            fi
-            if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "cancelled" ] || [ "${conclusion}" = "timed_out" ]; then
-              echo "::error::Web deploy ${run_id} finished with conclusion=${conclusion}"
-              exit 1
-            fi
-            echo "Watch attempt ${watch_attempt}/40 failed (rc=${watch_rc}, conclusion=${conclusion:-unknown}); retry in 15s..."
-            sleep 15
-          done
-          echo "::error::Timed out watching web deploy ${run_id} on ${BE_REPO}"
-          exit 1
+          V="${VERSION}"
+          bash scripts/post-release-to-telegram.sh \
+            "OXPlayer-Android-${V}-arm64-v8a.apk" \
+            "OXPlayer-Android-${V}-armeabi-v7a.apk"

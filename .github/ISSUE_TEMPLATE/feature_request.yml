@@ -23,7 +23,6 @@ body:
         - Seerr / media requests UI
         - Auth / Sign in with Telegram
         - Settings / profile
-        - Website (website/)
         - Android / iOS / desktop packaging
         - Other
     validations:
