@@ -70,6 +70,9 @@ import app.oxplayer.composables.dialogs.AudioPicker
 import app.oxplayer.composables.dialogs.ChapterSelectionSheet
 import app.oxplayer.composables.dialogs.PlaybackSpeedPicker
 import app.oxplayer.composables.dialogs.SubtitlePicker
+import app.oxplayer.composables.dialogs.SushiAiKeyMissingSheet
+import app.oxplayer.composables.dialogs.SushiOnlineSubtitleSheet
+import app.oxplayer.composables.dialogs.SushiSubtitleBusyOverlay
 import app.oxplayer.composables.shared.CurrentTime
 import app.oxplayer.objects.PlayerSettingsObject
 import app.oxplayer.objects.VideoPlayerObject
@@ -80,6 +83,7 @@ import app.oxplayer.utility.leanBackEnabled
 import app.oxplayer.utility.visible
 import kotlin.time.Duration.Companion.seconds
 
+private enum class SushiSubtitlePending { None, Auto, Translate }
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -91,6 +95,10 @@ fun CustomVideoControls(
 
     val showAudioDialog = remember { mutableStateOf(false) }
     val showSubDialog = remember { mutableStateOf(false) }
+    var showOnlineSheet by remember { mutableStateOf(false) }
+    var showAiKeySheet by remember { mutableStateOf(false) }
+    var subtitleBusy by remember { mutableStateOf<String?>(null) }
+    var pendingSubtitle by remember { mutableStateOf(SushiSubtitlePending.None) }
     var showChapterDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
 
@@ -386,9 +394,92 @@ fun CustomVideoControls(
             player = exoPlayer,
             onDismissRequest = {
                 showSubDialog.value = false
-            }
+            },
+            onAutomatic = {
+                if (subtitleBusy == null && pendingSubtitle == SushiSubtitlePending.None) {
+                    pendingSubtitle = SushiSubtitlePending.Auto
+                }
+            },
+            onOnline = {
+                showOnlineSheet = true
+            },
+            onTranslate = {
+                if (subtitleBusy == null && pendingSubtitle == SushiSubtitlePending.None) {
+                    pendingSubtitle = SushiSubtitlePending.Translate
+                }
+            },
         )
     }
+
+    // Key only the sheet close. Resetting pendingSubtitle must not cancel this effect.
+    LaunchedEffect(showSubDialog.value) {
+        if (showSubDialog.value) return@LaunchedEffect
+        when (pendingSubtitle) {
+            SushiSubtitlePending.None -> return@LaunchedEffect
+            SushiSubtitlePending.Auto -> {
+                pendingSubtitle = SushiSubtitlePending.None
+                delay(400)
+                hideControls()
+                subtitleBusy = "Searching sub-plus…"
+                VideoPlayerObject.videoPlayerControls?.autoLoadSushiSubtitle { result ->
+                    val r = result.getOrNull()
+                    if (r?.errorCode != "busy") {
+                        subtitleBusy = null
+                        hideControls()
+                        val msg = when {
+                            r == null -> "Could not load subtitle"
+                            r.ok -> r.label ?: "Subtitle loaded"
+                            r.errorCode == "no_results" -> "No subtitles found"
+                            else -> "Could not load subtitle"
+                        }
+                        android.widget.Toast.makeText(
+                            activity,
+                            msg,
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            }
+            SushiSubtitlePending.Translate -> {
+                pendingSubtitle = SushiSubtitlePending.None
+                delay(400)
+                hideControls()
+                subtitleBusy = "Translating to Persian…"
+                VideoPlayerObject.videoPlayerControls?.translateSubtitleToPersian { result ->
+                    val r = result.getOrNull()
+                    if (r?.errorCode != "busy") {
+                        subtitleBusy = null
+                        hideControls()
+                        when {
+                            r == null -> android.widget.Toast.makeText(
+                                activity, "Could not translate", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                            r.ok -> android.widget.Toast.makeText(
+                                activity, r.label ?: "Persian subtitle applied", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                            r.errorCode == "missing_key" -> showAiKeySheet = true
+                            r.errorCode == "no_source" -> android.widget.Toast.makeText(
+                                activity,
+                                "Need a text subtitle first — try Online subtitles",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                            else -> android.widget.Toast.makeText(
+                                activity, "Could not translate", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showOnlineSheet) {
+        SushiOnlineSubtitleSheet(onDismissRequest = { showOnlineSheet = false })
+    }
+    if (showAiKeySheet) {
+        SushiAiKeyMissingSheet(onDismissRequest = { showAiKeySheet = false })
+    }
+    subtitleBusy?.let { SushiSubtitleBusyOverlay(it) }
 
     if (showChapterDialog) {
         ChapterSelectionSheet(

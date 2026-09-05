@@ -1077,6 +1077,167 @@ class GuideProgram {
 ;
 }
 
+/// One sub-plus pack row for the native TV online-subtitle sheet.
+class SushiOnlineSubtitlePack {
+  SushiOnlineSubtitlePack({
+    required this.tag,
+    required this.title,
+    required this.hint,
+  });
+
+  String tag;
+
+  String title;
+
+  String hint;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      tag,
+      title,
+      hint,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static SushiOnlineSubtitlePack decode(Object result) {
+    result as List<Object?>;
+    return SushiOnlineSubtitlePack(
+      tag: result[0]! as String,
+      title: result[1]! as String,
+      hint: result[2]! as String,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! SushiOnlineSubtitlePack || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
+/// Result of auto-load / download / translate. [errorCode] is `missing_key`,
+/// `no_source`, `no_results`, `need_pick`, or `failed`.
+class SushiSubtitleActionResult {
+  SushiSubtitleActionResult({
+    required this.ok,
+    this.errorCode,
+    this.label,
+    this.fileNames,
+    this.tag,
+  });
+
+  bool ok;
+
+  String? errorCode;
+
+  String? label;
+
+  List<String>? fileNames;
+
+  String? tag;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      ok,
+      errorCode,
+      label,
+      fileNames,
+      tag,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static SushiSubtitleActionResult decode(Object result) {
+    result as List<Object?>;
+    return SushiSubtitleActionResult(
+      ok: result[0]! as bool,
+      errorCode: result[1] as String?,
+      label: result[2] as String?,
+      fileNames: (result[3] as List<Object?>?)?.cast<String>(),
+      tag: result[4] as String?,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! SushiSubtitleActionResult || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
+class SushiAiKeySetup {
+  SushiAiKeySetup({
+    required this.deepLink,
+    required this.telegramInstalled,
+  });
+
+  String deepLink;
+
+  bool telegramInstalled;
+
+  List<Object?> _toList() {
+    return <Object?>[
+      deepLink,
+      telegramInstalled,
+    ];
+  }
+
+  Object encode() {
+    return _toList();  }
+
+  static SushiAiKeySetup decode(Object result) {
+    result as List<Object?>;
+    return SushiAiKeySetup(
+      deepLink: result[0]! as String,
+      telegramInstalled: result[1]! as bool,
+    );
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  bool operator ==(Object other) {
+    if (other is! SushiAiKeySetup || other.runtimeType != runtimeType) {
+      return false;
+    }
+    if (identical(this, other)) {
+      return true;
+    }
+    return _deepEquals(encode(), other.encode());
+  }
+
+  @override
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
+  int get hashCode => Object.hashAll(_toList())
+;
+}
+
 
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
@@ -1139,6 +1300,15 @@ class _PigeonCodec extends StandardMessageCodec {
     }    else if (value is GuideProgram) {
       buffer.putUint8(146);
       writeValue(buffer, value.encode());
+    }    else if (value is SushiOnlineSubtitlePack) {
+      buffer.putUint8(147);
+      writeValue(buffer, value.encode());
+    }    else if (value is SushiSubtitleActionResult) {
+      buffer.putUint8(148);
+      writeValue(buffer, value.encode());
+    }    else if (value is SushiAiKeySetup) {
+      buffer.putUint8(149);
+      writeValue(buffer, value.encode());
     } else {
       super.writeValue(buffer, value);
     }
@@ -1185,6 +1355,12 @@ class _PigeonCodec extends StandardMessageCodec {
         return GuideChannel.decode(readValue(buffer)!);
       case 146: 
         return GuideProgram.decode(readValue(buffer)!);
+      case 147: 
+        return SushiOnlineSubtitlePack.decode(readValue(buffer)!);
+      case 148: 
+        return SushiSubtitleActionResult.decode(readValue(buffer)!);
+      case 149: 
+        return SushiAiKeySetup.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
@@ -1597,6 +1773,63 @@ class VideoPlayerApi {
       return (pigeonVar_replyList[0] as bool?)!;
     }
   }
+
+  /// Sideload a decoded `.srt` as an ExoPlayer text track without tearing down Telegram playback.
+  Future<bool> setSubtitleFromText(String data, String? title, String? languageCode) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.setSubtitleFromText$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[data, title, languageCode]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
+
+  Future<bool> clearExternalSubtitle() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.clearExternalSubtitle$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as bool?)!;
+    }
+  }
 }
 
 abstract class VideoPlayerListenerCallback {
@@ -1713,6 +1946,16 @@ abstract class VideoPlayerControlsCallback {
   void loadProgram(GuideChannel selection);
 
   Future<List<GuideProgram>> fetchProgramsForChannel(String channelId);
+
+  Future<List<SushiOnlineSubtitlePack>> searchSushiOnlineSubtitles();
+
+  Future<SushiSubtitleActionResult> downloadSushiOnlineSubtitle(String tag, String fileName);
+
+  Future<SushiSubtitleActionResult> autoLoadSushiSubtitle();
+
+  Future<SushiSubtitleActionResult> translateSubtitleToPersian();
+
+  Future<SushiAiKeySetup> sushiAiKeySetup();
 
   static void setUp(VideoPlayerControlsCallback? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
@@ -1864,6 +2107,110 @@ abstract class VideoPlayerControlsCallback {
               'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.fetchProgramsForChannel was null, expected non-null String.');
           try {
             final List<GuideProgram> output = await api.fetchProgramsForChannel(arg_channelId!);
+            return wrapResponse(result: output);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.searchSushiOnlineSubtitles$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            final List<SushiOnlineSubtitlePack> output = await api.searchSushiOnlineSubtitles();
+            return wrapResponse(result: output);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.downloadSushiOnlineSubtitle$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.downloadSushiOnlineSubtitle was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final String? arg_tag = (args[0] as String?);
+          assert(arg_tag != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.downloadSushiOnlineSubtitle was null, expected non-null String.');
+          final String? arg_fileName = (args[1] as String?);
+          assert(arg_fileName != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.downloadSushiOnlineSubtitle was null, expected non-null String.');
+          try {
+            final SushiSubtitleActionResult output = await api.downloadSushiOnlineSubtitle(arg_tag!, arg_fileName!);
+            return wrapResponse(result: output);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.autoLoadSushiSubtitle$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            final SushiSubtitleActionResult output = await api.autoLoadSushiSubtitle();
+            return wrapResponse(result: output);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.translateSubtitleToPersian$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            final SushiSubtitleActionResult output = await api.translateSubtitleToPersian();
+            return wrapResponse(result: output);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.sushiAiKeySetup$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          try {
+            final SushiAiKeySetup output = await api.sushiAiKeySetup();
             return wrapResponse(result: output);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);

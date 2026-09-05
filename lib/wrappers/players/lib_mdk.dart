@@ -13,6 +13,8 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
@@ -146,7 +148,14 @@ class LibMDK extends BasePlayer {
   @override
   Future<int> setAudioTrack(AudioStreamModel? model, PlaybackModel playbackModel) async {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
-    if (wantedAudioStream == AudioStreamModel.no() || wantedAudioStream == null) {
+    if (wantedAudioStream == null || wantedAudioStream.index == AudioStreamModel.no().index) {
+      if (oxplayerShouldSkipAudioTrackOff(playbackModel)) {
+        OxplayerAudioLog.event('audio_track_skip_off_muxed', fields: {
+          'backend': 'mdk',
+          'defaultAudioIndex': playbackModel.mediaStreams?.defaultAudioStreamIndex,
+        });
+        return -1;
+      }
       _controller?.setAudioTracks([-1]);
       return -1;
     } else {
@@ -184,6 +193,15 @@ class LibMDK extends BasePlayer {
       }
       return wantedSubtitle.index;
     }
+  }
+
+  @override
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
+    if (_controller == null || data.trim().isEmpty) return;
+    final file = File('${Directory.systemTemp.path}${Platform.pathSeparator}sushi_ext_sub.srt');
+    await file.writeAsString(data, flush: true);
+    externalSubEnabled = true;
+    _controller!.setExternalSubtitle(file.uri.toString());
   }
 
   @override

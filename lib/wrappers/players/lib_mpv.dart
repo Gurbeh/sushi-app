@@ -23,6 +23,7 @@ import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_env.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
 import 'package:fladder/oxplayer/oxplayer_telegram_stream_cb.dart';
@@ -920,8 +921,7 @@ class LibMPV extends BasePlayer {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
     if (wantedAudioStream == null) return -1;
     if (wantedAudioStream.index == AudioStreamModel.no().index) {
-      final muxedAvailable = playbackModel.audioStreams?.any((s) => s.index >= 0) ?? false;
-      if (OxplayerConfig.isEnabled && !playbackModel.isAudioPlayback && muxedAvailable) {
+      if (oxplayerShouldSkipAudioTrackOff(playbackModel)) {
         _logAudio('audio_track_skip_off_muxed', fields: {
           'defaultAudioIndex': playbackModel.mediaStreams?.defaultAudioStreamIndex,
         });
@@ -977,13 +977,13 @@ class LibMPV extends BasePlayer {
     await _syncLibassSubtitleStyle();
     // Confirm mpv accepted it and (a beat later) whether any cue actually surfaced.
     OxplayerStreamLog.event('sushi_sub_from_text_set', fields: {
-      'activeId': _player?.state.track.subtitle.id,
+      'activeIdLen': _player?.state.track.subtitle.id.length,
       'subCount': _player?.state.tracks.subtitle.length,
     });
     Future.delayed(const Duration(milliseconds: 2500), () {
       OxplayerStreamLog.event('sushi_sub_from_text_check', fields: {
         'textSeen': _subtitleTextSeen,
-        'activeId': _player?.state.track.subtitle.id,
+        'activeIdLen': _player?.state.track.subtitle.id.length,
       });
     });
   }

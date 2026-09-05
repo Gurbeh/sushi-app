@@ -37,6 +37,7 @@ import kotlin.time.Duration.Companion.seconds
 private const val OX_NATIVE_PLY_TAG = "OX_NATIVE_PLY"
 private const val OX_STREAM_TAG = "OX_STREAM"
 private const val OX_AUDIO_TAG = "OX_AUDIO"
+const val SUSHI_EXT_SUB_ID = "sushi-ext"
 
 private fun oxAudioLog(message: String) {
     Log.i(OX_AUDIO_TAG, message)
@@ -278,6 +279,102 @@ class VideoPlayerImplementation(
         }
     }
 
+    private var sushiExtFile: java.io.File? = null
+    var pendingSelectSushiExt = false
+    var sushiExtLanguage: String? = null
+
+    override fun setSubtitleFromText(
+        data: String,
+        title: String?,
+        languageCode: String?,
+        callback: (Result<Boolean>) -> Unit,
+    ) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                callback(Result.success(sideloadSushiSubtitle(data, title, languageCode)))
+            } catch (e: Exception) {
+                Log.e(OX_NATIVE_PLY_TAG, "setSubtitleFromText", e)
+                callback(Result.success(false))
+            }
+        }
+    }
+
+    override fun clearExternalSubtitle(callback: (Result<Boolean>) -> Unit) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                callback(Result.success(clearSushiExternalSubtitle()))
+            } catch (e: Exception) {
+                Log.e(OX_NATIVE_PLY_TAG, "clearExternalSubtitle", e)
+                callback(Result.success(false))
+            }
+        }
+    }
+
+    private fun sideloadSushiSubtitle(data: String, title: String?, languageCode: String?): Boolean {
+        val exo = player
+        if (exo == null) {
+            Log.w(OX_NATIVE_PLY_TAG, "sideload skip: exo null chars=${data.length}")
+            return false
+        }
+        val activity = VideoPlayerObject.currentActivity
+        if (activity == null) {
+            Log.w(OX_NATIVE_PLY_TAG, "sideload skip: no activity chars=${data.length}")
+            return false
+        }
+        if (data.isBlank()) return false
+        val file = java.io.File(activity.cacheDir, "sushi_ext_sub.srt")
+        file.writeText(data, Charsets.UTF_8)
+        sushiExtFile = file
+        sushiExtLanguage = languageCode
+        pendingSelectSushiExt = true
+        val current = exo.currentMediaItem
+        if (current == null) {
+            Log.w(OX_NATIVE_PLY_TAG, "sideload skip: no media item chars=${data.length}")
+            return false
+        }
+        val pos = exo.currentPosition.coerceAtLeast(0L)
+        val play = exo.playWhenReady
+        val kept = (current.localConfiguration?.subtitleConfigurations ?: emptyList())
+            .filter { it.id != SUSHI_EXT_SUB_ID }
+        val sidecar = MediaItem.SubtitleConfiguration.Builder(android.net.Uri.fromFile(file))
+            .setId(SUSHI_EXT_SUB_ID)
+            .setMimeType(MimeTypes.APPLICATION_SUBRIP)
+            .setLanguage(languageCode ?: "fa")
+            .setLabel(title ?: "Online")
+            .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+            .build()
+        val rebuilt = current.buildUpon()
+            .setSubtitleConfigurations(kept + sidecar)
+            .build()
+        exo.setMediaItem(rebuilt, pos)
+        exo.prepare()
+        exo.playWhenReady = play
+        VideoPlayerObject.usePersianSubtitleFace = languageCode.equals("fa", ignoreCase = true) ||
+            languageCode.equals("per", ignoreCase = true)
+        Log.d(
+            OX_NATIVE_PLY_TAG,
+            "sideload ok chars=${data.length} lang=$languageCode title=$title pos=$pos",
+        )
+        return true
+    }
+
+    private fun clearSushiExternalSubtitle(): Boolean {
+        val exo = player ?: return false
+        val current = exo.currentMediaItem ?: return true
+        val kept = (current.localConfiguration?.subtitleConfigurations ?: emptyList())
+            .filter { it.id != SUSHI_EXT_SUB_ID }
+        if (kept.size == (current.localConfiguration?.subtitleConfigurations?.size ?: 0)) return true
+        pendingSelectSushiExt = false
+        sushiExtFile = null
+        val pos = exo.currentPosition.coerceAtLeast(0L)
+        val play = exo.playWhenReady
+        exo.setMediaItem(current.buildUpon().setSubtitleConfigurations(kept).build(), pos)
+        exo.prepare()
+        exo.playWhenReady = play
+        VideoPlayerObject.usePersianSubtitleFace = false
+        return true
+    }
+
     override fun open(url: String, play: Boolean, callback: (Result<Boolean>) -> Unit) {
         Handler(Looper.getMainLooper()).postDelayed(delayInMillis = 1.seconds.inWholeMilliseconds) {
             try {
@@ -476,6 +573,27 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
         // User picks in native UI update current*Index + playbackData; prefer that over stale defaults.
         val currentSubIndex = VideoPlayerObject.currentSubtitleTrackIndex.value.toLong()
         val internalSubTracks = this.getSubtitleTracks()
+        val selectedSushiExt = VideoPlayerObject.implementation.pendingSelectSushiExt && internalSubTracks.isNotEmpty()
+        if (selectedSushiExt) {
+            val sushi = internalSubTracks.lastOrNull {
+                it.language.equals("fa", ignoreCase = true) ||
+                    it.label.contains("Online", ignoreCase = true) ||
+                    it.label.contains("AI Persian", ignoreCase = true) ||
+                    it.label.contains("auto", ignoreCase = true)
+            } ?: internalSubTracks.last()
+            VideoPlayerObject.implementation.pendingSelectSushiExt = false
+            Log.d(
+                OX_NATIVE_PLY_TAG,
+                "select sushi ext label=${sushi.label} lang=${sushi.language} tracks=${internalSubTracks.size}",
+            )
+            clearSubtitleTrack()
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    exo.setInternalSubtitleTrack(sushi)
+                } catch (_: Exception) {
+                }
+            }
+        } else {
         val listPos = playableData.subtitleTracks.indexOfFirst { it.index == currentSubIndex }
         val wantedSubIndex: Int = when {
             listPos >= 0 -> listPos - 1
@@ -504,6 +622,7 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                     }
                 }
             }
+        }
         }
 
         val currentAudioIndex = VideoPlayerObject.currentAudioTrackIndex.value.toLong()

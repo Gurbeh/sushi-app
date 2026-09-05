@@ -200,4 +200,24 @@ void main() {
     expect(ready.canDownload, isTrue);
     expect(sushiItemHasPlaybackActions(ready), isTrue);
   });
+
+  test('empty audioLangs still exposes a playable default audio index', () {
+    final streams = sushiBuildMediaStreams(const [
+      SushiFile(
+        fileId: 31360,
+        qualityLabel: '1080p',
+        height: 1080,
+        audioLangs: '',
+        subLangs: 'fa',
+        sizeBytes: 1,
+        durationS: 1,
+        state: SushiFileState.ready,
+      ),
+    ]);
+    final version = streams.versionStreams.single;
+    expect(version.audioStreams, hasLength(1));
+    expect(version.audioStreams.single.index, 0);
+    expect(version.audioStreams.single.displayTitle, 'Default');
+    expect(version.defaultAudioStreamIndex, 0);
+  });
 }

@@ -25,6 +25,7 @@ import 'package:fladder/screens/video_player/components/video_player_quality_con
 import 'package:fladder/screens/video_player/components/video_player_queue.dart';
 import 'package:fladder/screens/video_player/components/video_subtitle_controls.dart';
 import 'package:fladder/sushi/subtitles/sushi_online_subtitle_sheet.dart';
+import 'package:fladder/sushi/subtitles/sushi_subtitle_actions.dart';
 import 'package:fladder/util/focus_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/device_orientation_extension.dart';

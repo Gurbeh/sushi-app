@@ -49,4 +49,14 @@ abstract final class SushiConfig {
   static String mainBotAppCodeUrl(String startPayload) {
     return 'https://t.me/$mainBotUsername?start=$startPayload';
   }
+
+  static const _bakedOpenSubtitlesKey = String.fromEnvironment('OPENSUBTITLES_API_KEY');
+
+  /// Free OpenSubtitles **consumer** key (app, not a user login). Anonymous download quota is
+  /// 5/day per IP. Empty skips that translate fallback.
+  static String get openSubtitlesApiKey {
+    if (_bakedOpenSubtitlesKey.trim().isNotEmpty) return _bakedOpenSubtitlesKey.trim();
+    if (_allowEnvHandles) return OxplayerDotenv.get('OPENSUBTITLES_API_KEY').trim();
+    return '';
+  }
 }

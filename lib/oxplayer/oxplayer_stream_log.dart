@@ -17,11 +17,17 @@ abstract final class OxplayerStreamLog {
     for (final e in fields.entries) {
       final v = e.value;
       if (v == null) continue;
-      parts.add('${e.key}=$v');
+      parts.add('${e.key}=${_clipField(v)}');
     }
     final line = 'OX_STREAM ${parts.join(' ')}';
     developer.log(line, name: _logName);
     debugPrint(line);
+  }
+
+  static String _clipField(Object v) {
+    final s = v.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (s.length <= 80) return s;
+    return '${s.substring(0, 80)}…';
   }
 
   /// Redacts JWT/token query params; keeps host + path for CDN debugging.

@@ -191,6 +191,10 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     // Always await: joins provider warm-up init if still running (avoids double mpv create).
     await init();
 
+    if (OxplayerEnv.isEnabled) {
+      state.beginSushiSubtitleSession(model.item.id);
+    }
+
     ref.read(playBackModel)?.dispose();
     await state.stop();
     ref.read(playbackRateProvider.notifier).state = 1.0;
@@ -288,6 +292,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       await state.play();
 
       if (OxplayerEnv.isEnabled) {
+        unawaited(state.maybeSushiStartOnlineSubtitle(model));
         OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
         // Keep buffering=true until ExoPlayer reports STATE_READY — premature false

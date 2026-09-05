@@ -86,4 +86,67 @@ void main() {
       2,
     );
   });
+
+  test('english-only softsub is not treated as Farsi', () {
+    final streams = [
+      SubStreamModel.no(),
+      _sub(index: 2, language: 'eng', displayTitle: 'English'),
+    ];
+    expect(oxplayerHasPersianSoftSub(streams), isFalse);
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: false),
+      SushiStartSubtitle.automaticOnline,
+    );
+  });
+
+  test('Farsi softsub wins; hardsub stays Off; no softsub runs Automatic', () {
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true),
+      SushiStartSubtitle.persianSoft,
+    );
+    expect(
+      sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false),
+      SushiStartSubtitle.off,
+    );
+    expect(
+      sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: true),
+      SushiStartSubtitle.off,
+    );
+    expect(oxplayerHasPersianSoftSub([_sub(index: 3, language: 'fa', displayTitle: 'Persian')]), isTrue);
+    expect(oxplayerHasPersianSoftSub([SubStreamModel.no()]), isFalse);
+  });
+
+  test('catalog-only fa lang code is not a playable Farsi softsub', () {
+    final stub = SubStreamModel(
+      name: 'FA',
+      id: 'sushi_sub_1_0',
+      title: 'FA',
+      displayTitle: 'FA',
+      language: 'fa',
+      codec: '',
+      isDefault: true,
+      isExternal: false,
+      index: 0,
+    );
+    expect(oxplayerSubtitleTrackIsPlayable(stub), isFalse);
+    expect(oxplayerHasPersianSoftSub([SubStreamModel.no(), stub]), isFalse);
+    expect(
+      sushiStartSubtitleChoice(
+        hardSub: false,
+        hasPersianSoft: oxplayerHasPersianSoftSub([SubStreamModel.no(), stub]),
+      ),
+      SushiStartSubtitle.automaticOnline,
+    );
+  });
+
+  test('Off selection still runs Automatic even if a Farsi track exists', () {
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true, subtitleOff: true),
+      SushiStartSubtitle.automaticOnline,
+    );
+    expect(
+      sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: true, subtitleOff: true),
+      SushiStartSubtitle.off,
+    );
+  });
 }

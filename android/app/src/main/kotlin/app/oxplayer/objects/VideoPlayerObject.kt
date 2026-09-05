@@ -113,6 +113,8 @@ object VideoPlayerObject {
     var videoPlayerListener: VideoPlayerListenerCallback? = null
     var videoPlayerControls: VideoPlayerControlsCallback? = null
 
+    var usePersianSubtitleFace: Boolean = false
+
     var tvGuide = MutableStateFlow<TVGuideModel?>(null)
     val guideVisible = MutableStateFlow(false)
 

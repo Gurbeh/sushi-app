@@ -78,4 +78,70 @@ void main() {
       expect(seasonMatchScore(pack('Euphoria', const ['Euphoria.US.S03E01.1080p.WEB']), 3), 1);
     });
   });
+
+  group('sushiFilterSubplusPacks', () {
+    SubplusPack movie({
+      required String title,
+      required String year,
+      bool series = false,
+    }) =>
+        SubplusPack(
+          tag: title,
+          title: title,
+          imdb: '',
+          year: year,
+          series: series,
+          translator: '',
+          releases: const ['x'],
+          poster: '',
+        );
+
+    test('same title different year is dropped when playing year is known', () {
+      final packs = [
+        movie(title: 'The Breadwinner (2017)', year: '2017'),
+        movie(title: 'The Box Man (2024)', year: '2024'),
+      ];
+      expect(
+        sushiFilterSubplusPacks(packs, query: 'The Breadwinner', year: '2026'),
+        isEmpty,
+      );
+    });
+
+    test('keeps the pack whose year matches the playing movie', () {
+      final packs = [
+        movie(title: 'The Breadwinner (2017)', year: '2017'),
+        movie(title: 'The Breadwinner (2026)', year: '2026'),
+      ];
+      final got = sushiFilterSubplusPacks(packs, query: 'The Breadwinner', year: '2026');
+      expect(got, hasLength(1));
+      expect(got.single.year, '2026');
+    });
+
+    test('movies drop series packs', () {
+      final packs = [
+        movie(title: 'The Breadwinner (2017)', year: '2017'),
+        movie(title: 'The Residence - Season 1 (2025)', year: '2025', series: true),
+      ];
+      final got = sushiFilterSubplusPacks(packs, query: 'The Breadwinner');
+      expect(got, hasLength(1));
+      expect(got.single.title, 'The Breadwinner (2017)');
+    });
+  });
+
+  group('pickMovieSubFile', () {
+    test('skips SDH when a dialogue track exists', () {
+      final files = [
+        f('The.Breadwinner.2026.en[sdh].srt'),
+        f('The.Breadwinner.2026.en.srt'),
+      ];
+      expect(pickMovieSubFile(files)!.name, 'The.Breadwinner.2026.en.srt');
+    });
+
+    test('falls back to SDH when that is the only file', () {
+      expect(
+        pickMovieSubFile([f('The.Breadwinner.2026.en[sdh].srt')])!.name,
+        'The.Breadwinner.2026.en[sdh].srt',
+      );
+    });
+  });
 }

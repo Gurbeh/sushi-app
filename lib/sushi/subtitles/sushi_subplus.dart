@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:fladder/sushi/sushi_http.dart';
 import 'package:http/http.dart' as http;
 
 const _apiRoot = 'https://sub-plus.ir/api.php';
@@ -83,6 +84,22 @@ const _ordinalSeasons = {
   return (season: season, episode: episode);
 }
 
+bool _subplusFileLooksSdh(SubplusSubFile f) {
+  final n = f.name.toLowerCase();
+  return n.contains('[sdh]') ||
+      n.contains('.sdh.') ||
+      n.contains('_sdh') ||
+      n.contains('-sdh') ||
+      n.contains(' sdh');
+}
+
+/// Movie pack: skip SDH when a hearing-impaired copy sits next to a dialogue track.
+SubplusSubFile? pickMovieSubFile(List<SubplusSubFile> files) {
+  if (files.isEmpty) return null;
+  final noSdh = files.where((f) => !_subplusFileLooksSdh(f)).toList();
+  return (noSdh.isNotEmpty ? noSdh : files).first;
+}
+
 /// Picks the subtitle file for a specific [season]/[episode] out of a season pack. Falls back to
 /// an episode-only match, then to the single file, then null.
 SubplusSubFile? pickEpisodeFile(List<SubplusSubFile> files, int season, int episode) {
@@ -96,6 +113,32 @@ SubplusSubFile? pickEpisodeFile(List<SubplusSubFile> files, int season, int epis
     if (se.season == null) epOnly ??= f;
   }
   return epOnly;
+}
+
+/// Drops fuzzy search junk and same-title collisions (2017 vs 2026 *The Breadwinner*).
+///
+/// When [year] is known, dated packs that disagree are discarded — better empty than the
+/// wrong film. Undated packs stay only if nothing matches the year. Movies drop `series` packs.
+List<SubplusPack> sushiFilterSubplusPacks(
+  List<SubplusPack> packs, {
+  String? query,
+  String? year,
+  ({int season, int episode})? episode,
+}) {
+  var list = packs;
+  final q = query?.trim().toLowerCase() ?? '';
+  if (q.isNotEmpty) {
+    list = [for (final p in list) if (p.title.toLowerCase().contains(q)) p];
+  }
+  if (episode == null) {
+    list = [for (final p in list) if (!p.series) p];
+  }
+  if (year != null && year.isNotEmpty) {
+    final hits = [for (final p in list) if (p.year == year) p];
+    if (hits.isNotEmpty) return hits;
+    list = [for (final p in list) if (p.year.isEmpty) p];
+  }
+  return list;
 }
 
 /// How well a pack matches a target [season] (0 = unknown, positive = match, negative = mismatch).
@@ -136,10 +179,15 @@ class SushiSubplusClient {
   Future<List<SubplusPack>> search(String query, {String lang = _defaultLang}) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
+    final uri = Uri.parse(_apiRoot);
+    sushiHttpAssertAllowed(uri);
     final resp = await _client
         .post(
-          Uri.parse(_apiRoot),
-          headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+          uri,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': kSushiHttpUserAgent,
+          },
           body: {'q': q, 'l': lang},
         )
         .timeout(_timeout);
@@ -170,10 +218,15 @@ class SushiSubplusClient {
   Future<String> downloadUrl(String tag) async {
     final t = tag.trim();
     if (t.isEmpty) throw SubplusException('empty tag');
+    final uri = Uri.parse(_apiRoot);
+    sushiHttpAssertAllowed(uri);
     final resp = await _client
         .post(
-          Uri.parse(_apiRoot),
-          headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+          uri,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': kSushiHttpUserAgent,
+          },
           body: {'dl': t},
         )
         .timeout(_timeout);
@@ -190,7 +243,12 @@ class SushiSubplusClient {
 
   Future<List<SubplusSubFile>> fetchSubs(String tag) async {
     final url = await downloadUrl(tag);
-    final resp = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 45));
+    final uri = Uri.parse(url);
+    sushiHttpAssertAllowed(uri);
+    final resp = await _client.get(
+      uri,
+      headers: const {'User-Agent': kSushiHttpUserAgent},
+    ).timeout(const Duration(seconds: 45));
     if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
       throw SubplusException('zip download HTTP ${resp.statusCode}');
     }

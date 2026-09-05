@@ -50,6 +50,37 @@ int? oxplayerResolveSubtitleStreamIndex({
   return oxplayerPreferredSubtitleStreamIndex(subStreams) ?? selectedIndex;
 }
 
+/// Muxed/external tracks have a codec and/or URL. Sushi `sub_langs` catalog
+/// codes are empty-codec stubs — they are not a playable Farsi softsub.
+bool oxplayerSubtitleTrackIsPlayable(SubStreamModel s) {
+  if (s.index == -1) return false;
+  final url = s.url?.trim() ?? '';
+  if (url.isNotEmpty) return true;
+  return s.codec.trim().isNotEmpty;
+}
+
+/// True when the container already has a playable Persian (Farsi) soft subtitle.
+bool oxplayerHasPersianSoftSub(List<SubStreamModel>? subStreams) {
+  if (subStreams == null || subStreams.isEmpty) return false;
+  return subStreams.any((s) =>
+      oxplayerSubtitleTrackIsPlayable(s) &&
+      (OxPersianLanguage.isPersianLanguage(s.language) ||
+          OxPersianLanguage.isPersianLanguage(s.displayTitle)));
+}
+
+/// What to apply at playback start. Previous title's AI / Automatic pick must not carry over.
+enum SushiStartSubtitle { persianSoft, automaticOnline, off }
+
+SushiStartSubtitle sushiStartSubtitleChoice({
+  required bool hardSub,
+  required bool hasPersianSoft,
+  bool subtitleOff = false,
+}) {
+  if (hardSub) return SushiStartSubtitle.off;
+  if (hasPersianSoft && !subtitleOff) return SushiStartSubtitle.persianSoft;
+  return SushiStartSubtitle.automaticOnline;
+}
+
 /// Persian first, then English, else first real track.
 int? oxplayerPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
   if (subStreams == null || subStreams.isEmpty) return null;

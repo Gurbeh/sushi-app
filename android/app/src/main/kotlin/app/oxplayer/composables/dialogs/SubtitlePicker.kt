@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,15 +57,16 @@ private fun muxedFallbackSubtitleRows(internal: List<InternalTrack>): List<Subti
     }
 }
 
-// TODO(sushi, doc 15 §11): this native picker only lists Off + embedded/muxed tracks. The Sushi
-// "Automatic (online)" / "Online subtitles…" rows (sushi_online_subtitle_sheet.dart) are Flutter-only
-// and never reach the leanback / Android-TV player, which is forced onto this native backend. Porting
-// them needs a pigeon setSubtitleFromText + an ExoPlayer sideload path — see doc 15 §11 for the plan.
+// Sushi Automatic / Online / Translate rows (doc 15 §11). Native picker only listed Off +
+// muxed tracks before; these call Flutter over pigeon, then Exo sideload.
 @OptIn(UnstableApi::class)
 @Composable
 fun SubtitlePicker(
     player: ExoPlayer,
     onDismissRequest: () -> Unit,
+    onAutomatic: () -> Unit = {},
+    onOnline: () -> Unit = {},
+    onTranslate: () -> Unit = {},
 ) {
     val selectedIndex by VideoPlayerObject.currentSubtitleTrackIndex.collectAsState()
     val subTitles by VideoPlayerObject.subtitleTracks.collectAsState(emptyList())
@@ -106,8 +108,6 @@ fun SubtitlePicker(
         }
     }
 
-    if (effectiveSubTitles.isEmpty()) return
-
     val focusRequesters = remember(effectiveSubTitles) {
         effectiveSubTitles.associateWith { FocusRequester() }
     }
@@ -133,6 +133,36 @@ fun SubtitlePicker(
                 .wrapContentWidth()
                 .padding(horizontal = 8.dp, vertical = 16.dp),
         ) {
+            item {
+                TrackButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onAutomatic()
+                        onDismissRequest()
+                    },
+                ) { Text("Automatic (online)") }
+            }
+            item {
+                TrackButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onOnline()
+                        onDismissRequest()
+                    },
+                ) { Text("Online subtitles…") }
+            }
+            item {
+                TrackButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onTranslate()
+                        onDismissRequest()
+                    },
+                ) { Text("Translate with AI (Persian)") }
+            }
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            }
             effectiveSubTitles.forEachIndexed { index, serverSub ->
                 val isOffTrack = index == 0
                 val selected = serverSub.index == selectedIndex.toLong()

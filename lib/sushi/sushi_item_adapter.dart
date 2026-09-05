@@ -73,26 +73,29 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
     final audioCodes = file.audioLangs.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     final subCodes = file.subLangs.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
-    final audioStreams = audioCodes.isEmpty
-        ? [AudioStreamModel.no()]
-        : audioCodes.mapIndexed((i, code) {
-            return AudioStreamModel(
-              displayTitle: code.toUpperCase(),
-              name: code.toUpperCase(),
-              language: code,
-              codec: '',
-              channelLayout: '',
-              sampleRate: null,
-              channels: null,
-              bitRate: null,
-              bitDepth: null,
-              profile: null,
-              spatialFormat: null,
-              isDefault: i == 0,
-              isExternal: false,
-              index: i,
-            );
-          }).toList();
+    // Empty audio_langs means the catalog has no ISO codes, not that the file is
+    // silent. AudioStreamModel.no() (index -1) is the picker "Off" sentinel —
+    // stuffing it here makes libMPV/libMDK call setAudioTrack(no()) and mute
+    // muxed audio. Synthesize a default track so both players keep aid=auto.
+    final audioStreams = (audioCodes.isEmpty ? const [''] : audioCodes).mapIndexed((i, code) {
+      final label = code.isEmpty ? 'Default' : code.toUpperCase();
+      return AudioStreamModel(
+        displayTitle: label,
+        name: label,
+        language: code,
+        codec: '',
+        channelLayout: '',
+        sampleRate: null,
+        channels: null,
+        bitRate: null,
+        bitDepth: null,
+        profile: null,
+        spatialFormat: null,
+        isDefault: i == 0,
+        isExternal: false,
+        index: i,
+      );
+    }).toList();
 
     final subStreams = subCodes.mapIndexed((i, code) {
       return SubStreamModel(

@@ -128,6 +128,11 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   }
 
   @override
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
+    await player.setSubtitleFromText(data, title, language);
+  }
+
+  @override
   Future<void> setVolume(double volume) async {
     // Pigeon/ExoPlayer expect 0.0–1.0; settings store 0–100.
     final normalized = (volume / 100).clamp(0.0, 1.0);
@@ -215,9 +220,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       currentItem: model.item.toSimpleItem(context),
       startPosition: startPosition.inMilliseconds,
       description: model.item.overview.summary,
-      defaultAudioTrack: oxplayerResolvePlaybackAudioStream(model)?.index ??
-          model.mediaStreams?.defaultAudioStreamIndex ??
-          1,
+      defaultAudioTrack: oxplayerDefaultAudioTrackIndex(model),
       nextVideo: model.nextVideo?.toSimpleItem(context),
       previousVideo: model.previousVideo?.toSimpleItem(context),
       audioTracks: model.audioStreams

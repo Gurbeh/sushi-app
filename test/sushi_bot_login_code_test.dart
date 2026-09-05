@@ -67,5 +67,17 @@ void main() {
     expect(sushiHttpUriAllowed(Uri.parse('https://example.com/')), isFalse);
     expect(sushiHttpUriAllowed(Uri.parse('http://t.me/s/SushiBotsConversation')),
         isFalse);
+    expect(sushiHttpUriAllowed(Uri.parse('https://sub-plus.ir/api.php')), isTrue);
+    expect(sushiHttpUriAllowed(Uri.parse('http://sub-plus.ir/download/x.zip')),
+        isTrue);
+    expect(
+        sushiHttpUriAllowed(Uri.parse(
+            'https://generativelanguage.googleapis.com/v1beta/models/x')),
+        isTrue);
+    expect(sushiHttpUriAllowed(Uri.parse('http://image.tmdb.org/x')), isFalse);
+    expect(
+        sushiHttpUriAllowed(
+            Uri.parse('https://api.opensubtitles.com/api/v1/subtitles')),
+        isTrue);
   });
 }

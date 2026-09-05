@@ -24,6 +24,7 @@ import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
 import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
+import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -32,6 +33,7 @@ import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/providers/window_title_provider.dart';
 import 'package:fladder/src/video_player_helper.g.dart' hide PlaybackState;
+import 'package:fladder/sushi/subtitles/sushi_subtitle_actions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/lib_mdk.dart'
@@ -629,9 +631,24 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   Future<int> setSubtitleTrack(SubStreamModel? model, PlaybackModel playbackModel) async =>
       await _player?.setSubtitleTrack(model, playbackModel) ?? -1;
 
-  /// Sushi Automatic / Online subtitle picker: inject a subtitle from decoded text.
-  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async =>
-      _player?.setSubtitleFromText(data, title: title, language: language);
+  /// Sushi Automatic / Online / Translate: inject SRT.
+  /// Native VideoPlayerActivity is a separate Exo surface. Dart `_player` is often
+  /// still LibMPV — do not also load into mpv (it dumps the whole SRT into logcat).
+  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
+    if (nativeActivityStarted) {
+      if (_player is NativePlayer) {
+        await _player?.setSubtitleFromText(data, title: title, language: language);
+      } else {
+        final ok = await VideoPlayerApi().setSubtitleFromText(data, title, language);
+        log(
+          'sushi_sub_from_text native_exo chars=${data.length} ok=$ok',
+          name: 'sushi.subs',
+        );
+      }
+      return;
+    }
+    await _player?.setSubtitleFromText(data, title: title, language: language);
+  }
 
   Future<void> setVolume(double volume) async => _player?.setVolume(volume);
 
@@ -735,6 +752,99 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
               subTitle: context != null ? p.subLabel(context.localized) : null,
             ))
         .toList();
+  }
+
+  @override
+  Future<List<SushiOnlineSubtitlePack>> searchSushiOnlineSubtitles() async {
+    try {
+      final packs = await sushiSearchOnlinePacks(ref);
+      return [
+        for (final p in packs)
+          SushiOnlineSubtitlePack(
+            tag: p.tag,
+            title: p.title,
+            hint: p.hint.isEmpty ? p.title : p.hint,
+          ),
+      ];
+    } catch (e) {
+      log('searchSushiOnlineSubtitles: $e');
+      return const [];
+    }
+  }
+
+  @override
+  Future<SushiSubtitleActionResult> downloadSushiOnlineSubtitle(String tag, String fileName) async {
+    final r = await sushiDownloadOnlinePack(src: ref, tag: tag, fileName: fileName, player: this);
+    return SushiSubtitleActionResult(
+      ok: r.ok,
+      errorCode: r.errorCode,
+      label: r.label,
+      fileNames: r.fileNames,
+      tag: r.tag,
+    );
+  }
+
+  @override
+  Future<SushiSubtitleActionResult> autoLoadSushiSubtitle() async {
+    final r = await sushiRunAutoLoad(ref, player: this);
+    return SushiSubtitleActionResult(
+      ok: r.ok,
+      errorCode: r.errorCode,
+      label: r.label,
+      fileNames: r.fileNames,
+      tag: r.tag,
+    );
+  }
+
+  void beginSushiSubtitleSession(String itemId) {
+    sushiBeginPlaybackSubtitleSession(ref, itemId);
+  }
+
+  /// Playable Farsi already on → keep it. Hardsub → Off. Else Automatic (online).
+  /// Catalog-only `sub_langs=fa` stubs are not playable; those still auto-load.
+  /// AI translate never starts on its own.
+  Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
+    final sourceName = model.mediaStreams?.currentVersionStream?.name;
+    final hardSub = oxplayerMediaSourceLooksHardSub(sourceName);
+    final hasPersianSoft = oxplayerHasPersianSoftSub(model.subStreams);
+    final resolved = oxplayerResolveSubtitleStreamIndex(
+      selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
+      serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
+      subStreams: model.subStreams,
+      mediaSourceName: sourceName,
+    );
+    final subtitleOff = resolved == null || resolved == -1;
+    final choice = sushiStartSubtitleChoice(
+      hardSub: hardSub,
+      hasPersianSoft: hasPersianSoft,
+      subtitleOff: subtitleOff,
+    );
+    log(
+      'sushi_sub_start_choice choice=${choice.name} hardSub=$hardSub '
+      'hasPersianSoft=$hasPersianSoft resolved=$resolved',
+      name: 'sushi.subs',
+    );
+    if (choice != SushiStartSubtitle.automaticOnline) return;
+    final r = await sushiRunAutoLoad(ref, player: this);
+    log('sushi_sub_auto_result ok=${r.ok} error=${r.errorCode}', name: 'sushi.subs');
+  }
+
+  @override
+  Future<SushiSubtitleActionResult> translateSubtitleToPersian() async {
+    final r = await sushiRunTranslateToPersian(ref, player: this);
+    return SushiSubtitleActionResult(
+      ok: r.ok,
+      errorCode: r.errorCode,
+      label: r.label,
+      fileNames: r.fileNames,
+      tag: r.tag,
+    );
+  }
+
+  @override
+  Future<SushiAiKeySetup> sushiAiKeySetup() async {
+    final s = await sushiAiKeySetupInfo();
+    return SushiAiKeySetup(deepLink: s.deepLink, telegramInstalled: s.telegramInstalled);
   }
 
   Future<Uint8List?> takeScreenshot() {

@@ -2,41 +2,38 @@
 // direct client -> sub-plus.ir call. Production runs the list + ranking server-side. Do not ship.
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/subtitles/sushi_subplus.dart';
+import 'package:fladder/sushi/subtitles/sushi_subtitle_actions.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
-
-typedef SushiEpisodeRef = ({int season, int episode});
 
 void _log(String phase, [Map<String, Object?> fields = const {}]) =>
     OxplayerStreamLog.event('sushi_sub_$phase', fields: fields);
 
-/// What Sushi has injected into the player right now, or null when a normal (embedded / off)
-/// track is active. Drives the "selected" mark in the subtitle list, which the embedded-track
-/// machinery knows nothing about because [MediaControlsWrapper.setSubtitleFromText] bypasses it.
-class SushiActiveSubtitle {
-  const SushiActiveSubtitle({required this.auto, required this.label});
-  final bool auto; // true = Automatic, false = a manual pick from the Online sheet
-  final String label;
-}
-
-final sushiActiveSubtitleProvider = StateProvider<SushiActiveSubtitle?>((ref) => null);
-
-// TODO(sushi): localise these once the feature graduates from prototype (doc 07 §7).
 const _kAutomatic = 'Automatic (online)';
 const _kOnline = 'Online subtitles…';
+const _kTranslate = 'Translate with AI (Persian)';
 const _kSearching = 'Searching sub-plus…';
 const _kNoResults = 'No subtitles found';
 const _kApplied = 'Subtitle loaded';
 const _kFailed = 'Could not load subtitle';
+const _kTranslateFailed = 'AI translate failed';
+const _kTranslating = 'Translating to Persian…';
+const _kTranslated = 'Persian subtitle applied';
+const _kNoSource = 'Need a text subtitle first — try Online subtitles';
+const _kAiKeyMissing =
+    'AI translate needs a free Gemini API key. Set it in the Sushi bot.';
+const _kSetApiKey = 'Set API key';
+const _kRetry = 'Retry';
 
-/// The two rows prepended to the subtitle dialog. Empty when the feature is off.
+/// The rows prepended to the subtitle dialog. Empty when the feature is off.
 ///
 /// Everything the async work needs is read from [ref] here, synchronously, because the calls
 /// below pop the dialog first — after which this [ref] is disposed and unusable.
@@ -45,6 +42,11 @@ List<Widget> sushiSubtitleMenuRows(BuildContext context, WidgetRef ref) {
   final theme = Theme.of(context);
   final active = ref.watch(sushiActiveSubtitleProvider);
   final sel = theme.colorScheme.primary.withValues(alpha: 0.3);
+
+  void closeTransientRoutes() {
+    Navigator.of(context, rootNavigator: true).popUntil((route) => route is! PopupRoute);
+  }
+
   return [
     ListTile(
       leading: const Icon(Icons.auto_awesome_rounded),
@@ -53,19 +55,11 @@ List<Widget> sushiSubtitleMenuRows(BuildContext context, WidgetRef ref) {
       onTap: () {
         final messenger = ScaffoldMessenger.of(context);
         final container = ProviderScope.containerOf(context, listen: false);
-        final player = ref.read(videoPlayerProvider);
-        final title = _playingTitle(ref);
-        final year = _playingYear(ref);
-        final episode = _playingEpisode(ref);
-        Navigator.of(context).pop();
-        sushiAutoLoadSubtitle(
-          messenger: messenger,
-          container: container,
-          player: player,
-          title: title,
-          year: year,
-          episode: episode,
-        );
+        final navigator = Navigator.of(context, rootNavigator: true);
+        closeTransientRoutes();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          sushiAutoLoadSubtitle(messenger: messenger, container: container, navigator: navigator);
+        });
       },
     ),
     ListTile(
@@ -74,115 +68,241 @@ List<Widget> sushiSubtitleMenuRows(BuildContext context, WidgetRef ref) {
       subtitle: active?.auto == false ? Text(active!.label, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
       tileColor: active?.auto == false ? sel : null,
       onTap: () {
-        final navigator = Navigator.of(context);
-        navigator.pop();
-        showSushiOnlineSubtitles(navigator.context);
+        final navigator = Navigator.of(context, rootNavigator: true);
+        closeTransientRoutes();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showSushiOnlineSubtitles(navigator.context);
+        });
+      },
+    ),
+    ListTile(
+      leading: const Icon(Icons.translate_rounded),
+      title: Text(_kTranslate, style: theme.textTheme.titleMedium),
+      onTap: () {
+        final messenger = ScaffoldMessenger.of(context);
+        final container = ProviderScope.containerOf(context, listen: false);
+        final navigator = Navigator.of(context, rootNavigator: true);
+        closeTransientRoutes();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          sushiTranslateSubtitle(
+            messenger: messenger,
+            container: container,
+            navigator: navigator,
+          );
+        });
       },
     ),
     const Divider(height: 1),
   ];
 }
 
-/// Whether a normal embedded/off subtitle row should show as selected: only when Sushi has not
-/// injected an online subtitle over the top of it.
-bool sushiEmbeddedRowSelectable(WidgetRef ref) => ref.watch(sushiActiveSubtitleProvider) == null;
-
-/// Call when the user picks a normal embedded / off track, so the Sushi mark clears.
-void sushiClearActiveSubtitle(WidgetRef ref) =>
-    ref.read(sushiActiveSubtitleProvider.notifier).state = null;
-
-String? _playingTitle(WidgetRef ref) {
-  final name = ref.read(playBackModel)?.item.title.trim() ?? '';
-  return name.isEmpty ? null : name;
-}
-
-String? _playingYear(WidgetRef ref) {
-  final overview = ref.read(playBackModel)?.item.overview;
-  return (overview?.yearAired ?? overview?.productionYear)?.toString();
-}
-
-/// Season/episode of the playing item when it is a TV episode, else null.
-SushiEpisodeRef? _playingEpisode(WidgetRef ref) {
-  final item = ref.read(playBackModel)?.item;
-  if (item is EpisodeModel && item.season > 0 && item.episode > 0) {
-    return (season: item.season, episode: item.episode);
-  }
-  return null;
-}
-
 void _toast(ScaffoldMessengerState messenger, String msg) {
   messenger.showSnackBar(
-    SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+    SnackBar(content: Text(msg), duration: const Duration(seconds: 3)),
   );
 }
 
-/// Automatic: search by [title], apply the episode's (or top pack's first) file silently.
-Future<void> sushiAutoLoadSubtitle({
-  required ScaffoldMessengerState messenger,
-  required ProviderContainer container,
-  required MediaControlsWrapper player,
-  required String? title,
-  required String? year,
-  required SushiEpisodeRef? episode,
+Future<void> _withBusyDialog({
+  required NavigatorState navigator,
+  required String message,
+  required Future<void> Function() body,
 }) async {
-  if (title == null) return;
-  _log('auto_start', {'title': title, 'year': year, 'ep': episode == null ? '' : 'S${episode.season}E${episode.episode}'});
-  final client = SushiSubplusClient();
+  final ctx = navigator.context;
+  if (!ctx.mounted) {
+    await body();
+    return;
+  }
+  showDialog<void>(
+    context: ctx,
+    barrierDismissible: false,
+    useRootNavigator: true,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    ),
+  );
   try {
-    _toast(messenger, _kSearching);
-    final packs = rankSubplusPacks(await client.search(title), year: year, episode: episode);
-    _log('auto_search', {'packs': packs.length, 'top': packs.isEmpty ? '' : packs.first.title});
-    if (packs.isEmpty) {
-      _toast(messenger, _kNoResults);
-      return;
-    }
-    final subs = await client.fetchSubs(packs.first.tag);
-    final pick = episode == null
-        ? (subs.isEmpty ? null : subs.first)
-        : pickEpisodeFile(subs, episode.season, episode.episode);
-    _log('auto_files', {'tag': packs.first.tag, 'files': subs.length, 'pick': pick?.name ?? ''});
-    if (pick == null) {
-      _toast(messenger, _kNoResults);
-      return;
-    }
-    await player.setSubtitleFromText(pick.text, title: '${packs.first.title} · auto', language: 'fa');
-    container.read(sushiActiveSubtitleProvider.notifier).state =
-        SushiActiveSubtitle(auto: true, label: '${packs.first.title} · ${pick.name}');
-    _log('auto_applied', {'chars': pick.text.length});
-    _toast(messenger, _kApplied);
-  } catch (e, st) {
-    _log('auto_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
-    _toast(messenger, _kFailed);
+    await body();
   } finally {
-    client.close();
+    if (ctx.mounted) {
+      Navigator.of(ctx, rootNavigator: true).pop();
+    }
   }
 }
 
-/// Prototype ranking. For a TV [episode] the season match dominates (wrong-season packs sink);
-/// then a matching year, then packs that carry release names. The full heuristic (release-token
-/// overlap, fps) is doc 15 §4.
-List<SubplusPack> rankSubplusPacks(List<SubplusPack> packs, {String? year, SushiEpisodeRef? episode}) {
-  final sorted = [...packs];
-  sorted.sort((a, b) {
-    int score(SubplusPack p) {
-      var s = 0;
-      if (episode != null) {
-        s -= seasonMatchScore(p, episode.season) * 100; // +/-100 dominates everything else
-        if (p.releases.any((r) {
-          final se = parseSeasonEpisode(r);
-          return se.season == episode.season && se.episode == episode.episode;
-        })) {
-          s -= 20; // a release line naming this exact episode
-        }
-      }
-      if (year != null && year.isNotEmpty && p.year == year) s -= 2;
-      if (p.releases.isNotEmpty) s -= 1;
-      return s;
-    }
+/// Automatic: search by playing title, apply the episode's (or top pack's first) file silently.
+Future<void> sushiAutoLoadSubtitle({
+  required ScaffoldMessengerState messenger,
+  required ProviderContainer container,
+  NavigatorState? navigator,
+  MediaControlsWrapper? player,
+  String? title,
+  String? year,
+  SushiEpisodeRef? episode,
+}) async {
+  late final SushiSubtitleOpResult result;
+  Future<void> run() async {
+    result = await sushiRunAutoLoad(container);
+  }
 
-    return score(a).compareTo(score(b));
-  });
-  return sorted;
+  final nav = navigator;
+  if (nav != null && nav.context.mounted) {
+    await _withBusyDialog(navigator: nav, message: _kSearching, body: run);
+  } else {
+    await run();
+  }
+  if (result.errorCode == 'busy') {
+    _toast(messenger, 'Still loading subtitles…');
+    return;
+  }
+  if (result.ok) {
+    _toast(messenger, _kApplied);
+  } else if (result.errorCode == 'no_results') {
+    _toast(messenger, _kNoResults);
+  } else {
+    _toast(messenger, _kFailed);
+  }
+}
+
+Future<void> sushiTranslateSubtitle({
+  required ScaffoldMessengerState messenger,
+  required ProviderContainer container,
+  required NavigatorState navigator,
+  bool forceKeyRefresh = false,
+}) async {
+  late final SushiSubtitleOpResult result;
+  await _withBusyDialog(
+    navigator: navigator,
+    message: _kTranslating,
+    body: () async {
+      result = await sushiRunTranslateToPersian(container, forceKeyRefresh: forceKeyRefresh);
+    },
+  );
+  if (result.errorCode == 'busy') {
+    _toast(messenger, 'Still translating…');
+    return;
+  }
+  if (result.ok) {
+    _toast(messenger, _kTranslated);
+    return;
+  }
+  if (result.errorCode == 'missing_key') {
+    final ctx = navigator.context;
+    if (ctx.mounted) {
+      await showSushiAiKeyMissingDialog(ctx, messenger: messenger, container: container);
+    }
+    return;
+  }
+  if (result.errorCode == 'no_source') {
+    _toast(messenger, _kNoSource);
+    return;
+  }
+  _toast(messenger, _kTranslateFailed);
+}
+
+Future<void> showSushiAiKeyMissingDialog(
+  BuildContext context, {
+  required ScaffoldMessengerState messenger,
+  required ProviderContainer container,
+}) async {
+  final setup = await sushiAiKeySetupInfo();
+  if (!context.mounted) return;
+  await showDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => _AiKeyMissingDialog(
+      setup: setup,
+      onRetry: () async {
+        Navigator.of(ctx, rootNavigator: true).pop();
+        await sushiTranslateSubtitle(
+          messenger: messenger,
+          container: container,
+          navigator: Navigator.of(context, rootNavigator: true),
+          forceKeyRefresh: true,
+        );
+      },
+    ),
+  );
+}
+
+class _AiKeyMissingDialog extends StatefulWidget {
+  const _AiKeyMissingDialog({required this.setup, required this.onRetry});
+
+  final SushiAiKeySetupInfo setup;
+  final VoidCallback onRetry;
+
+  @override
+  State<_AiKeyMissingDialog> createState() => _AiKeyMissingDialogState();
+}
+
+class _AiKeyMissingDialogState extends State<_AiKeyMissingDialog> {
+  bool _showQr = false;
+
+  Future<void> _openBot() async {
+    final uri = Uri.parse(widget.setup.deepLink);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) setState(() => _showQr = true);
+    } catch (_) {
+      if (mounted) setState(() => _showQr = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final setup = widget.setup;
+    final showQr = !setup.telegramInstalled || _showQr;
+    return AlertDialog(
+      title: const Text(_kTranslate),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(_kAiKeyMissing),
+          const SizedBox(height: 16),
+          if (showQr) ...[
+            QrImageView(data: setup.deepLink, size: 220, backgroundColor: Colors.white),
+            if (setup.telegramInstalled)
+              TextButton(
+                onPressed: () => setState(() => _showQr = false),
+                child: const Text('Hide QR'),
+              ),
+          ] else
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _openBot,
+                    child: const Text(_kSetApiKey),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'QR',
+                  onPressed: () => setState(() => _showQr = true),
+                  icon: const Icon(Icons.qr_code_2),
+                ),
+              ],
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: widget.onRetry, child: const Text(_kRetry)),
+        TextButton(onPressed: () => Navigator.of(context, rootNavigator: true).pop(), child: const Text('Close')),
+      ],
+    );
+  }
 }
 
 Future<void> showSushiOnlineSubtitles(BuildContext context) {
@@ -201,9 +321,9 @@ class _OnlineSubtitleDialog extends ConsumerStatefulWidget {
 
 class _OnlineSubtitleDialogState extends ConsumerState<_OnlineSubtitleDialog> {
   final _client = SushiSubplusClient();
-  late final TextEditingController _query = TextEditingController(text: _playingTitle(ref) ?? '');
-  late final String? _year = _playingYear(ref);
-  late final SushiEpisodeRef? _episode = _playingEpisode(ref);
+  late final TextEditingController _query = TextEditingController(text: sushiPlayingTitle(ref) ?? '');
+  late final String? _year = sushiPlayingYear(ref);
+  late final SushiEpisodeRef? _episode = sushiPlayingEpisode(ref);
 
   bool _loading = false;
   String? _error;
@@ -237,7 +357,7 @@ class _OnlineSubtitleDialogState extends ConsumerState<_OnlineSubtitleDialog> {
       _log('search_done', {'packs': packs.length});
       if (!mounted) return;
       setState(() {
-        _packs = rankSubplusPacks(packs, year: _year, episode: _episode);
+        _packs = rankSubplusPacks(packs, query: _query.text, year: _year, episode: _episode);
         _loading = false;
       });
     } catch (e, st) {
@@ -298,6 +418,7 @@ class _OnlineSubtitleDialogState extends ConsumerState<_OnlineSubtitleDialog> {
       'chars': file.text.length,
       'head': head.length > 80 ? head.substring(0, 80) : head,
     });
+    sushiRememberSideloadedSrt(file.text);
     ref.read(sushiActiveSubtitleProvider.notifier).state =
         SushiActiveSubtitle(auto: false, label: '${pack.title} · ${file.name}');
     await player.setSubtitleFromText(file.text, title: '${pack.title} · ${file.name}', language: 'fa');

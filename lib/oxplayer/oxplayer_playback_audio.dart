@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/oxplayer/oxplayer_config.dart';
 
 /// Resolves a playable audio stream when Jellyfin default index is wrong (e.g. 0 = video).
 AudioStreamModel? oxplayerResolvePlaybackAudioStream(PlaybackModel model) {
@@ -14,4 +15,20 @@ AudioStreamModel? oxplayerResolvePlaybackAudioStream(PlaybackModel model) {
   }
 
   return streams.firstWhereOrNull((s) => s.index >= 0);
+}
+
+/// Sushi files with empty `audio_langs` still mux audio. Forcing the picker
+/// "Off" sentinel (`index == -1`) onto libMPV/libMDK mutes playback.
+bool oxplayerShouldSkipAudioTrackOff(PlaybackModel playbackModel) {
+  return OxplayerConfig.isEnabled && !playbackModel.isAudioPlayback;
+}
+
+/// Native Exo treats a negative default as "disable audio". Never send Off
+/// on first load — fall back to the first real catalog index, then 1.
+int oxplayerDefaultAudioTrackIndex(PlaybackModel model) {
+  final resolved = oxplayerResolvePlaybackAudioStream(model)?.index;
+  if (resolved != null && resolved >= 0) return resolved;
+  final fallback = model.mediaStreams?.defaultAudioStreamIndex;
+  if (fallback != null && fallback >= 0) return fallback;
+  return 1;
 }

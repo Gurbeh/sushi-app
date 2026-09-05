@@ -247,6 +247,13 @@ abstract class VideoPlayerApi {
   /// Re-applies default audio/subtitle selection from the last [sendPlayableModel] (e.g. after Flutter merges muxed streams).
   @async
   bool refreshDefaultTrackSelection();
+
+  /// Sideload a decoded `.srt` as an ExoPlayer text track without tearing down Telegram playback.
+  @async
+  bool setSubtitleFromText(String data, String? title, String? languageCode);
+
+  @async
+  bool clearExternalSubtitle();
 }
 
 class PlaybackState {
@@ -346,6 +353,47 @@ class GuideProgram {
   });
 }
 
+/// One sub-plus pack row for the native TV online-subtitle sheet.
+class SushiOnlineSubtitlePack {
+  final String tag;
+  final String title;
+  final String hint;
+
+  const SushiOnlineSubtitlePack({
+    required this.tag,
+    required this.title,
+    required this.hint,
+  });
+}
+
+/// Result of auto-load / download / translate. [errorCode] is `missing_key`,
+/// `no_source`, `no_results`, `need_pick`, or `failed`.
+class SushiSubtitleActionResult {
+  final bool ok;
+  final String? errorCode;
+  final String? label;
+  final List<String>? fileNames;
+  final String? tag;
+
+  const SushiSubtitleActionResult({
+    required this.ok,
+    this.errorCode,
+    this.label,
+    this.fileNames,
+    this.tag,
+  });
+}
+
+class SushiAiKeySetup {
+  final String deepLink;
+  final bool telegramInstalled;
+
+  const SushiAiKeySetup({
+    required this.deepLink,
+    required this.telegramInstalled,
+  });
+}
+
 @FlutterApi()
 abstract class VideoPlayerListenerCallback {
   void onPlaybackStateChanged(PlaybackState state);
@@ -370,4 +418,19 @@ abstract class VideoPlayerControlsCallback {
   void loadProgram(GuideChannel selection);
   @async
   List<GuideProgram> fetchProgramsForChannel(String channelId);
+
+  @async
+  List<SushiOnlineSubtitlePack> searchSushiOnlineSubtitles();
+
+  @async
+  SushiSubtitleActionResult downloadSushiOnlineSubtitle(String tag, String fileName);
+
+  @async
+  SushiSubtitleActionResult autoLoadSushiSubtitle();
+
+  @async
+  SushiSubtitleActionResult translateSubtitleToPersian();
+
+  @async
+  SushiAiKeySetup sushiAiKeySetup();
 }

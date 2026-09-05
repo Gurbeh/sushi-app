@@ -412,9 +412,11 @@ class PlaybackModelHelper {
           newStreamModel?.audioStreams,
           newStreamModel?.defaultAudioStreamIndex);
 
+      final rememberSubs = !OxplayerEnv.isEnabled &&
+          (ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)));
       final subStreamIndex = oxplayerResolveSubtitleStreamIndex(
         selectedIndex: selectSubStream(
-            ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)),
+            rememberSubs,
             oldModel?.mediaStreams?.currentSubStream,
             newStreamModel?.subStreams,
             newStreamModel?.defaultSubStreamIndex),
@@ -754,8 +756,10 @@ class PlaybackModelHelper {
         playbackModel.mediaStreams?.currentAudioStream,
         playbackModel.audioStreams,
         playbackModel.mediaStreams?.defaultAudioStreamIndex);
+    final rememberSubs = !OxplayerEnv.isEnabled &&
+        (ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)));
     final subIndex = selectSubStream(
-        ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)),
+        rememberSubs,
         playbackModel.mediaStreams?.currentSubStream,
         playbackModel.subStreams,
         playbackModel.mediaStreams?.defaultSubStreamIndex);

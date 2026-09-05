@@ -781,6 +781,120 @@ data class GuideProgram (
 
   override fun hashCode(): Int = toList().hashCode()
 }
+
+/**
+ * One sub-plus pack row for the native TV online-subtitle sheet.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class SushiOnlineSubtitlePack (
+  val tag: String,
+  val title: String,
+  val hint: String
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): SushiOnlineSubtitlePack {
+      val tag = pigeonVar_list[0] as String
+      val title = pigeonVar_list[1] as String
+      val hint = pigeonVar_list[2] as String
+      return SushiOnlineSubtitlePack(tag, title, hint)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      tag,
+      title,
+      hint,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is SushiOnlineSubtitlePack) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return VideoPlayerHelperPigeonUtils.deepEquals(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/**
+ * Result of auto-load / download / translate. [errorCode] is `missing_key`,
+ * `no_source`, `no_results`, `need_pick`, or `failed`.
+ *
+ * Generated class from Pigeon that represents data sent in messages.
+ */
+data class SushiSubtitleActionResult (
+  val ok: Boolean,
+  val errorCode: String? = null,
+  val label: String? = null,
+  val fileNames: List<String>? = null,
+  val tag: String? = null
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): SushiSubtitleActionResult {
+      val ok = pigeonVar_list[0] as Boolean
+      val errorCode = pigeonVar_list[1] as String?
+      val label = pigeonVar_list[2] as String?
+      val fileNames = pigeonVar_list[3] as List<String>?
+      val tag = pigeonVar_list[4] as String?
+      return SushiSubtitleActionResult(ok, errorCode, label, fileNames, tag)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      ok,
+      errorCode,
+      label,
+      fileNames,
+      tag,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is SushiSubtitleActionResult) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return VideoPlayerHelperPigeonUtils.deepEquals(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
+
+/** Generated class from Pigeon that represents data sent in messages. */
+data class SushiAiKeySetup (
+  val deepLink: String,
+  val telegramInstalled: Boolean
+)
+ {
+  companion object {
+    fun fromList(pigeonVar_list: List<Any?>): SushiAiKeySetup {
+      val deepLink = pigeonVar_list[0] as String
+      val telegramInstalled = pigeonVar_list[1] as Boolean
+      return SushiAiKeySetup(deepLink, telegramInstalled)
+    }
+  }
+  fun toList(): List<Any?> {
+    return listOf(
+      deepLink,
+      telegramInstalled,
+    )
+  }
+  override fun equals(other: Any?): Boolean {
+    if (other !is SushiAiKeySetup) {
+      return false
+    }
+    if (this === other) {
+      return true
+    }
+    return VideoPlayerHelperPigeonUtils.deepEquals(toList(), other.toList())  }
+
+  override fun hashCode(): Int = toList().hashCode()
+}
 private open class VideoPlayerHelperPigeonCodec : StandardMessageCodec() {
   override fun readValueOfType(type: Byte, buffer: ByteBuffer): Any? {
     return when (type) {
@@ -874,6 +988,21 @@ private open class VideoPlayerHelperPigeonCodec : StandardMessageCodec() {
           GuideProgram.fromList(it)
         }
       }
+      147.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          SushiOnlineSubtitlePack.fromList(it)
+        }
+      }
+      148.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          SushiSubtitleActionResult.fromList(it)
+        }
+      }
+      149.toByte() -> {
+        return (readValue(buffer) as? List<Any?>)?.let {
+          SushiAiKeySetup.fromList(it)
+        }
+      }
       else -> super.readValueOfType(type, buffer)
     }
   }
@@ -949,6 +1078,18 @@ private open class VideoPlayerHelperPigeonCodec : StandardMessageCodec() {
       }
       is GuideProgram -> {
         stream.write(146)
+        writeValue(stream, value.toList())
+      }
+      is SushiOnlineSubtitlePack -> {
+        stream.write(147)
+        writeValue(stream, value.toList())
+      }
+      is SushiSubtitleActionResult -> {
+        stream.write(148)
+        writeValue(stream, value.toList())
+      }
+      is SushiAiKeySetup -> {
+        stream.write(149)
         writeValue(stream, value.toList())
       }
       else -> super.writeValue(stream, value)
@@ -1043,6 +1184,9 @@ interface VideoPlayerApi {
   fun setSubtitleSettings(settings: SubtitleSettings)
   /** Re-applies default audio/subtitle selection from the last [sendPlayableModel] (e.g. after Flutter merges muxed streams). */
   fun refreshDefaultTrackSelection(callback: (Result<Boolean>) -> Unit)
+  /** Sideload a decoded `.srt` as an ExoPlayer text track without tearing down Telegram playback. */
+  fun setSubtitleFromText(data: String, title: String?, languageCode: String?, callback: (Result<Boolean>) -> Unit)
+  fun clearExternalSubtitle(callback: (Result<Boolean>) -> Unit)
 
   companion object {
     /** The codec used by VideoPlayerApi. */
@@ -1270,6 +1414,46 @@ interface VideoPlayerApi {
           channel.setMessageHandler(null)
         }
       }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.setSubtitleFromText$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val dataArg = args[0] as String
+            val titleArg = args[1] as String?
+            val languageCodeArg = args[2] as String?
+            api.setSubtitleFromText(dataArg, titleArg, languageCodeArg) { result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(VideoPlayerHelperPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(VideoPlayerHelperPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.clearExternalSubtitle$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.clearExternalSubtitle{ result: Result<Boolean> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(VideoPlayerHelperPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(VideoPlayerHelperPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
     }
   }
 }
@@ -1458,6 +1642,106 @@ class VideoPlayerControlsCallback(private val binaryMessenger: BinaryMessenger, 
           callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
         } else {
           val output = it[0] as List<GuideProgram>
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun searchSushiOnlineSubtitles(callback: (Result<List<SushiOnlineSubtitlePack>>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.searchSushiOnlineSubtitles$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(null) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as List<SushiOnlineSubtitlePack>
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun downloadSushiOnlineSubtitle(tagArg: String, fileNameArg: String, callback: (Result<SushiSubtitleActionResult>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.downloadSushiOnlineSubtitle$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(tagArg, fileNameArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as SushiSubtitleActionResult
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun autoLoadSushiSubtitle(callback: (Result<SushiSubtitleActionResult>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.autoLoadSushiSubtitle$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(null) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as SushiSubtitleActionResult
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun translateSubtitleToPersian(callback: (Result<SushiSubtitleActionResult>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.translateSubtitleToPersian$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(null) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as SushiSubtitleActionResult
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun sushiAiKeySetup(callback: (Result<SushiAiKeySetup>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.sushiAiKeySetup$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(null) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as SushiAiKeySetup
           callback(Result.success(output))
         }
       } else {

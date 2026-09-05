@@ -398,7 +398,8 @@ internal fun ExoPlayer(
                                 android.graphics.Color.TRANSPARENT,
                                 CaptionStyleCompat.EDGE_TYPE_OUTLINE,
                                 subtitleSettings.outlineColor.toInt(),
-                                if (subtitleSettings.fontWeight >= 700) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                                persianSubtitleTypeface(view.context)
+                                    ?: if (subtitleSettings.fontWeight >= 700) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
                             )
                         )
                     }
@@ -431,5 +432,24 @@ internal fun ExoPlayer(
             )
         }
     }
+}
+
+private var cachedPersianFace: android.graphics.Typeface? = null
+
+private fun persianSubtitleTypeface(context: android.content.Context): android.graphics.Typeface? {
+    if (!app.oxplayer.objects.VideoPlayerObject.usePersianSubtitleFace) return null
+    cachedPersianFace?.let { return it }
+    val paths = listOf(
+        "flutter_assets/assets/fonts/vazirmatn/Vazirmatn-Regular.ttf",
+        "assets/fonts/vazirmatn/Vazirmatn-Regular.ttf",
+    )
+    for (path in paths) {
+        try {
+            cachedPersianFace = android.graphics.Typeface.createFromAsset(context.assets, path)
+            return cachedPersianFace
+        } catch (_: Exception) {
+        }
+    }
+    return null
 }
 

@@ -42,7 +42,7 @@ abstract class BasePlayer {
   void applySubtitleSettings(SubtitleSettingsModel settings) {}
 
   /// Sushi: inject an external subtitle straight from decoded text (no track index, no URL).
-  /// Used by the Automatic / Online subtitle picker. Default no-op; mpv overrides.
+  /// Used by Automatic / Online / AI translate. Default no-op; mpv, MDK, and native Exo override.
   Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {}
 
   Uri? isValidUrl(String input) {
