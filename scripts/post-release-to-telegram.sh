@@ -45,6 +45,21 @@ file_label() {
   esac
 }
 
+# The hashtag is what main-bot reads to decide which Download button a file feeds, and what a human
+# searches the channel by. A file with no tag is still posted, just not offered as a download.
+file_tags() {
+  case "$1" in
+    *arm64-v8a*.apk) echo "#android #arm64" ;;
+    *armeabi-v7a*.apk) echo "#android_old #armeabi" ;;
+    *-Setup.exe) echo "#windows" ;;
+    *.ipa) echo "#ios" ;;
+    *.dmg) echo "#macos" ;;
+    *.AppImage.zsync) echo "" ;;
+    *.AppImage) echo "#linux" ;;
+    *) echo "" ;;
+  esac
+}
+
 post_one() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -58,7 +73,12 @@ post_one() {
     return 1
   fi
 
-  local cap="Sushi ${VERSION} · $(file_label "$file")"
+  local cap tags
+  cap="Sushi ${VERSION} · $(file_label "$file")"
+  tags="$(file_tags "$file")"
+  if [[ -n "$tags" ]]; then
+    cap="${cap}"$'\n'"${tags} #sushi"
+  fi
   echo "Uploading $(basename "$file") (${size} bytes) via ${BASE}"
 
   local tmp http
