@@ -93,7 +93,7 @@ class _AdvancedLoginOptionsDialogState extends ConsumerState<_AdvancedLoginOptio
       _warning = null;
     });
     try {
-      final result = await probeAndNormalizeUrl(url, probeSeerrUrl);
+      final result = await probeAndNormalizeUrl(url, (_) async => null);
       if (!mounted) return;
       if (result.probed) {
         Navigator.of(context).pop(result.url);

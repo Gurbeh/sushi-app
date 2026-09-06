@@ -24,13 +24,14 @@ import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/video_stream_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
-import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_provider_read.dart';
+import 'package:fladder/sushi/sushi_playback_prefetch.dart';
+import 'package:fladder/sushi/sushi_native_playback.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
+import 'package:fladder/sushi/sushi_playback_repair.dart';
+import 'package:fladder/sushi/sushi_stuck_playback.dart';
+import 'package:fladder/sushi/sushi_playback_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
@@ -61,7 +62,7 @@ BuildContext _playbackRootContext(BuildContext context) {
 }
 
 /// Survives widget dispose while loading dialog / createPlaybackModel runs.
-OxplayerRead _playbackRead(BuildContext context) {
+SushiRead _playbackRead(BuildContext context) {
   return ProviderScope.containerOf(context, listen: false).read;
 }
 
@@ -654,7 +655,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
       final model = await op.valueOrCancellation(null);
       if (op.isCanceled || model == null) {
         if (!op.isCanceled) {
-          unawaited(OxplayerPlaybackTelemetry.reportFailure(
+          unawaited(SushiPlaybackTelemetry.reportFailure(
             stage: 'playback_model',
             reason: 'sushi_play_resolve_failed',
             itemId: itemModel.id,
@@ -676,8 +677,8 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
       return;
     }
 
-    if (OxplayerEnv.isEnabled) {
-      OxplayerPlaybackPrefetch.scheduleForItem(
+    if (SushiEnv.isEnabled) {
+      SushiPlaybackPrefetch.scheduleForItem(
         read,
         itemModel.id,
         startPosition: startPosition,
@@ -687,7 +688,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
 
     final op = CancelableOperation.fromFuture((() async {
       // OX: defer MPV init to loadPlaybackItem — early init races provider bootstrap init().
-      if (!OxplayerEnv.isEnabled) {
+      if (!SushiEnv.isEnabled) {
         await read(videoPlayerProvider.notifier).init();
       }
       return await read(playbackModelHelper).createPlaybackModel(
@@ -703,7 +704,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
     final model = await op.valueOrCancellation(null);
     if (op.isCanceled || model == null) {
       if (!op.isCanceled) {
-        unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        unawaited(SushiPlaybackTelemetry.reportFailure(
           stage: 'playback_model',
           reason: 'unable_to_create_playback_model',
           itemId: itemModel.id,
@@ -718,8 +719,8 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
 
     final actualStartPosition = startPosition ?? await model.startDuration() ?? Duration.zero;
 
-    if (OxplayerEnv.isEnabled) {
-      OxplayerStreamLog.event('playback_model_ready', fields: {
+    if (SushiEnv.isEnabled) {
+      SushiStreamLog.event('playback_model_ready', fields: {
         'itemId': model.item.id,
         'hasMedia': model.media != null,
       });
@@ -770,7 +771,7 @@ extension ItemBaseModelsBooleans on List<ItemBaseModel> {
     final result = await op.valueOrCancellation(null);
     if (op.isCanceled || result == null) {
       if (!op.isCanceled) {
-        unawaited(OxplayerPlaybackTelemetry.reportFailure(
+        unawaited(SushiPlaybackTelemetry.reportFailure(
           stage: 'playback_model',
           reason: 'unable_to_create_playback_model',
           itemId: isNotEmpty ? first.id : null,
@@ -910,7 +911,7 @@ class _LoadIndicatorCancelableState extends State<_LoadIndicatorCancelable> {
   @override
   void initState() {
     super.initState();
-    if (OxplayerEnv.isEnabled) {
+    if (SushiEnv.isEnabled) {
       _coldStartHintTimer = Timer(const Duration(seconds: 5), () {
         if (mounted) setState(() => _showColdStartHint = true);
       });
@@ -991,8 +992,8 @@ class _LoadIndicatorCancelableState extends State<_LoadIndicatorCancelable> {
                       spacing: 8,
                       children: [
                         Text(
-                          OxplayerEnv.isEnabled
-                              ? context.localized.oxplayerPreparingPlayback
+                          SushiEnv.isEnabled
+                              ? context.localized.sushiPreparingPlayback
                               : context.localized.loading,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
@@ -1002,9 +1003,9 @@ class _LoadIndicatorCancelableState extends State<_LoadIndicatorCancelable> {
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
-                        if (_showColdStartHint && OxplayerEnv.isEnabled)
+                        if (_showColdStartHint && SushiEnv.isEnabled)
                           Text(
-                            context.localized.oxplayerPlaybackColdStartHint,
+                            context.localized.sushiPlaybackColdStartHint,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
@@ -1038,7 +1039,7 @@ Future<void> _playVideo(
   required PlaybackModel? current,
   Duration? startPosition,
   List<ItemBaseModel>? queue,
-  required OxplayerRead read,
+  required SushiRead read,
   VoidCallback? onPlayerExit,
   CancelableOperation? cancelOperation,
 }) async {
@@ -1046,7 +1047,7 @@ Future<void> _playVideo(
 
   if (current == null) {
     if (playContext.mounted) {
-      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+      unawaited(SushiPlaybackTelemetry.reportFailure(
         stage: 'playback_model',
         reason: 'playback_model_null',
       ));
@@ -1060,8 +1061,8 @@ Future<void> _playVideo(
 
   final actualStartPosition = startPosition ?? await current.startDuration() ?? Duration.zero;
   if (!playContext.mounted) {
-    if (OxplayerEnv.isEnabled) {
-      OxplayerStreamLog.event('play_video_aborted', fields: {
+    if (SushiEnv.isEnabled) {
+      SushiStreamLog.event('play_video_aborted', fields: {
         'reason': 'context_unmounted',
         'itemId': current.item.id,
       });
@@ -1070,18 +1071,18 @@ Future<void> _playVideo(
     return;
   }
 
-  if (OxplayerEnv.isEnabled) {
-    OxplayerStreamLog.event('play_video_start', fields: {
+  if (SushiEnv.isEnabled) {
+    SushiStreamLog.event('play_video_start', fields: {
       'itemId': current.item.id,
       'startMs': actualStartPosition.inMilliseconds,
     });
   }
 
   final nativeOpenedEarly =
-      OxplayerEnv.isEnabled && playContext.mounted && await oxplayerOpenNativePlayerEarly(read, playContext);
+      SushiEnv.isEnabled && playContext.mounted && await sushiOpenNativePlayerEarly(read, playContext);
   if (!playContext.mounted) {
-    if (OxplayerEnv.isEnabled) {
-      OxplayerStreamLog.event('play_video_aborted', fields: {
+    if (SushiEnv.isEnabled) {
+      SushiStreamLog.event('play_video_aborted', fields: {
         'reason': 'context_unmounted_after_native_early',
         'itemId': current.item.id,
       });
@@ -1096,8 +1097,8 @@ Future<void> _playVideo(
       );
 
   Timer? stuckWatch;
-  if (loadedCorrectly && OxplayerEnv.isEnabled) {
-    stuckWatch = oxplayerScheduleStuckPlaybackWatch(
+  if (loadedCorrectly && SushiEnv.isEnabled) {
+    stuckWatch = sushiScheduleStuckPlaybackWatch(
       read: read,
       itemId: current.item.id,
       streamUrl: current.media?.url,
@@ -1106,8 +1107,8 @@ Future<void> _playVideo(
     );
   }
 
-  if (!loadedCorrectly && OxplayerEnv.isEnabled) {
-    loadedCorrectly = await oxplayerMaybeRetryPlayAfterLoadFailure(
+  if (!loadedCorrectly && SushiEnv.isEnabled) {
+    loadedCorrectly = await sushiMaybeRetryPlayAfterLoadFailure(
       read: read,
       current: current,
       startPosition: actualStartPosition,
@@ -1117,7 +1118,7 @@ Future<void> _playVideo(
   if (!loadedCorrectly) {
     stuckWatch?.cancel();
     if (playContext.mounted) {
-      unawaited(OxplayerPlaybackTelemetry.reportFailure(
+      unawaited(SushiPlaybackTelemetry.reportFailure(
         stage: 'player_load',
         reason: 'load_playback_item_failed',
         itemId: current.item.id,

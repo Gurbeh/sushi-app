@@ -13,23 +13,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart' as mpv;
 import 'package:media_kit_video/media_kit_video.dart';
 
-import 'package:fladder/oxplayer/playback/ox_hls_web_buffer_config.dart';
+import 'package:fladder/sushi/playback/sushi_hls_web_buffer_config.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/audio_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_mpv.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_stream_cb.dart';
-import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_playback_telemetry.dart';
+import 'package:fladder/sushi/sushi_playback_audio.dart';
+import 'package:fladder/sushi/sushi_stream_mpv.dart';
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
+import 'package:fladder/sushi/sushi_telegram_stream_cb.dart';
+import 'package:fladder/sushi/sushi_audio_log.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
+import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
@@ -66,7 +65,7 @@ class LibMPV extends BasePlayer {
   int _externalSubtitleLoadGen = 0;
   // mpv's own log stream (decode/demux warnings+errors) can burst into hundreds of lines/sec
   // during a bad decode stretch (observed live: an HEVC ref-frame error storm during a Telegram
-  // FLOOD_WAIT-induced resync flooded OxplayerStreamLog.event's debugPrint/developer.log calls
+  // FLOOD_WAIT-induced resync flooded SushiStreamLog.event's debugPrint/developer.log calls
   // fast enough to make the whole app unresponsive — "Not Responding", force-stopped by the
   // user, no actual native crash was ever recorded in Windows' Application Error log). Throttled
   // per-second below; only the count of drops is logged, not each dropped line.
@@ -84,7 +83,7 @@ class LibMPV extends BasePlayer {
   static final Map<String, String> _externalSubtitleCache = {};
 
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
-    OxplayerAudioLog.event(phase, fields: {
+    SushiAudioLog.event(phase, fields: {
       'backend': 'mpv',
       'preferredVolume': _preferredVolume,
       'playerVolume': _player?.state.volume,
@@ -102,8 +101,8 @@ class LibMPV extends BasePlayer {
     required double preferredVolume,
     bool fadeAborted = false,
   }) {
-    if (!OxplayerEnv.isEnabled) return;
-    unawaited(OxplayerPlaybackTelemetry.reportVolumeAnomaly(
+    if (!SushiEnv.isEnabled) return;
+    unawaited(SushiPlaybackTelemetry.reportVolumeAnomaly(
       reason: reason,
       playerVolume: playerVolume,
       preferredVolume: preferredVolume,
@@ -122,18 +121,18 @@ class LibMPV extends BasePlayer {
     dispose();
 
     mpv.MediaKit.ensureInitialized();
-    await OxHlsWebBufferConfig.apply();
+    await SushiHlsWebBufferConfig.apply();
 
     _player = mpv.Player(
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
-        libassAndroidFont: OxSubtitleFont.libassFontForPlayer,
+        libassAndroidFont: SushiSubtitleFont.libassFontForPlayer,
         // media_kit only applies libassAndroidFont when name is also set (Android).
-        libassAndroidFontName: OxplayerConfig.isEnabled ? OxSubtitleFont.family : null,
+        libassAndroidFontName: SushiSubtitleFont.family,
         libass: !kIsWeb && settings.useLibass,
         bufferSize: settings.bufferSize * 1024 * 1024, // MPV uses buffer size in bytes
         // mpv's own protocol/demuxer errors (e.g. a custom stream_cb protocol failing to open)
-        // never reach OX_STREAM/OX_AUDIO otherwise — they stay inside libmpv unless explicitly
+        // never reach SUSHI_STREAM/OX_AUDIO otherwise — they stay inside libmpv unless explicitly
         // requested via mpv_request_log_messages. 'warn' is enough for real failures without
         // flooding logs with routine 'v'/'debug' chatter.
         logLevel: mpv.MPVLogLevel.warn,
@@ -202,7 +201,7 @@ class LibMPV extends BasePlayer {
     final now = DateTime.now();
     if (now.difference(_mpvLogWindowStart) >= const Duration(seconds: 1)) {
       if (_mpvLogDroppedInWindow > 0) {
-        OxplayerStreamLog.event('mpv_log_throttled', fields: {'droppedLastSecond': _mpvLogDroppedInWindow});
+        SushiStreamLog.event('mpv_log_throttled', fields: {'droppedLastSecond': _mpvLogDroppedInWindow});
       }
       _mpvLogWindowStart = now;
       _mpvLogCountInWindow = 0;
@@ -213,7 +212,7 @@ class LibMPV extends BasePlayer {
       return;
     }
     _mpvLogCountInWindow++;
-    OxplayerStreamLog.event('mpv_log', fields: {
+    SushiStreamLog.event('mpv_log', fields: {
       'level': log.level,
       'prefix': log.prefix,
       'text': log.text,
@@ -270,7 +269,7 @@ class LibMPV extends BasePlayer {
         if (value.any((line) => line.trim().isNotEmpty)) {
           if (!_subtitleTextSeen) {
             _subtitleTextSeen = true;
-            OxplayerStreamLog.event('subtitle_text_seen', fields: {
+            SushiStreamLog.event('subtitle_text_seen', fields: {
               'preview': () {
                 final line = value.firstWhere((l) => l.trim().isNotEmpty, orElse: () => '').trim();
                 return line.length > 40 ? '${line.substring(0, 40)}…' : line;
@@ -287,24 +286,24 @@ class LibMPV extends BasePlayer {
 
   /// Registers the "gotdstream://" stream_cb protocol on [player]'s own mpv_handle (Windows
   /// only — no-ops elsewhere). Must run for every new mpv.Player, not just the first: this is a
-  /// per-handle registration (see OxplayerTelegramStreamCb), so crossfadeToUrl's incomingPlayer
+  /// per-handle registration (see SushiTelegramStreamCb), so crossfadeToUrl's incomingPlayer
   /// needs its own call too, or its gotdstream:// loads fail as an unrecognized protocol.
   Future<void> _registerStreamCb(mpv.Player player) async {
-    OxplayerStreamLog.event('stream_cb_register_entry', fields: {
-      'oxplayerEnvEnabled': OxplayerEnv.isEnabled,
+    SushiStreamLog.event('stream_cb_register_entry', fields: {
+      'sushiEnvEnabled': SushiEnv.isEnabled,
       'targetPlatform': defaultTargetPlatform.name,
       'isNativePlayer': player.platform is mpv.NativePlayer,
     });
-    if (!OxplayerEnv.isEnabled ||
+    if (!SushiEnv.isEnabled ||
         (defaultTargetPlatform != TargetPlatform.windows && defaultTargetPlatform != TargetPlatform.android)) {
       return;
     }
     if (player.platform is! mpv.NativePlayer) return;
     try {
       final handle = await player.handle;
-      OxplayerTelegramStreamCb.registerOn(handle);
+      SushiTelegramStreamCb.registerOn(handle);
     } catch (error) {
-      OxplayerStreamLog.event('stream_cb_register_handle_error', fields: {'error': error.toString()});
+      SushiStreamLog.event('stream_cb_register_handle_error', fields: {'error': error.toString()});
     }
   }
 
@@ -327,8 +326,8 @@ class LibMPV extends BasePlayer {
     final incomingPlayer = mpv.Player(
       configuration: mpv.PlayerConfiguration(
         title: "nl.jknaapen.fladder",
-        libassAndroidFont: OxSubtitleFont.libassFontForPlayer,
-        libassAndroidFontName: OxplayerConfig.isEnabled ? OxSubtitleFont.family : null,
+        libassAndroidFont: SushiSubtitleFont.libassFontForPlayer,
+        libassAndroidFontName: SushiSubtitleFont.family,
         libass: !kIsWeb && _settings.useLibass,
         bufferSize: _settings.bufferSize * 1024 * 1024,
       ),
@@ -406,8 +405,8 @@ class LibMPV extends BasePlayer {
     _externalSubtitleCache.clear();
 
     // Telegram loopback bridge / stream_cb: progressive Range seek path.
-    final oxStreamDirectMkv = oxplayerStreamProgressiveHttpUrl(url);
-    final oxStreamResumeSeek = oxplayerStreamMpvResumeSeekGrace(url, startPosition);
+    final sushiStreamDirectMkv = sushiStreamProgressiveHttpUrl(url);
+    final sushiStreamResumeSeek = sushiStreamMpvResumeSeekGrace(url, startPosition);
     // TdlibHttpBridgeServer is purely reactive to whatever byte range mpv's first request asks
     // for (see its serveFile()) — it never independently fetches byte 0. Pre-setting mpv's
     // native `start` property makes mpv jump straight to the target byte offset on open and
@@ -419,14 +418,14 @@ class LibMPV extends BasePlayer {
     // Same caution applies to the stream_cb transport (gotdstream://): the early byte-offset
     // seek this avoids happens in mpv/ffmpeg's demuxer layer, not the HTTP stream driver
     // specifically, so it isn't specific to the HTTP bridge.
-    final tdlibBridge = oxplayerIsTelegramDirectPlayUrl(url);
+    final tdlibBridge = sushiIsTelegramDirectPlayUrl(url);
     _remuxTimelineBase = Duration.zero;
 
-    if (oxStreamResumeSeek) {
-      OxplayerStreamLog.event('mpv_resume_grace', fields: {
-        'startPosition': OxplayerStreamLog.formatDuration(startPosition),
-        'retryIntervalSec': oxplayerStreamMpvResumeRetryInterval.inSeconds,
-        'maxRetrySec': oxplayerStreamMpvResumeMaxRetry.inSeconds,
+    if (sushiStreamResumeSeek) {
+      SushiStreamLog.event('mpv_resume_grace', fields: {
+        'startPosition': SushiStreamLog.formatDuration(startPosition),
+        'retryIntervalSec': sushiStreamMpvResumeRetryInterval.inSeconds,
+        'maxRetrySec': sushiStreamMpvResumeMaxRetry.inSeconds,
       });
     }
 
@@ -434,8 +433,8 @@ class LibMPV extends BasePlayer {
 
     // Telegram direct-play progressive (HTTP bridge or stream_cb): bigger demuxer cache so
     // forward seek doesn't underrun while MTProto fills the next window.
-    if (OxplayerEnv.isEnabled &&
-        oxplayerIsTelegramDirectPlayUrl(url) &&
+    if (SushiEnv.isEnabled &&
+        sushiIsTelegramDirectPlayUrl(url) &&
         _player?.platform is mpv.NativePlayer) {
       final native = _player!.platform as dynamic;
       try {
@@ -452,12 +451,12 @@ class LibMPV extends BasePlayer {
     // live: "Refusing to load potentially unsafe URL from a playlist" / "Reading plaintext
     // playlist". --load-unsafe-playlists is the fix mpv's own error names. Reset to 'no' when
     // the URL is not ours so a later external playlist on this player stays origin-checked.
-    if (OxplayerEnv.isEnabled && _player?.platform is mpv.NativePlayer) {
+    if (SushiEnv.isEnabled && _player?.platform is mpv.NativePlayer) {
       final native = _player!.platform as dynamic;
       try {
         await native.setProperty(
           'load-unsafe-playlists',
-          oxplayerIsTelegramDirectPlayUrl(url) ? 'yes' : 'no',
+          sushiIsTelegramDirectPlayUrl(url) ? 'yes' : 'no',
         );
       } catch (_) {/* older libmpv */}
     }
@@ -468,14 +467,14 @@ class LibMPV extends BasePlayer {
       _logAudio('load_open_volume_fix', fields: {
         'openedVolume': openedVolume,
         'play': play,
-        'urlHost': OxplayerStreamLog.describeHost(url),
+        'urlHost': SushiStreamLog.describeHost(url),
       });
       await _player?.setVolume(_preferredVolume);
     } else {
       _logAudio('load_open', fields: {
         'openedVolume': openedVolume,
         'play': play,
-        'urlHost': OxplayerStreamLog.describeHost(url),
+        'urlHost': SushiStreamLog.describeHost(url),
       });
     }
 
@@ -484,17 +483,17 @@ class LibMPV extends BasePlayer {
 
     // Telegram HTTP bridge / stream_cb progressive: long-lived Range reads —
     // reopening every few seconds kills mid-seek buffering (jump-to-start / stall).
-    if (!oxStreamDirectMkv) {
+    if (!sushiStreamDirectMkv) {
       final retryEvery =
-          oxStreamResumeSeek ? oxplayerStreamMpvResumeRetryInterval : _currentRetryDuration;
-      final maxRetry = oxStreamResumeSeek ? oxplayerStreamMpvResumeMaxRetry : _maxRetryDuration;
+          sushiStreamResumeSeek ? sushiStreamMpvResumeRetryInterval : _currentRetryDuration;
+      final maxRetry = sushiStreamResumeSeek ? sushiStreamMpvResumeMaxRetry : _maxRetryDuration;
       _retryTimer = RestartableTimer(
         retryEvery,
         () async {
           await Future.delayed(const Duration(milliseconds: 150));
           if (DateTime.now().isAfter(_firstLoadAttempt.add(maxRetry))) {
             log("Max retry duration reached, stopping retries.");
-            unawaited(OxplayerPlaybackTelemetry.reportFailure(
+            unawaited(SushiPlaybackTelemetry.reportFailure(
               stage: 'player_load',
               reason: 'max_retry_duration_reached',
               streamUrl: url,
@@ -528,7 +527,7 @@ class LibMPV extends BasePlayer {
         subPlaying?.cancel();
       }
 
-      if (oxStreamDirectMkv) {
+      if (sushiStreamDirectMkv) {
         subPlaying = _player?.stream.playing.listen((event) {
           if (event) {
             if (startPosition > Duration.zero) {
@@ -537,9 +536,9 @@ class LibMPV extends BasePlayer {
             onReady();
           }
         });
-        final readyTimeout = oxStreamResumeSeek
-            ? oxplayerStreamMpvResumeReadyTimeout
-            : oxplayerStreamMpvDefaultReadyTimeout;
+        final readyTimeout = sushiStreamResumeSeek
+            ? sushiStreamMpvResumeReadyTimeout
+            : sushiStreamMpvDefaultReadyTimeout;
         remuxReadyTimeout = Timer(readyTimeout, onReady);
 
         // A reload (audio switch / seek) re-opens the element after an async PlaybackInfo
@@ -559,7 +558,7 @@ class LibMPV extends BasePlayer {
       subBuffering = _player?.stream.buffering.listen((event) {
         if (event == false) {
           final dur = _player?.state.duration ?? Duration.zero;
-          if (dur > Duration.zero || oxStreamDirectMkv) {
+          if (dur > Duration.zero || sushiStreamDirectMkv) {
             onReady();
           }
         }
@@ -701,8 +700,8 @@ class LibMPV extends BasePlayer {
         mpv.SubtitleTrack.data(cached, title: wanted.displayTitle, language: wanted.language),
       );
       await _syncLibassSubtitleStyle();
-      OxplayerStreamLog.event('subtitle_track_external', fields: {
-        'url': OxplayerStreamLog.describeUrl(url),
+      SushiStreamLog.event('subtitle_track_external', fields: {
+        'url': SushiStreamLog.describeUrl(url),
         'index': wanted.index,
         'bytes': cached.length,
         'via': 'cache',
@@ -710,12 +709,10 @@ class LibMPV extends BasePlayer {
       return;
     }
 
-    if (OxplayerConfig.isEnabled) {
-      OxplayerStreamLog.event('subtitle_track_external_start', fields: {
-        'url': OxplayerStreamLog.describeUrl(url),
-        'index': wanted.index,
-      });
-    }
+    SushiStreamLog.event('subtitle_track_external_start', fields: {
+      'url': SushiStreamLog.describeUrl(url),
+      'index': wanted.index,
+    });
 
     try {
       http.Response? response;
@@ -730,7 +727,7 @@ class LibMPV extends BasePlayer {
         await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
       }
       if (response == null || response.statusCode != 200) {
-        OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
+        SushiStreamLog.event('subtitle_track_external_fail', fields: {
           'status': response?.statusCode,
           'index': wanted.index,
         });
@@ -749,15 +746,15 @@ class LibMPV extends BasePlayer {
         ),
       );
       await _syncLibassSubtitleStyle();
-      OxplayerStreamLog.event('subtitle_track_external', fields: {
-        'url': OxplayerStreamLog.describeUrl(url),
+      SushiStreamLog.event('subtitle_track_external', fields: {
+        'url': SushiStreamLog.describeUrl(url),
         'index': wanted.index,
         'bytes': text.length,
         'via': 'data',
       });
     } catch (error) {
       if (loadGen != _externalSubtitleLoadGen) return;
-      OxplayerStreamLog.event('subtitle_track_external_fail', fields: {
+      SushiStreamLog.event('subtitle_track_external_fail', fields: {
         'index': wanted.index,
         'error': error.runtimeType.toString(),
       });
@@ -779,17 +776,15 @@ class LibMPV extends BasePlayer {
     try {
       await native.setProperty('sub-ass', 'no');
       // OX: hide mpv soft OSD; Flutter `_VideoSubtitles` paints sized text.
-      final hideMpvOsd = OxplayerConfig.isEnabled;
+      const hideMpvOsd = true;
       await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
-      if (OxplayerConfig.isEnabled) {
-        OxplayerStreamLog.event('subtitle_mpv_text_path', fields: {
+      SushiStreamLog.event('subtitle_mpv_text_path', fields: {
           'codec': codec,
           'subAss': 'no',
           'subVisibility': hideMpvOsd ? 'no' : 'yes',
           'flutterOverlay': 'expected',
           'mpvOsd': hideMpvOsd ? 'hidden' : 'visible',
         });
-      }
     } catch (_) {}
   }
 
@@ -921,7 +916,7 @@ class LibMPV extends BasePlayer {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
     if (wantedAudioStream == null) return -1;
     if (wantedAudioStream.index == AudioStreamModel.no().index) {
-      if (oxplayerShouldSkipAudioTrackOff(playbackModel)) {
+      if (sushiShouldSkipAudioTrackOff(playbackModel)) {
         _logAudio('audio_track_skip_off_muxed', fields: {
           'defaultAudioIndex': playbackModel.mediaStreams?.defaultAudioStreamIndex,
         });
@@ -955,7 +950,7 @@ class LibMPV extends BasePlayer {
   @override
   Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
     if (_player == null || data.trim().isEmpty) {
-      OxplayerStreamLog.event('sushi_sub_from_text_skip', fields: {
+      SushiStreamLog.event('sushi_sub_from_text_skip', fields: {
         'player': _player != null,
         'chars': data.trim().length,
       });
@@ -966,7 +961,7 @@ class LibMPV extends BasePlayer {
     _currentSubtitleCodec = 'subrip';
     _currentSubtitleLanguage = language ?? '';
     _subtitleTextSeen = false;
-    OxplayerStreamLog.event('sushi_sub_from_text', fields: {
+    SushiStreamLog.event('sushi_sub_from_text', fields: {
       'chars': data.length,
       'preview': data.trimLeft().length > 60 ? '${data.trimLeft().substring(0, 60)}…' : data.trimLeft(),
     });
@@ -976,12 +971,12 @@ class LibMPV extends BasePlayer {
     );
     await _syncLibassSubtitleStyle();
     // Confirm mpv accepted it and (a beat later) whether any cue actually surfaced.
-    OxplayerStreamLog.event('sushi_sub_from_text_set', fields: {
+    SushiStreamLog.event('sushi_sub_from_text_set', fields: {
       'activeIdLen': _player?.state.track.subtitle.id.length,
       'subCount': _player?.state.tracks.subtitle.length,
     });
     Future.delayed(const Duration(milliseconds: 2500), () {
-      OxplayerStreamLog.event('sushi_sub_from_text_check', fields: {
+      SushiStreamLog.event('sushi_sub_from_text_check', fields: {
         'textSeen': _subtitleTextSeen,
         'activeIdLen': _player?.state.track.subtitle.id.length,
       });
@@ -1042,12 +1037,10 @@ class LibMPV extends BasePlayer {
           codec: wantedSubtitle.codec,
         ),
       );
-      if (OxplayerConfig.isEnabled) {
-        OxplayerStreamLog.event('subtitle_track_direct_sid', fields: {
-          'sid': wantedSubtitle.index,
-          'codec': wantedSubtitle.codec,
-        });
-      }
+      SushiStreamLog.event('subtitle_track_direct_sid', fields: {
+        'sid': wantedSubtitle.index,
+        'codec': wantedSubtitle.codec,
+      });
     }
 
     await _syncLibassSubtitleStyle();
@@ -1062,17 +1055,16 @@ class LibMPV extends BasePlayer {
 
   /// Desktop libass has no Android asset loader — point mpv at extracted Vazirmatn.
   Future<void> _applyOxLibassFontDir(dynamic nativePlayer) async {
-    if (!OxplayerConfig.isEnabled) return;
-    final dir = await OxSubtitleFont.ensureLibassFontsDir();
+    final dir = await SushiSubtitleFont.ensureLibassFontsDir();
     if (dir == null || dir.isEmpty) return;
     try {
       await nativePlayer.setProperty('sub-fonts-dir', dir);
-      await nativePlayer.setProperty('sub-font', OxSubtitleFont.family);
+      await nativePlayer.setProperty('sub-font', SushiSubtitleFont.family);
     } catch (_) {}
   }
 
   Future<void> _syncLibassSubtitleStyle() async {
-    if (!OxplayerConfig.isEnabled || _player?.platform is! mpv.NativePlayer) return;
+    if (_player?.platform is! mpv.NativePlayer) return;
     final native = _player!.platform as dynamic;
     final hasSubtitle = _currentSubtitleCodec.isNotEmpty || _currentSubtitleLanguage.isNotEmpty;
     final settings = _subtitleSettings;
@@ -1084,9 +1076,9 @@ class LibMPV extends BasePlayer {
       }
       if (!_isAssSubtitleCodec(_currentSubtitleCodec)) {
         await native.setProperty('sub-ass', 'no');
-        final hideMpvOsd = OxplayerConfig.isEnabled;
+        const hideMpvOsd = true;
         await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
-        OxplayerStreamLog.event('subtitle_mpv_style_sync', fields: {
+        SushiStreamLog.event('subtitle_mpv_style_sync', fields: {
           'path': 'flutter_text',
           'codec': _currentSubtitleCodec,
           'subVisibility': hideMpvOsd ? 'no' : 'yes',
@@ -1099,9 +1091,9 @@ class LibMPV extends BasePlayer {
       await native.setProperty('sub-ass-override', 'force');
       await native.setProperty(
         'sub-ass-force-style',
-        OxSubtitleFont.assForceStyle(settings, language: _currentSubtitleLanguage),
+        SushiSubtitleFont.assForceStyle(settings, language: _currentSubtitleLanguage),
       );
-      OxplayerStreamLog.event('subtitle_mpv_style_sync', fields: {
+      SushiStreamLog.event('subtitle_mpv_style_sync', fields: {
         'path': 'libass_burn',
         'codec': _currentSubtitleCodec,
         'subVisibility': 'yes',
@@ -1307,13 +1299,12 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
     required bool libass,
     required bool isAss,
   }) {
-    if (!OxplayerConfig.isEnabled) return;
     if (text.isEmpty && path == 'empty') return;
     final key = '$path|${widget.currentSubtitleCodec}|$libass|$isAss|${text.isEmpty}';
     if (key == _lastPaintDecisionLog) return;
     _lastPaintDecisionLog = key;
     final preview = text.trim();
-    OxplayerStreamLog.event('subtitle_flutter_paint', fields: {
+    SushiStreamLog.event('subtitle_flutter_paint', fields: {
       'path': path,
       'codec': widget.currentSubtitleCodec.isEmpty ? '(none)' : widget.currentSubtitleCodec,
       'libass': libass,

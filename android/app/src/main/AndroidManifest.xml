@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="app.oxplayer">
+    package="app.sushi">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -91,14 +91,14 @@
                     <action android:name="android.intent.action.VIEW" />
                     <category android:name="android.intent.category.DEFAULT" />
                     <category android:name="android.intent.category.BROWSABLE" />
-                    <data android:scheme="oxplayer" />
+                    <data android:scheme="sushi" />
             </intent-filter>
             <intent-filter android:autoVerify="true">
                     <action android:name="android.intent.action.VIEW" />
                     <category android:name="android.intent.category.DEFAULT" />
                     <category android:name="android.intent.category.BROWSABLE" />
-                    <data android:scheme="https" android:host="oxplayer.app" android:pathPrefix="/share" />
-                    <data android:scheme="https" android:host="www.oxplayer.app" android:pathPrefix="/share" />
+                    <data android:scheme="https" android:host="sushi.app" android:pathPrefix="/share" />
+                    <data android:scheme="https" android:host="www.sushi.app" android:pathPrefix="/share" />
             </intent-filter>
         </activity>
 
@@ -112,7 +112,7 @@
             android:launchMode="singleTop"
             android:exported="true" />
 
-        <!-- OXPlayer: no library notification WorkManager FGS (still declare DATA_SYNC for background_downloader). -->
+        <!-- Sushi: no library notification WorkManager FGS (still declare DATA_SYNC for background_downloader). -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             tools:node="remove" />
@@ -132,7 +132,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Impeller GLES mipmap gen crashes on TCL/Android TV (Sentry OXPLAYER-CLIENT-6: TQMQueueMipgen). -->
+        <!-- Impeller GLES mipmap gen crashes on TCL/Android TV (Sentry SUSHI-CLIENT-6: TQMQueueMipgen). -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />

@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
-import 'package:fladder/oxplayer/ox_season_availability.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/sushi/sushi_season_availability.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -149,16 +149,16 @@ class SeasonPoster extends ConsumerWidget {
                               },
                               loading: () => const SizedBox.shrink(),
                             ),
-                        if (OxplayerConfig.isEnabled)
+                        if (SushiConfig.isEnabled)
                           Builder(
                             builder: (context) {
-                              if (oxSeasonShowWatchedTick(season)) {
+                              if (sushiSeasonShowWatchedTick(season)) {
                                 return StatusCard(
                                   color: Theme.of(context).colorScheme.primary,
                                   child: const Icon(Icons.check_rounded),
                                 );
                               }
-                              final countText = oxSeasonPosterCountText(season);
+                              final countText = sushiSeasonPosterCountText(season);
                               if (countText == null) return const SizedBox.shrink();
                               return StatusCard(
                                 color: Theme.of(context).colorScheme.primary,

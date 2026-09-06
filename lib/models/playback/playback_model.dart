@@ -30,21 +30,20 @@ export 'playback_queue_source.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
 import 'package:fladder/models/video_stream_model.dart';
-import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
-import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_link_cache.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_media_source.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
-import 'package:fladder/oxplayer/oxplayer_delivery_reader_sync.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart' show OxplayerTdlibBridgeException;
+import 'package:fladder/sushi/sushi_library_item_ratings.dart';
+import 'package:fladder/sushi/sushi_force_repair_interceptor.dart';
+import 'package:fladder/sushi/sushi_playback_link_cache.dart';
+import 'package:fladder/sushi/sushi_playback_media_source.dart';
+import 'package:fladder/sushi/sushi_playback_telemetry.dart';
+import 'package:fladder/sushi/sushi_provider_bots_bootstrap.dart';
+import 'package:fladder/sushi/sushi_playback_subtitle.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart' show SushiTdlibBridgeException;
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_url_resolver.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_session_cache.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
+import 'package:fladder/sushi/sushi_stream_url_resolver.dart';
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
+import 'package:fladder/sushi/sushi_tdlib_session_cache.dart';
 import 'package:fladder/profiles/default_profile.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
@@ -282,8 +281,8 @@ class PlaybackModelHelper {
 
       if (firstItemToPlay == null) return null;
 
-      final ItemBaseModel? fullItem = OxplayerEnv.isEnabled
-          ? await oxFetchFreshItemForPlayback(ref, firstItemToPlay.id)
+      final ItemBaseModel? fullItem = SushiEnv.isEnabled
+          ? await sushiFetchFreshItemForPlayback(ref, firstItemToPlay.id)
           : (await api.usersUserIdItemsItemIdGet(itemId: firstItemToPlay.id)).body;
 
       if (fullItem == null) {
@@ -296,11 +295,11 @@ class PlaybackModelHelper {
 
       final actualStartPosition = startPosition ?? fullItem.userData.playBackPosition;
 
-      OxplayerStreamLog.event('playback_model', fields: {
+      SushiStreamLog.event('playback_model', fields: {
         'itemId': firstItemToPlay.id,
         'resumeTicks': fullItem.userData.playbackPositionTicks,
-        'requestedStart': OxplayerStreamLog.formatDuration(startPosition),
-        'actualStart': OxplayerStreamLog.formatDuration(actualStartPosition),
+        'requestedStart': SushiStreamLog.formatDuration(startPosition),
+        'actualStart': SushiStreamLog.formatDuration(actualStartPosition),
       });
 
       final options = {
@@ -373,7 +372,7 @@ class PlaybackModelHelper {
     } catch (e, st) {
       log("Error creating playback model: ${e.toString()}");
       debugPrint('createPlaybackModel error: $e\n$st');
-      if (e is OxplayerTdlibBridgeException) {
+      if (e is SushiTdlibBridgeException) {
         // No BuildContext threaded down this far (some callers pass null) — FladderSnack falls
         // back to the app-level stored context, same as the "your bot isn't connected" message
         // startPlaybackSession throws today.
@@ -412,9 +411,9 @@ class PlaybackModelHelper {
           newStreamModel?.audioStreams,
           newStreamModel?.defaultAudioStreamIndex);
 
-      final rememberSubs = !OxplayerEnv.isEnabled &&
+      final rememberSubs = !SushiEnv.isEnabled &&
           (ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)));
-      final subStreamIndex = oxplayerResolveSubtitleStreamIndex(
+      final subStreamIndex = sushiResolveSubtitleStreamIndex(
         selectedIndex: selectSubStream(
             rememberSubs,
             oldModel?.mediaStreams?.currentSubStream,
@@ -432,36 +431,10 @@ class PlaybackModelHelper {
 
       final requestedMediaSourceId = newStreamModel?.currentVersionStream?.id;
 
-      if (OxplayerEnv.isEnabled) {
-        final readerSync = await oxplayerEnsureTdlibMatchesOxUser(ref.read(userProvider)?.credentials.token);
-        // The native Telegram session is reading the wrong account (e.g. a leftover bot-mode
-        // login after the personal bot was disconnected) — any copy the server makes now lands
-        // somewhere this session can never see. Bail out instead of hanging on a delivery that
-        // will never arrive; see oxplayerEnsureTdlibMatchesOxUser's doc comment.
-        if (readerSync == OxplayerReaderSyncResult.mismatched) {
-          OxplayerStreamLog.event('playback_reader_mismatch', fields: {'itemId': item.id});
-          await OxplayerPlaybackTelemetry.reportFailure(
-            stage: 'reader_sync',
-            reason: 'native_session_mismatch',
-            itemId: item.id,
-          );
-          // Throw rather than return null: a null model here previously fell through to
-          // _createOfflinePlaybackModel (via createPlaybackModel's `??`), which also has nothing
-          // and returns null too — the caller then sees an unexplained "unable to play" at best,
-          // or nothing at all if that call site has no generic null handling. Throwing surfaces a
-          // message the user can act on, via createPlaybackModel's catch below — same mechanism
-          // startPlaybackSession already uses for "your bot isn't connected".
-          throw OxplayerTdlibBridgeException(
-            "This device's Telegram sign-in is out of date. Go to Settings and log out, then sign "
-            "in again, so it can reconnect to your Telegram account.",
-          );
-        }
-      }
-
       Future<PlaybackInfoResponse?> fetchPlaybackInfo({required bool forceRepair}) async {
         if (forceRepair) {
-          OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
-          oxplayerArmForceRepairPlayback(ref);
+          SushiPlaybackLinkCache.invalidate(requestedMediaSourceId);
+          sushiArmForceRepairPlayback(ref);
         }
         final response = await api.itemsItemIdPlaybackInfoPost(
           itemId: item.id,
@@ -480,27 +453,27 @@ class PlaybackModelHelper {
             mediaSourceId: newStreamModel?.currentVersionStream?.id,
           ),
         );
-        if (response.body != null && OxplayerEnv.isEnabled) {
-          OxplayerPlaybackLinkCache.putFromResponse(response.body);
+        if (response.body != null && SushiEnv.isEnabled) {
+          SushiPlaybackLinkCache.putFromResponse(response.body);
         }
         return response.body;
       }
 
       PlaybackInfoResponse? playbackInfo;
-      if (OxplayerEnv.isEnabled) {
-        await OxplayerProviderBotsBootstrap.ensureReady();
+      if (SushiEnv.isEnabled) {
+        await SushiProviderBotsBootstrap.ensureReady();
         if (requestedMediaSourceId != null) {
-          playbackInfo = OxplayerPlaybackLinkCache.get(requestedMediaSourceId);
+          playbackInfo = SushiPlaybackLinkCache.get(requestedMediaSourceId);
         }
         // Do not wait for dashboard prefetch. That path only warms TDLib; play was
         // stalling after prefetch returned (no startPlaybackSession / playback_url).
         if (playbackInfo != null) {
-          OxplayerStreamLog.event('playback_link_cache_hit', fields: {
+          SushiStreamLog.event('playback_link_cache_hit', fields: {
             'itemId': item.id,
             'mediaSourceId': requestedMediaSourceId,
           });
         } else {
-          OxplayerStreamLog.event('playback_link_cache_miss', fields: {
+          SushiStreamLog.event('playback_link_cache_miss', fields: {
             'itemId': item.id,
             'mediaSourceId': requestedMediaSourceId,
           });
@@ -508,8 +481,8 @@ class PlaybackModelHelper {
       }
       playbackInfo ??= await fetchPlaybackInfo(forceRepair: false);
       if (playbackInfo == null) {
-        OxplayerStreamLog.event('playback_info_null', fields: {'itemId': item.id});
-        await OxplayerPlaybackTelemetry.reportFailure(
+        SushiStreamLog.event('playback_info_null', fields: {'itemId': item.id});
+        await SushiPlaybackTelemetry.reportFailure(
           stage: 'playback_info',
           reason: 'null_response',
           itemId: item.id,
@@ -517,7 +490,7 @@ class PlaybackModelHelper {
         return null;
       }
 
-      var mediaSource = oxplayerResolvePlaybackMediaSource(
+      var mediaSource = sushiResolvePlaybackMediaSource(
         playbackInfo,
         requestedMediaSourceId: requestedMediaSourceId,
       );
@@ -527,22 +500,22 @@ class PlaybackModelHelper {
       }
 
       var mediaPath = isValidVideoUrl(mediaSource.path ?? "");
-      OxplayerStreamLog.event('playback_media_path', fields: {
+      SushiStreamLog.event('playback_media_path', fields: {
         'itemId': item.id,
-        'path': OxplayerStreamLog.describeUrl(mediaPath),
+        'path': SushiStreamLog.describeUrl(mediaPath),
         'supportsDirectPlay': mediaSource.supportsDirectPlay,
         'supportsDirectStream': mediaSource.supportsDirectStream,
       });
       String? resolvedMediaPath;
-      if (mediaPath != null && OxplayerEnv.isEnabled) {
+      if (mediaPath != null && SushiEnv.isEnabled) {
         try {
-          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath);
+          resolvedMediaPath = await sushiResolveStreamPlaybackUrl(ref.read, mediaPath);
         } catch (e) {
           // The public Telegram pool purges daily; a link can go dead between hydrate and this
           // play attempt. Force-repair sends a brand new copyMessage and retry once, silently,
-          // rather than surfacing an error — see oxplayerIsTdlibFileMissingError.
+          // rather than surfacing an error — see sushiIsTdlibFileMissingError.
           //
-          // oxplayerIsTelegramDeliveryWaitTimeoutError covers a different dead end that needs the
+          // sushiIsTelegramDeliveryWaitTimeoutError covers a different dead end that needs the
           // same fix: the server marks a delivery "sent" the moment Telegram accepts the copy and
           // will not re-copy while that sender stays healthy, but the only way the client can ever
           // learn the resulting message id is a live push at the moment of copy — there is no
@@ -555,31 +528,31 @@ class PlaybackModelHelper {
           // attempt is actively listening for. Confirmed against production logs (oxp_18941):
           // "delivery copy already sent — awaiting report" on every attempt, sender healthy,
           // provider_bot_id unchanged, message_id never gets past 0.
-          final isDeliveryTimeout = oxplayerIsTelegramDeliveryWaitTimeoutError(e);
-          if (!oxplayerIsTelegramProviderLink(mediaPath) ||
-              !(oxplayerIsTdlibFileMissingError(e) || isDeliveryTimeout)) {
+          final isDeliveryTimeout = sushiIsTelegramDeliveryWaitTimeoutError(e);
+          if (!sushiIsTelegramProviderLink(mediaPath) ||
+              !(sushiIsTdlibFileMissingError(e) || isDeliveryTimeout)) {
             rethrow;
           }
           debugPrint(
-            '$oxplayTdlibLogTag: resolve failed ($e) for itemId=${item.id} — refetch retry',
+            '$sushiplayTdlibLogTag: resolve failed ($e) for itemId=${item.id} — refetch retry',
           );
-          OxplayerTdlibSessionCache.invalidateTelegramUrl(mediaPath);
-          OxplayerPlaybackLinkCache.invalidate(requestedMediaSourceId);
+          SushiTdlibSessionCache.invalidateTelegramUrl(mediaPath);
+          SushiPlaybackLinkCache.invalidate(requestedMediaSourceId);
           final repairedInfo = await fetchPlaybackInfo(forceRepair: true);
           final repairedSource = repairedInfo == null
               ? null
-              : oxplayerResolvePlaybackMediaSource(repairedInfo, requestedMediaSourceId: requestedMediaSourceId);
+              : sushiResolvePlaybackMediaSource(repairedInfo, requestedMediaSourceId: requestedMediaSourceId);
           final repairedPath = isValidVideoUrl(repairedSource?.path ?? "");
           if (repairedInfo == null || repairedSource == null || repairedPath == null) {
-            debugPrint('$oxplayTdlibLogTag: force-repair produced no usable media source, giving up');
+            debugPrint('$sushiplayTdlibLogTag: force-repair produced no usable media source, giving up');
             return null;
           }
-          resolvedMediaPath = await oxplayerResolveStreamPlaybackUrl(
+          resolvedMediaPath = await sushiResolveStreamPlaybackUrl(
             ref.read,
             repairedPath,
             forceRefreshNodes: true,
           );
-          debugPrint('$oxplayTdlibLogTag: force-repair retry succeeded');
+          debugPrint('$sushiplayTdlibLogTag: force-repair retry succeeded');
           playbackInfo = repairedInfo;
           mediaSource = repairedSource;
           mediaPath = repairedPath;
@@ -595,7 +568,7 @@ class PlaybackModelHelper {
         defaultSubStreamIndex: subStreamIndex,
       );
 
-      final isTelegram = oxplayerIsTelegramProviderLink(mediaPath);
+      final isTelegram = sushiIsTelegramProviderLink(mediaPath);
       final mediaSegments = isTelegram ? null : await api.mediaSegmentsGet(id: item.id);
       final trickPlayResp = isTelegram ? null : await api.getTrickPlay(item: item, ref: ref);
 
@@ -603,11 +576,11 @@ class PlaybackModelHelper {
       final chapters = item.overview.chapters ?? [];
 
       if (type == PlaybackType.tv && resolvedMediaPath != null) {
-        OxplayerStreamLog.event('playback_url', fields: {
+        SushiStreamLog.event('playback_url', fields: {
           'itemId': item.id,
-          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
-          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
-          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'apiMediaPath': SushiStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': SushiStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': SushiStreamLog.formatDuration(startPosition),
           'startTimeTicks': startPosition?.toRuntimeTicks,
           'model': 'tv',
         });
@@ -646,11 +619,11 @@ class PlaybackModelHelper {
           queryParameters: directOptions,
         );
 
-        OxplayerStreamLog.event('playback_url', fields: {
+        SushiStreamLog.event('playback_url', fields: {
           'itemId': item.id,
-          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
-          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
-          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'apiMediaPath': SushiStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': SushiStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': SushiStreamLog.formatDuration(startPosition),
           'startTimeTicks': startPosition?.toRuntimeTicks,
           'model': 'direct',
         });
@@ -669,11 +642,11 @@ class PlaybackModelHelper {
           bitRateOptions: qualityOptions,
         );
       } else if ((mediaSource.supportsTranscoding ?? false) && mediaSource.transcodingUrl != null) {
-        OxplayerStreamLog.event('playback_url', fields: {
+        SushiStreamLog.event('playback_url', fields: {
           'itemId': item.id,
-          'apiMediaPath': OxplayerStreamLog.describeUrl(mediaPath),
-          'resolvedUrl': OxplayerStreamLog.describeUrl(resolvedMediaPath),
-          'startPosition': OxplayerStreamLog.formatDuration(startPosition),
+          'apiMediaPath': SushiStreamLog.describeUrl(mediaPath),
+          'resolvedUrl': SushiStreamLog.describeUrl(resolvedMediaPath),
+          'startPosition': SushiStreamLog.formatDuration(startPosition),
           'startTimeTicks': startPosition?.toRuntimeTicks,
           'model': 'transcode',
         });
@@ -695,7 +668,7 @@ class PlaybackModelHelper {
     } catch (e, st) {
       log(e.toString());
       debugPrint('_createServerPlaybackModel error: $e\n$st');
-      await OxplayerPlaybackTelemetry.reportException(
+      await SushiPlaybackTelemetry.reportException(
         stage: 'create_server_playback_model',
         exception: e,
         stackTrace: st,
@@ -756,7 +729,7 @@ class PlaybackModelHelper {
         playbackModel.mediaStreams?.currentAudioStream,
         playbackModel.audioStreams,
         playbackModel.mediaStreams?.defaultAudioStreamIndex);
-    final rememberSubs = !OxplayerEnv.isEnabled &&
+    final rememberSubs = !SushiEnv.isEnabled &&
         (ref.read(userProvider.select((value) => value?.userConfiguration?.rememberSubtitleSelections ?? true)));
     final subIndex = selectSubStream(
         rememberSubs,
@@ -783,7 +756,7 @@ class PlaybackModelHelper {
 
     PlaybackInfoResponse playbackInfo = response.bodyOrThrow;
 
-    final mediaSource = oxplayerResolvePlaybackMediaSource(
+    final mediaSource = sushiResolvePlaybackMediaSource(
       playbackInfo,
       requestedMediaSourceId: playbackModel.mediaStreams?.currentVersionStream?.id,
     );
@@ -820,8 +793,8 @@ class PlaybackModelHelper {
       );
 
       final mediaPath = isValidVideoUrl(mediaSource.path ?? "");
-      final resolvedMediaPath = mediaPath != null && OxplayerEnv.isEnabled
-          ? await oxplayerResolveStreamPlaybackUrl(ref.read, mediaPath)
+      final resolvedMediaPath = mediaPath != null && SushiEnv.isEnabled
+          ? await sushiResolveStreamPlaybackUrl(ref.read, mediaPath)
           : mediaPath;
 
       newModel = DirectPlaybackModel(

@@ -22,7 +22,7 @@ import 'package:fladder/models/library_search/library_search_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/view_model.dart';
-import 'package:fladder/oxplayer/oxplayer_library_search.dart';
+import 'package:fladder/sushi/sushi_library_search.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/library_filters_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -55,7 +55,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
 
   final Ref ref;
 
-  int get pageSize => oxLibrarySearchPageSize(ref.read(clientSettingsProvider).libraryPageSize ?? 500);
+  int get pageSize => sushiLibrarySearchPageSize(ref.read(clientSettingsProvider).libraryPageSize ?? 500);
 
   LibraryFiltersProvider get filterProvider => libraryFiltersProvider(state.views.included.map((e) => e.id).toList());
 
@@ -85,10 +85,10 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
 
     // OX defers Filters2 until a chip is used. Sushi has no Filters2 — chips
     // stay empty forever unless we seed TMDB genre/year maps here.
-    if (SushiConfig.isEnabled || !oxLibrarySearchDeferFilters(state)) {
+    if (SushiConfig.isEnabled || !sushiLibrarySearchDeferFilters(state)) {
       await loadFilters();
     } else {
-      state = oxLibrarySearchPrimeCollectionTypes(state);
+      state = sushiLibrarySearchPrimeCollectionTypes(state);
     }
 
     if (!wasInitialized) {
@@ -208,10 +208,10 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       return;
     }
 
-    final cachedViews = oxLibrarySearchViewsFromCache(ref, viewModelId);
+    final cachedViews = sushiLibrarySearchViewsFromCache(ref, viewModelId);
     if (cachedViews != null) {
       state = state.copyWith(views: cachedViews);
-      state = oxLibrarySearchPrimeCollectionTypes(state);
+      state = sushiLibrarySearchPrimeCollectionTypes(state);
       final findFavouriteFilter = ref
           .read(libraryFiltersProvider(cachedViews.included.map((e) => e.id).toList()))
           .firstWhereOrNull((element) => element.isFavourite);
@@ -237,7 +237,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     state = state.copyWith(
       views: views,
     );
-    state = oxLibrarySearchPrimeCollectionTypes(state);
+    state = sushiLibrarySearchPrimeCollectionTypes(state);
 
     final findFavouriteFilter = ref
         .read(libraryFiltersProvider(views.included.map((e) => e.id).toList()))
@@ -293,8 +293,8 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       );
       return;
     }
-    if (oxLibrarySearchDeferFilters(state)) {
-      state = oxLibrarySearchPrimeCollectionTypes(state);
+    if (sushiLibrarySearchDeferFilters(state)) {
+      state = sushiLibrarySearchPrimeCollectionTypes(state);
       return;
     }
     final enabledCollections = state.views.included.map((e) => e.collectionType.itemKinds).expand((element) => element);
@@ -357,7 +357,7 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     }
     final searchString = searchTerm ?? (state.searchQuery.isNotEmpty ? state.searchQuery : null);
     final collectionType = viewModel?.collectionType ?? state.views.included.firstOrNull?.collectionType;
-    final oxFields = oxLibrarySearchListFields(collectionType);
+    final sushiFields = sushiLibrarySearchListFields(collectionType);
     final response = await api.itemsGet(
       parentId: viewModel?.id ?? id,
       searchTerm: searchString,
@@ -373,8 +373,8 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       studioIds: state.filters.studios.included.map((e) => e.id).toList(),
       sortBy: shuffle == true ? [ItemSortBy.random] : state.filters.sortingOption.toSortBy,
       sortOrder: [state.filters.sortOrder.sortOrder],
-      fields: oxFields.isNotEmpty
-          ? oxFields
+      fields: sushiFields.isNotEmpty
+          ? sushiFields
           : {
               ItemFields.genres,
               ItemFields.parentid,

@@ -8,11 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
+import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
+import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
@@ -170,7 +168,7 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                     communityRating: details.episode?.overview.communityRating,
                     contentTags: details.episode?.overview.tags ?? const [],
                     additionalLabels: details.episode != null
-                        ? oxLibraryDetailLabels(
+                        ? sushiLibraryDetailLabels(
                             context,
                             ref,
                             widget.item.id,
@@ -179,11 +177,11 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                           )
                         : const [],
                     mediaStreamHelper: details.episode != null &&
-                            oxplayerShowMediaStreamHelper(details.episode!.mediaStreams)
+                            sushiShowMediaStreamHelper(details.episode!.mediaStreams)
                         ? MediaStreamHelper(
                             mediaStream: details.episode!.mediaStreams,
                             onItemChanged: (changed) {
-                              oxplayerOnUserMediaStreamsChanged(
+                              sushiOnUserMediaStreamsChanged(
                                 ref,
                                 changed,
                                 itemId: details.episode!.id,
@@ -211,27 +209,15 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                       },
                     ),
                   if (actors.mainCast.isNotEmpty == true)
-                    OxplayerConfig.isEnabled
-                        ? OxSeerrPeopleRow(
-                            people: actors.mainCast,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: actors.mainCast,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: actors.mainCast,
+                      contentPadding: padding,
+                    ),
                   if (actors.guestActors.isNotEmpty == true)
-                    OxplayerConfig.isEnabled
-                        ? OxSeerrPeopleRow(
-                            people: actors.guestActors,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: actors.guestActors,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: actors.guestActors,
+                      contentPadding: padding,
+                    ),
                   if (details.episodes.length > 1)
                     EpisodePosters(
                       contentPadding: padding,

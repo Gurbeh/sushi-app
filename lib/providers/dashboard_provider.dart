@@ -6,10 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
+import 'package:fladder/sushi/sushi_home_feed.dart';
 import 'package:fladder/models/items/channel_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -38,103 +36,29 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<void> fetchNextUpAndResume({bool force = false}) async {
-    if (SushiConfig.isEnabled) {
-      // Each call is a real Telegram bot round-trip, not a cheap HTTP GET — never let two
-      // overlap (e.g. pull-to-refresh landing while an initial fetch is still in flight).
-      // Queue a follow-up instead of dropping: refreshOnStart often races /initbot, and dropping
-      // the second call leaves rails empty until the user pulls again.
-      if (_sushiHomeInFlight) {
-        _sushiHomeQueued = true;
-        _sushiHomeQueuedForce |= force;
-        return;
-      }
-      _sushiHomeInFlight = true;
-      try {
-        var runForce = force;
-        do {
-          _sushiHomeQueued = false;
-          final extra = _sushiHomeQueuedForce;
-          _sushiHomeQueuedForce = false;
-          await _fetchSushiHome(force: runForce || extra);
-          runForce = false;
-        } while (_sushiHomeQueued);
-      } finally {
-        _sushiHomeInFlight = false;
-        state = state.copyWith(loading: false, loaded: true);
-      }
+    // Each call is a real Telegram bot round-trip, not a cheap HTTP GET — never let two
+    // overlap (e.g. pull-to-refresh landing while an initial fetch is still in flight).
+    // Queue a follow-up instead of dropping: refreshOnStart often races /initbot, and dropping
+    // the second call leaves rails empty until the user pulls again.
+    if (_sushiHomeInFlight) {
+      _sushiHomeQueued = true;
+      _sushiHomeQueuedForce |= force;
       return;
     }
-    if (OxplayerConfig.isEnabled && state.loaded) return;
-
-    Future<void> load() async {
-      if (state.loading) return;
-      state = state.copyWith(loading: true);
-
-      final viewTypes =
-          ref.read(viewsProvider.select((value) => value.dashboardViews)).map((e) => e.collectionType).toSet();
-      const limit = 16;
-
-      final imagesToFetch = {
-        ImageType.logo,
-        ImageType.primary,
-        ImageType.backdrop,
-        ImageType.banner,
-      }.toList();
-
-      final fieldsToFetch = {
-        ItemFields.parentid,
-        ItemFields.mediastreams,
-        ItemFields.mediasources,
-        ItemFields.candelete,
-        ItemFields.candownload,
-        ItemFields.primaryimageaspectratio,
-        ItemFields.overview,
-        ItemFields.airtime,
-      };
-
-      final activeProgramsFuture = viewTypes.contains(CollectionType.livetv)
-          ? _fetchActivePrograms(limit)
-          : Future<List<ItemBaseModel>>.value(const []);
-
-      final resumeVideoFuture = viewTypes.contains(CollectionType.movies) ||
-              viewTypes.contains(CollectionType.tvshows)
-          ? _fetchResumeItems(mediaTypes: [MediaType.video], imagesToFetch: imagesToFetch, fieldsToFetch: fieldsToFetch, limit: limit)
-          : Future<List<ItemBaseModel>>.value(const []);
-
-      final resumeAudioFuture = viewTypes.contains(CollectionType.music)
-          ? _fetchResumeItems(mediaTypes: [MediaType.audio], imagesToFetch: imagesToFetch, fieldsToFetch: fieldsToFetch, limit: limit)
-          : Future<List<ItemBaseModel>>.value(const []);
-
-      final resumeBooksFuture = viewTypes.contains(CollectionType.books)
-          ? _fetchResumeItems(mediaTypes: [MediaType.book], imagesToFetch: imagesToFetch, fieldsToFetch: fieldsToFetch, limit: limit)
-          : Future<List<ItemBaseModel>>.value(const []);
-
-      final nextUpFuture = _fetchNextUp(fieldsToFetch);
-
-      final results = await Future.wait<Object>([
-        activeProgramsFuture,
-        resumeVideoFuture,
-        resumeAudioFuture,
-        resumeBooksFuture,
-        nextUpFuture,
-      ]);
-
-      state = state.copyWith(
-        activePrograms: results[0] as List<ItemBaseModel>,
-        resumeVideo: results[1] as List<ItemBaseModel>,
-        resumeAudio: results[2] as List<ItemBaseModel>,
-        resumeBooks: results[3] as List<ItemBaseModel>,
-        nextUp: results[4] as List<ItemBaseModel>,
-        loading: false,
-        loaded: true,
-      );
+    _sushiHomeInFlight = true;
+    try {
+      var runForce = force;
+      do {
+        _sushiHomeQueued = false;
+        final extra = _sushiHomeQueuedForce;
+        _sushiHomeQueuedForce = false;
+        await _fetchSushiHome(force: runForce || extra);
+        runForce = false;
+      } while (_sushiHomeQueued);
+    } finally {
+      _sushiHomeInFlight = false;
+      state = state.copyWith(loading: false, loaded: true);
     }
-
-    if (OxplayerConfig.isEnabled) {
-      await OxplayerScreenTelemetry.trackLoad(screen: 'home', phase: 'dashboard', load: load);
-      return;
-    }
-    await load();
   }
 
   Future<List<ItemBaseModel>> _fetchActivePrograms(int limit) async {
@@ -214,7 +138,7 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   Future<void> _applySushiHome(SushiCachedHome home) async {
     List<ItemBaseModel> map(List<SushiRow> rows) => rows.map(sushiRowToItemBaseModel).toList();
     final slider = map(home.slider);
-    oxApplySushiHomeRailsRef(
+    sushiApplySushiHomeRailsRef(
       ref,
       SushiHomeRailsData(
         slider: slider,
@@ -232,11 +156,10 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   /// Re-reads the client-owned continue-watching store into [state] — no `/home` bot round-trip.
   /// Driven by the poster menu's "Add / Remove Continue Watching" toggle on the home rows.
   Future<void> reloadSushiContinue() async {
-    if (!SushiConfig.isEnabled) return;
     state = state.copyWith(resumeVideo: await sushiContinueLoad());
   }
 
-  void applyOxHomeFeed(OxHomeFeedDashboard feed) {
+  void applyOxHomeFeed(SushiHomeFeedDashboard feed) {
     state = state.copyWith(
       nextUp: feed.nextUp,
       resumeVideo: feed.resumeVideo,

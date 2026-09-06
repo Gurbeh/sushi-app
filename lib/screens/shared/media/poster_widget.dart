@@ -33,7 +33,7 @@ class PosterWidget extends ConsumerWidget {
   final bool primaryPosters;
   final Function(bool focus)? onFocusChanged;
   final bool showSyncStatus;
-  final bool oxDetailBadges;
+  final bool sushiDetailBadges;
   final bool sushiContinueToggle;
 
   const PosterWidget({
@@ -53,7 +53,7 @@ class PosterWidget extends ConsumerWidget {
     this.primaryPosters = false,
     this.onFocusChanged,
     this.showSyncStatus = false,
-    this.oxDetailBadges = false,
+    this.sushiDetailBadges = false,
     this.sushiContinueToggle = false,
     super.key,
   });
@@ -87,7 +87,7 @@ class PosterWidget extends ConsumerWidget {
               primaryPosters: primaryPosters,
               onFocusChanged: onFocusChanged,
               showSyncStatus: showSyncStatus,
-              oxDetailBadges: oxDetailBadges,
+              sushiDetailBadges: sushiDetailBadges,
               sushiContinueToggle: sushiContinueToggle,
             ),
           ),

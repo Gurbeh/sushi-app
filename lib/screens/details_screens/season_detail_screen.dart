@@ -7,12 +7,9 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
-import 'package:fladder/oxplayer/ox_season_playable.dart';
-import 'package:fladder/oxplayer/ox_season_watch_actions.dart';
-import 'package:fladder/oxplayer/widgets/ox_season_request_button.dart';
+import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_season_playable.dart';
+import 'package:fladder/sushi/sushi_season_watch_actions.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/episode_details_list.dart';
@@ -79,7 +76,7 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                     genres: details.overview.genreItems,
                     communityRating: details.overview.communityRating,
                     contentTags: details.overview.tags,
-                    additionalLabels: oxLibraryDetailLabels(
+                    additionalLabels: sushiLibraryDetailLabels(
                       context,
                       ref,
                       widget.item.id,
@@ -94,7 +91,7 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                           runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            if (oxSeasonHasPlayableEpisodes(details))
+                            if (sushiSeasonHasPlayableEpisodes(details))
                               SelectableIconButton(
                                 onPressed: () async => await ref
                                     .read(userProvider.notifier)
@@ -103,9 +100,9 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                                 selectedIcon: IconsaxPlusBold.heart,
                                 icon: IconsaxPlusLinear.heart,
                               ),
-                            if (oxSeasonHasPlayableEpisodes(details))
+                            if (sushiSeasonHasPlayableEpisodes(details))
                               SelectableIconButton(
-                                onPressed: () async => await oxSeasonMarkPlayed(
+                                onPressed: () async => await sushiSeasonMarkPlayed(
                                   ref,
                                   details,
                                   !details.userData.played,
@@ -114,10 +111,6 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                                 selectedIcon: IconsaxPlusBold.tick_circle,
                                 icon: IconsaxPlusLinear.tick_circle,
                               ),
-                            OxSeasonRequestButton(
-                              seriesId: details.seriesId,
-                              seasonNumber: details.season,
-                            ),
                           ],
                         ),
                       ),
@@ -180,27 +173,15 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                       padding: padding,
                     ),
                   if (details.overview.people.mainCast.isNotEmpty)
-                    OxplayerConfig.isEnabled
-                        ? OxSeerrPeopleRow(
-                            people: details.overview.people.mainCast,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: details.overview.people.mainCast,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: details.overview.people.mainCast,
+                      contentPadding: padding,
+                    ),
                   if (details.overview.people.guestActors.isNotEmpty)
-                    OxplayerConfig.isEnabled
-                        ? OxSeerrPeopleRow(
-                            people: details.overview.people.guestActors,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: details.overview.people.guestActors,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: details.overview.people.guestActors,
+                      contentPadding: padding,
+                    ),
                   if (details.specialFeatures.isNotEmpty)
                     SpecialFeaturesRow(
                         contentPadding: padding,

@@ -4,8 +4,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart' as enums;
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/home_preferences_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/ox_home_dashboard_order.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_home_dashboard_order.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -35,8 +35,8 @@ class HomePreferencesNotifier extends StateNotifier<HomePreferencesModel> {
     final views = ref.read(viewsProvider).views;
 
     final libraryIds = views.map((v) => v.id).toList();
-    final availableIds = OxplayerConfig.isEnabled
-        ? OxHomeDashboardOrder.allOrderableIds(libraryIds)
+    final availableIds = SushiConfig.isEnabled
+        ? SushiHomeDashboardOrder.allOrderableIds(libraryIds)
         : libraryIds;
 
     final orderedLibraryIds = _buildOrderedLibraryIds(

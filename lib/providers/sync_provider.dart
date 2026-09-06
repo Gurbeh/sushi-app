@@ -82,7 +82,7 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<void> updateSyncStates() async {
-    if (SushiConfig.isEnabled) return;
+    return;
     final lastState =
         (await _db.getAllItems.get()).where((item) => item.unSyncedData && item.userData != null).toList();
     if (updatingSyncStatus || lastState.isEmpty) return;
@@ -341,19 +341,19 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
       if (saveDirectory == null) {
         String? selectedDirectory =
             await FilePicker.platform.getDirectoryPath(dialogTitle: context.localized.syncSelectDownloadsFolder);
-        if (selectedDirectory?.isEmpty == true && context.mounted) {
+        if (selectedDirectory?.isEmpty == context.mounted) {
           FladderSnack.show(context.localized.syncNoFolderSetup, context: context);
           return;
         }
         ref.read(clientSettingsProvider.notifier).setSyncPath(selectedDirectory);
       }
 
-      if (SushiConfig.isEnabled) {
+      
         FladderSnack.show(context.localized.syncAddItemForSyncing(item.detailedName(context.localized) ?? "Unknown"),
             context: context);
         await sushiAddSyncItem(this, context, item);
         return;
-      }
+      
 
       if (context.mounted) {
         FladderSnack.show(context.localized.syncAddItemForSyncing(item.detailedName(context.localized) ?? "Unknown"),
@@ -405,12 +405,12 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
 
       await ref.read(backgroundDownloaderProvider).cancelTaskWithId(item.id);
 
-      if (SushiConfig.isEnabled) {
+      
         sushiCancelDownload(item.id);
         for (final element in nestedChildren) {
           sushiCancelDownload(element.id);
         }
-      }
+      
 
       await _db.deleteAllItems([...nestedChildren, item]);
 
@@ -473,9 +473,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<void> _deleteSyncedItemAndFiles(SyncedItem item) async {
-    if (SushiConfig.isEnabled) {
+    
       sushiCancelDownload(item.id);
-    }
+    
     await ref.read(backgroundDownloaderProvider).cancelTaskWithId(item.id);
     await _db.deleteAllItems([item]);
     if (await item.directory.exists()) {
@@ -547,9 +547,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<int> updateItem(SyncedItem item) async {
-    if (SushiConfig.isEnabled) {
+    
       return _db.insertItem(item);
-    }
+    
     SyncedItem syncedItem = item;
     try {
       await ref.read(jellyApiProvider).userItemsItemIdUserDataPost(itemId: syncedItem.id, body: syncedItem.userData);
@@ -561,9 +561,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }
 
   Future<SyncedItem> deleteFullSyncFiles(SyncedItem syncedItem, DownloadTask? task) async {
-    if (SushiConfig.isEnabled) {
+    
       sushiCancelDownload(syncedItem.id);
-    }
+    
     await syncedItem.deleteDatFiles(ref);
 
     syncedItem = syncedItem.copyWith(
@@ -588,9 +588,9 @@ class SyncNotifier extends StateNotifier<SyncSettingsModel> {
   }) async {
     cleanupTemporaryFiles();
 
-    if (SushiConfig.isEnabled) {
+    
       return sushiSyncFile(this, syncItem, skipDownload);
-    }
+    
 
     if (!skipDownload && syncItem.videoFile.existsSync()) {
       return true;
@@ -862,9 +862,7 @@ extension SyncNotifierHelpers on SyncNotifier {
     // TMDB posters are saved in sushi_sync `_upsert` from the live ItemBaseModel.
     final imageData = item is AudioModel
         ? _audioImageDataFromParent(parent: parent, directory: directory)
-        : SushiConfig.isEnabled
-            ? null
-            : await saveImageData(item.images, directory);
+        : null;
 
     SyncedItem syncItem = SyncedItem(
       syncing: true,

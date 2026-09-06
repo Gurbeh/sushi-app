@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
 import 'package:fladder/util/application_info.dart';
 import 'package:fladder/util/string_extensions.dart';
@@ -13,7 +13,7 @@ class FladderLogo extends ConsumerWidget {
 
   /// [String.capitalize] lowercases the rest of the string, which breaks "Sushi".
   static String _logoAppName(String applicationName) {
-    if (applicationName == OxplayerBrand.appName) return applicationName;
+    if (applicationName == SushiBrand.appName) return applicationName;
     return applicationName.capitalize();
   }
 

@@ -1,5 +1,5 @@
 name: Bug report
-description: Something is broken in the OXPlayer app
+description: Something is broken in the Sushi app
 title: "BUG: "
 labels:
   - bug
@@ -7,14 +7,14 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Before filing:** If Fladder works against real Jellyfin but OXPlayer fails on the same flow, the bug is often in [oxplayer-be](https://github.com/Aryan-mor/oxplayer-be/issues/new/choose) (API shim), not Fladder client code.
+        **Before filing:** If Fladder works against real Jellyfin but Sushi fails on the same flow, the bug is often in [Sushi-be](https://github.com/Aryan-mor/Sushi-be/issues/new/choose) (API shim), not Fladder client code.
 
   - type: dropdown
     id: area
     attributes:
       label: Area
       options:
-        - lib/oxplayer (OX-specific)
+        - lib/Sushi (OX-specific)
         - Home / library / empty or wrong content
         - Playback / streaming
         - Seerr / requests
@@ -40,7 +40,7 @@ body:
     attributes:
       label: Reproduction steps
       placeholder: |
-        1. Open OXPlayer on Android
+        1. Open Sushi on Android
         2. Sign in with Telegram
         3. Open Home
         4. See empty screen
@@ -94,13 +94,13 @@ body:
     id: version
     attributes:
       label: App version
-      description: OXPlayer build or version
+      description: Sushi build or version
       placeholder: e.g. 1.0.0+42
 
   - type: input
     id: server
     attributes:
-      label: OXPlayer API / environment
+      label: Sushi API / environment
       placeholder: e.g. prod API, dev stack, user role VIP/admin
     validations:
       required: true
@@ -112,5 +112,5 @@ body:
       options:
         - label: "Compared API response to Jellyfin docs or curl"
           required: false
-        - label: "Likely oxplayer-be — please move or link issue there"
+        - label: "Likely Sushi-be — please move or link issue there"
           required: false

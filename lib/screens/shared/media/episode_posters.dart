@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
-import 'package:fladder/oxplayer/ox_episode_poster_image.dart';
+import 'package:fladder/sushi/sushi_episode_poster_image.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
@@ -259,8 +259,8 @@ class EpisodePoster extends ConsumerWidget {
     );
     bool episodeAvailable = episode.status == EpisodeStatus.available;
     final syncedDetails = ref.watch(syncedItemProvider(episode));
-    final oxImage = oxEpisodePosterImage(episode, episodeAvailable);
-    final displayImage = oxImage ??
+    final sushiImage = sushiEpisodePosterImage(episode, episodeAvailable);
+    final displayImage = sushiImage ??
         (!episodeAvailable ? episode.parentImages?.primary : episode.images?.primary);
     // blurOnly=true skips FadeInImage entirely (BlurHash-only); show art when we have any URL.
     final showMissingEpisodeArt = !episodeAvailable && displayImage != null;

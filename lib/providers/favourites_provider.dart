@@ -5,8 +5,7 @@ import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/favourites_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_favourites_feed.dart';
+import 'package:fladder/sushi/sushi_favourites_feed.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
@@ -31,7 +30,7 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
 
     state = state.copyWith(loading: true);
 
-    if (SushiConfig.isEnabled) {
+    
       final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
       final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
       state = state.copyWith(
@@ -40,10 +39,10 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
         loading: false,
       );
       return;
-    }
+    
 
-    if (OxplayerConfig.isEnabled) {
-      final feed = await OxplayerFavoritesFeed.fetch(ref);
+    
+      final feed = await SushiFavoritesFeed.fetch(ref);
       if (feed != null) {
         state = state.copyWith(
           favourites: feed.favourites,
@@ -52,7 +51,7 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
         );
         return;
       }
-    }
+    
 
     await _fetchMoviesAndSeries();
     await _fetchPeople();

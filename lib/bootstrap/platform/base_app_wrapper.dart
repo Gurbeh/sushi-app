@@ -4,11 +4,11 @@ import 'dart:io';
 
 import 'package:fladder/background/update_notifications_worker.dart' as update_worker;
 import 'package:fladder/models/account_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_session.dart';
-import 'package:fladder/oxplayer/oxplayer_sidebar_defaults.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_session.dart';
+import 'package:fladder/sushi/sushi_sidebar_defaults.dart';
+import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_tv_ui_limits.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
@@ -51,11 +51,11 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      oxplayerAttachSessionRouter(ref, autoRouter);
+      sushiAttachSessionRouter(ref, autoRouter);
       ref.read(sharedUtilityProvider).loadSettings();
       if (mounted) {
-        oxplayerApplySidebarDefaults(ref, context);
-        oxplayerApplyTvVisualDefaults(ref);
+        sushiApplySidebarDefaults(ref, context);
+        sushiApplyTvVisualDefaults(ref);
       }
       await platformInit();
       await _initializeNotifications();
@@ -104,14 +104,13 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
     // dropped its MTProto socket, and that is exactly the case the lock-screen/native-activity
     // guards would skip. Fire-and-forget and a no-op on a healthy connection, so it costs nothing
     // on a quick app switch.
-    if (state == AppLifecycleState.resumed && OxplayerEnv.isEnabled) {
-      unawaited(OxplayerTdlibBridgeController.instance().ensureConnected());
+    if (state == AppLifecycleState.resumed && SushiEnv.isEnabled) {
+      unawaited(SushiTdlibBridgeController.instance().ensureConnected());
     }
 
     final ignoreLifeCycle = ref.read(lockScreenActiveProvider) ||
         ref.read(userProvider) == null ||
-        ref.read(videoPlayerProvider).lastState?.playing == true ||
-        nativeActivityStarted;
+        ref.read(videoPlayerProvider).lastState?.playing == nativeActivityStarted;
 
     if (ignoreLifeCycle) {
       _lastPaused = DateTime.now();

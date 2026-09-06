@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Not sure yet? Write freely (Farsi or English). A maintainer can move this to bug/feature or split to oxplayer-be.
+        Not sure yet? Write freely (Farsi or English). A maintainer can move this to bug/feature or split to Sushi-be.
 
   - type: textarea
     id: raw_notes
@@ -21,7 +21,7 @@ body:
     id: context
     attributes:
       label: Where did you notice it?
-      placeholder: "OXPlayer Android, web, after login, Seerr modal, etc."
+      placeholder: "Sushi Android, web, after login, Seerr modal, etc."
 
   - type: dropdown
     id: guess
@@ -29,7 +29,7 @@ body:
       label: Your best guess
       options:
         - Probably a client bug
-        - Probably a backend / API bug (oxplayer-be)
+        - Probably a backend / API bug (Sushi-be)
         - Probably a feature
         - No idea
     validations:

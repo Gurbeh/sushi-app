@@ -14,17 +14,15 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_follow_action.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_user_data.dart';
-import 'package:fladder/oxplayer/oxplayer_watchlist_action.dart';
-import 'package:fladder/oxplayer/oxplayer_media_issue_action.dart';
-import 'package:fladder/oxplayer/oxplayer_share_action.dart';
-import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
+import 'package:fladder/sushi/sushi_follow_action.dart';
+import 'package:fladder/sushi/sushi_playback_user_data.dart';
+import 'package:fladder/sushi/sushi_watchlist_action.dart';
+import 'package:fladder/sushi/sushi_media_issue_action.dart';
+import 'package:fladder/sushi/sushi_share_action.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
@@ -38,7 +36,6 @@ import 'package:fladder/screens/playlists/add_to_playlists.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
 import 'package:fladder/screens/syncing/sync_item_details.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/util/clipboard_helper.dart';
 import 'package:fladder/util/file_downloader.dart';
 import 'package:fladder/util/item_base_model/play_item_helpers.dart';
@@ -141,29 +138,21 @@ extension ItemBaseModelExtensions on ItemBaseModel {
   }) {
     final isAdmin = ref.read(userProvider)?.policy?.isAdministrator ?? false;
     final hasPlaybackActions = sushiItemHasPlaybackActions(this);
-    final downloadEnabled = (SushiConfig.isEnabled ||
-            ref.read(userProvider.select(
-              (value) => value?.canDownload ?? false,
-            ))) &&
-        syncAble &&
-        hasPlaybackActions &&
-        (SushiConfig.isEnabled || (canDownload ?? false));
+    final downloadEnabled = syncAble && hasPlaybackActions;
     final downloadUrl = ref.read(userProvider.notifier).createDownloadUrl(this);
     final syncedItemFuture = ref.read(syncProvider.notifier).getSyncedItem(id);
-    final hasSeerrData = overview.seerrUrl?.isNotEmpty == true;
     final showMarkAs = switch (this) {
       AlbumModel() => false,
       ArtistModel() => false,
       _ => true,
     };
-    final oxEnabled = OxplayerConfig.isEnabled;
-    final oxFavorite = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isFavorite(id))) : userData.isFavourite;
-    final oxPlayed = oxEnabled ? ref.watch(oxItemFlagsProvider.select((s) => s.isPlayed(id))) : userData.played;
-    final oxShowBothMarkActions = oxEnabled &&
-        (oxplayerIsActivePlaybackItem(ref, id) || (userData.progress > 0 && !userData.played));
+    final sushiEnabled = true;
+    final sushiPlayed = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(id)));
+    final sushiShowBothMarkActions = sushiEnabled &&
+        (sushiIsActivePlaybackItem(ref, id) || (userData.progress > 0 && !userData.played));
     void applyMarkUserData(UserData? newData) {
       onUserDataChanged?.call(newData);
-      if (oxEnabled) oxplayerSyncPlaybackUserData(ref, id, newData);
+      if (sushiEnabled) sushiSyncPlaybackUserData(ref, id, newData);
     }
     // Sushi "Add / Remove Continue Watching" — only on the home rows that opt in (the continue
     // rail is client-owned, docs/12 §2). "In" it just means the store's entry list, which the
@@ -171,7 +160,6 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     // a series can share a TMDB id and both map to `sushi_tmdb_<id>`.
     final sushiShowContinueToggle = sushiContinueToggle &&
         !exclude.contains(ItemActions.continueWatching) &&
-        SushiConfig.isEnabled &&
         (this is MovieModel || this is SeriesModel);
     final sushiInContinue = sushiShowContinueToggle &&
         ref.read(dashboardProvider).resumeVideo.any((e) => e.id == id && e.runtimeType == runtimeType);
@@ -263,7 +251,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
                 : context.localized.playFromStart(subTextShort(context.localized) ?? name)),
           ),
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.addCollection) && isAdmin && !OxplayerConfig.isEnabled)
+      if (!exclude.contains(ItemActions.addCollection) && false)
         if (type != FladderItemType.boxset)
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.archive_add),
@@ -289,7 +277,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           ),
       if (showMarkAs) ...[
         if (!exclude.contains(ItemActions.markPlayed) &&
-            (!oxEnabled || !oxPlayed || oxShowBothMarkActions))
+            (!sushiEnabled || !sushiPlayed || sushiShowBothMarkActions))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye),
             action: () async {
@@ -303,7 +291,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             label: Text(context.localized.markAsWatched),
           ),
         if (!exclude.contains(ItemActions.markUnplayed) &&
-            (!oxEnabled || oxPlayed || oxShowBothMarkActions))
+            (!sushiEnabled || sushiPlayed || sushiShowBothMarkActions))
           ItemActionButton(
             icon: const Icon(IconsaxPlusLinear.eye_slash),
             label: Text(context.localized.markAsUnwatched),
@@ -320,29 +308,20 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       if (!exclude.contains(ItemActions.setFavorite))
         ItemActionButton(
           icon: Icon(
-            (SushiConfig.isEnabled
-                    ? (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
-                    : oxFavorite)
+            (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
                 ? IconsaxPlusLinear.heart_remove
                 : IconsaxPlusLinear.heart_add,
           ),
           action: () async {
             try {
-              if (SushiConfig.isEnabled) {
-                final on = !(ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false);
-                await ref.read(sushiItemFlagsProvider.notifier).setFavorite(this, on);
-              } else {
-                final newData = await ref.read(userProvider.notifier).setAsFavorite(!oxFavorite, id);
-                onUserDataChanged?.call(newData?.bodyOrThrow);
-              }
+              final on = !(ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false);
+              await ref.read(sushiItemFlagsProvider.notifier).setFavorite(this, on);
             } finally {
               context.refreshData();
             }
           },
           label: Text(
-            (SushiConfig.isEnabled
-                    ? (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
-                    : oxFavorite)
+            (ref.read(sushiItemFlagsProvider)[id]?.favorite ?? false)
                 ? context.localized.removeAsFavorite
                 : context.localized.addAsFavorite,
           ),
@@ -364,13 +343,9 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             );
           },
         ),
-      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerShareActions(context, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerFollowActions(context, ref, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerWatchlistActions(context, ref, this) : const <ItemAction>[]),
-      ...(OxplayerConfig.isEnabled && !SushiConfig.isEnabled ? oxplayerMediaIssueActions(context, ref, this) : const <ItemAction>[]),
       ...otherActions,
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.editMetaData) && isAdmin && !OxplayerConfig.isEnabled)
+      if (!exclude.contains(ItemActions.editMetaData) && false)
         ItemActionButton(
           icon: const Icon(IconsaxPlusLinear.edit),
           action: () async {
@@ -381,7 +356,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           },
           label: Text(context.localized.editMetadata),
         ),
-      if (!exclude.contains(ItemActions.refreshMetaData) && isAdmin && !OxplayerConfig.isEnabled)
+      if (!exclude.contains(ItemActions.refreshMetaData) && false)
         ItemActionButton(
           icon: const Icon(IconsaxPlusLinear.global_refresh),
           action: () async {
@@ -437,21 +412,6 @@ extension ItemBaseModelExtensions on ItemBaseModel {
           )
         ],
       ],
-      if (hasSeerrData && tmdbId != null)
-        ItemActionButton(
-          icon: const Icon(IconsaxPlusLinear.link_21),
-          action: () {
-            context.pushRoute(SeerrDetailsRoute(
-                mediaType: switch (this) {
-                  MovieModel() => SeerrMediaType.movie,
-                  SeriesModel() => SeerrMediaType.tvshow,
-                  _ => SeerrMediaType.movie,
-                }
-                    .name,
-                tmdbId: tmdbId!));
-          },
-          label: Text(context.localized.seerrDetails),
-        ),
       if (canDelete == true)
         ItemActionButton(
           icon: Container(

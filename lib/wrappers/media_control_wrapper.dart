@@ -22,9 +22,9 @@ import 'package:fladder/models/playback/audio_url_resolver.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
-import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
+import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
+import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -191,9 +191,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
   Future<void> loadVideo(PlaybackModel model, Duration startPosition, bool play) async {
     final url = model.media?.url;
-    if (oxplayerIsTdlibFileUrl(url)) {
+    if (sushiIsTdlibFileUrl(url)) {
       // Telegram-direct-play bytes only exist behind ExoPlayer's DataSource pipeline
-      // (OxRoutingDataSource/TelegramFileDataSource) — mpv/mdk can't resolve tdlib-file://
+      // (SushiRoutingDataSource/TelegramFileDataSource) — mpv/mdk can't resolve tdlib-file://
       // (it's not a protocol either of them understands, they just no-op), so this must run on
       // the native backend regardless of the user's player preference. Restored on the next
       // non-Telegram playback (see below).
@@ -498,7 +498,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// notification away.
   ///
   /// It also fires when the notification merely disappears, which happens on every episode change:
-  /// [OxPlaybackModelHelper.loadNewVideo] pauses first, and with `androidStopForegroundOnPause` the
+  /// [SushiPlaybackModelHelper.loadNewVideo] pauses first, and with `androidStopForegroundOnPause` the
   /// pause removes the foreground notification. The callback then lands ~1.5s later, by which time
   /// the NEXT episode is already loaded, and [stop] operates on it. Measured on a TV, two of these
   /// arrived per transition and the first one cleared the episode that had just started — which
@@ -532,8 +532,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     // that was starting. Measured on a TV: the release landed ~0.5s after the new session was
     // minted, and the episode never opened.
     final sessionUrl = playbackModel.media?.url;
-    if (oxplayerIsTelegramDirectPlayUrl(sessionUrl)) {
-      unawaited(OxplayerTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
+    if (sushiIsTelegramDirectPlayUrl(sessionUrl)) {
+      unawaited(SushiTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
     }
 
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(state: VideoPlayerState.disposed));
@@ -805,9 +805,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// AI translate never starts on its own.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
-    final hardSub = oxplayerMediaSourceLooksHardSub(sourceName);
-    final hasPersianSoft = oxplayerHasPersianSoftSub(model.subStreams);
-    final resolved = oxplayerResolveSubtitleStreamIndex(
+    final hardSub = sushiMediaSourceLooksHardSub(sourceName);
+    final hasPersianSoft = sushiHasPersianSoftSub(model.subStreams);
+    final resolved = sushiResolveSubtitleStreamIndex(
       selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
       serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
       subStreams: model.subStreams,

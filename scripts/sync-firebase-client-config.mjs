@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Materialize oxplayer-client Firebase client config from Infisical CONSOLE_FIREBASE
+ * Materialize sushi-client Firebase client config from Infisical CONSOLE_FIREBASE
  * (Firebase Admin SDK service account JSON).
  *
  * Writes:
- *   android/app/src/production/google-services.json  (app.oxplayer)
- *   android/app/src/direct/google-services.json       (app.oxplayer, same Firebase app as production —
+ *   android/app/src/production/google-services.json  (app.sushi)
+ *   android/app/src/direct/google-services.json       (app.sushi, same Firebase app as production —
  *                                                       `direct` flavor shares its applicationId)
- *   android/app/src/development/google-services.json (app.oxplayer.dev, if registered)
+ *   android/app/src/development/google-services.json (app.sushi.dev, if registered)
  *   lib/firebase_options.dart
  *
  * Env (CI after Infisical export, or local):
@@ -26,8 +26,8 @@ import { fileURLToPath } from "node:url";
 const clientRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const beRoot = path.resolve(clientRoot, "..", "oxplayer-be");
 
-const PRODUCTION_PACKAGE = "app.oxplayer";
-const DEVELOPMENT_PACKAGE = "app.oxplayer.dev";
+const PRODUCTION_PACKAGE = "app.sushi";
+const DEVELOPMENT_PACKAGE = "app.sushi.dev";
 const FIREBASE_SCOPE = "https://www.googleapis.com/auth/firebase";
 const SECRET_KEYS = ["CONSOLE_FIREBASE", "FIREBASE_ADMIN_SDK_JSON", "FIREBASE_SERVICE_ACCOUNT_JSON"];
 
@@ -454,7 +454,7 @@ async function main() {
     token,
     sa.project_id,
     PRODUCTION_PACKAGE,
-    "OXPlayer",
+    "Sushi",
   );
   let developmentApp = null;
   try {
@@ -462,7 +462,7 @@ async function main() {
       token,
       sa.project_id,
       DEVELOPMENT_PACKAGE,
-      "OXPlayer Dev",
+      "Sushi Dev",
     );
   } catch (err) {
     console.warn(`[firebase-sync] warn: could not register ${DEVELOPMENT_PACKAGE}: ${err.message || err}`);

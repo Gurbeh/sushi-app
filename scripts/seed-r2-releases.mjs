@@ -29,7 +29,7 @@ function loadEnv(filePath) {
 
 const env = { ...loadEnv(beEnv), ...process.env };
 const endpoint = env.CLOUDFLARE_S3_API_ENDPOINT;
-const bucket = env.CLOUDFLARE_R2_BUCKET || "oxplayer-channel-news";
+const bucket = env.CLOUDFLARE_R2_BUCKET || "sushi-channel-news";
 const accessKeyId = env.CLOUDFLARE_S3_ACCESS_KEY_ID;
 const secretAccessKey = env.CLOUDFLARE_S3_SECRET_ACCESS_KEY;
 
@@ -46,9 +46,9 @@ if (!dir || !fs.existsSync(dir)) {
 }
 
 const map = [
-  [`OXPlayer-Android-${version}-arm64-v8a.apk`, "releases/latest/OXPlayer-Android-arm64-v8a.apk", "application/vnd.android.package-archive"],
-  [`OXPlayer-Android-${version}-armeabi-v7a.apk`, "releases/latest/OXPlayer-Android-armeabi-v7a.apk", "application/vnd.android.package-archive"],
-  [`OXPlayer-Windows-${version}-Setup.exe`, "releases/latest/OXPlayer-Windows-Setup.exe", "application/vnd.microsoft.portable-executable"],
+  [`Sushi-Android-${version}-arm64-v8a.apk`, "releases/latest/Sushi-Android-arm64-v8a.apk", "application/vnd.android.package-archive"],
+  [`Sushi-Android-${version}-armeabi-v7a.apk`, "releases/latest/Sushi-Android-armeabi-v7a.apk", "application/vnd.android.package-archive"],
+  [`Sushi-Windows-${version}-Setup.exe`, "releases/latest/Sushi-Windows-Setup.exe", "application/vnd.microsoft.portable-executable"],
 ];
 
 const s3 = new S3Client({

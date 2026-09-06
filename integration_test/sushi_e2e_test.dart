@@ -1,6 +1,6 @@
 // Sushi playback E2E — drives the REAL app (real Telegram session, real API/delivery bots, real
 // mpv/native playback) on whatever already-logged-in device `flutter test integration_test/... -d
-// <device>` targets. Same philosophy as oxplayer_playback_e2e_test.dart: call the same
+// <device>` targets. Same philosophy as sushi_playback_e2e_test.dart: call the same
 // provider/extension entry points the real UI buttons call (`MovieDetails.fetchDetails`,
 // `ItemBaseModel.play`, `videoPlayerProvider.stateStream`) instead of tapping through
 // layout/locale-fragile widgets.
@@ -33,7 +33,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:fladder/main.dart' as app;
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
@@ -120,7 +120,7 @@ void main() {
       await notifier.fetchDetails(item).timeout(_detailsTimeout);
       detail = container.read(movieDetailsProvider(item.id));
       final openRequests = sushiRequestCount;
-      final playable = detail != null && oxMovieHasPlayableMedia(detail);
+      final playable = detail != null && sushiMovieHasPlayableMedia(detail);
       record(
         'item_open',
         playable && openRequests <= _maxRequestsPerInteraction,
@@ -142,7 +142,7 @@ void main() {
       await notifier.fetchDetails(detail ?? item).timeout(_detailsTimeout);
       final refreshed = container.read(movieDetailsProvider(item.id));
       final refreshRequests = sushiRequestCount;
-      final playable = refreshed != null && oxMovieHasPlayableMedia(refreshed);
+      final playable = refreshed != null && sushiMovieHasPlayableMedia(refreshed);
       record(
         'item_refresh',
         playable && refreshRequests <= _maxRequestsPerInteraction,
@@ -161,7 +161,7 @@ void main() {
     //    next /item or /play call. A crash here kills the whole test process, which itself is a
     //    clear FAIL signal even before the `expect` below runs.
     // ---------------------------------------------------------------------
-    if (detail != null && oxMovieHasPlayableMedia(detail)) {
+    if (detail != null && sushiMovieHasPlayableMedia(detail)) {
       try {
         var allOk = true;
         final details = <String>[];

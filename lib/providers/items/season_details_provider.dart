@@ -7,9 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
-import 'package:fladder/oxplayer/ox_virtual_episode_images.dart';
-import 'package:fladder/oxplayer/ox_season_user_data.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/sushi/sushi_virtual_episode_images.dart';
+import 'package:fladder/sushi/sushi_season_user_data.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
@@ -28,10 +27,10 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<Response?> fetchDetails(String seasonId, {SeasonModel? hint}) async {
-    if (SushiConfig.isEnabled) {
+    
       state = hint;
       return null;
-    }
+    
     SeasonModel? newState = hint;
 
     final season = await api.usersUserIdItemsItemIdGet(itemId: seasonId);
@@ -48,7 +47,7 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
       seasonId: newState?.id ?? seasonId,
       season: newState?.season,
       enableUserData: true,
-      fields: oxEpisodeListFields([
+      fields: sushiEpisodeListFields([
         ItemFields.overview,
         ItemFields.candelete,
         ItemFields.candownload,
@@ -67,15 +66,15 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
     }
 
     newState = newState?.copyWith(
-        episodes: oxApplyVirtualEpisodeImages(
+        episodes: sushiApplyVirtualEpisodeImages(
           EpisodeModel.episodesFromDto(episodes.body?.items, ref).toList(),
           episodes.body?.items,
           ref,
         ),
         specialFeatures: SpecialFeatureModel.specialFeaturesFromDto(specialFeatures, ref).toList());
-    if (OxplayerConfig.isEnabled && newState != null) {
+    if (newState != null) {
       newState = newState.copyWith(
-        userData: oxSeasonUserDataFromEpisodes(newState.episodes),
+        userData: sushiSeasonUserDataFromEpisodes(newState.episodes),
       );
     }
     state = newState;

@@ -16,7 +16,7 @@ import 'package:fladder/screens/shared/animated_fade_size.dart';
 import 'package:fladder/screens/shared/nested_bottom_appbar.dart';
 import 'package:fladder/screens/video_player/audio_player_full_screen.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
-import 'package:fladder/oxplayer/oxplayer_double_back_exit.dart';
+import 'package:fladder/sushi/sushi_double_back_exit.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/destination_model.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/fladder_app_bar.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/floating_player_bar.dart';
@@ -179,21 +179,21 @@ class _NavigationScaffoldState extends ConsumerState<NavigationScaffold> {
     final onRootTab = currentIndex == 0;
 
     return PopScope(
-      canPop: !showAudioOverlay && onRootTab && !OxplayerDoubleBackExit.blocksRootPop(),
+      canPop: !showAudioOverlay && onRootTab && !SushiDoubleBackExit.blocksRootPop(),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (showAudioOverlay) {
           // The AudioPlayerFullScreen has its own PopScope that handles this.
           return;
         }
-        if (onRootTab && OxplayerDoubleBackExit.handleRootBack(context)) {
+        if (onRootTab && SushiDoubleBackExit.handleRootBack(context)) {
           return;
         }
         if (!onRootTab) {
           // Not on the Home root tab — navigate home and reset the double-back
           // timer so the user must press Back *twice from Home* to exit, not
           // twice carried over from a different screen.
-          OxplayerDoubleBackExit.resetLastPress();
+          SushiDoubleBackExit.resetLastPress();
           widget.destinations.first.action?.call();
         }
       },

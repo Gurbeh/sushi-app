@@ -7,16 +7,14 @@ import 'package:palette_generator_master/palette_generator_master.dart';
 
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/images_models.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_hero_image.dart';
-import 'package:fladder/oxplayer/oxplayer_image_log.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
+import 'package:fladder/sushi/sushi_hero_image.dart';
+import 'package:fladder/sushi/sushi_image_log.dart';
+import 'package:fladder/sushi/sushi_tv_image_sizes.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/providers/window_title_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -127,11 +125,11 @@ class _DetailScaffoldState extends ConsumerState<DetailScaffold> {
       lastImages = widget.backDrops?.backDrop;
       backgroundImage = widget.backDrops?.randomBackDrop;
     }
-    if (OxplayerConfig.isEnabled) {
-      backgroundImage = oxplayerHeroImage(
+    
+      backgroundImage = sushiHeroImage(
         widget.backDrops?.backDrop?.firstOrNull ?? backgroundImage,
       );
-    }
+    
   }
 
   Future<void> _updateDominantColor() async {
@@ -162,16 +160,16 @@ class _DetailScaffoldState extends ConsumerState<DetailScaffold> {
     final minHeight = 450.0.clamp(0, size.height).toDouble();
     final maxHeight = size.height - 10;
     final leanBack = ref.watch(argumentsStateProvider.select((value) => value.leanBackMode));
-    final heroDecodeHeight = OxplayerConfig.isEnabled && leanBack
-        ? OxplayerTvImageSizes.decodeHeroHeight
+    final heroDecodeHeight = leanBack
+        ? SushiTvImageSizes.decodeHeroHeight
         : maxHeight ~/ 1.5;
-    if (OxplayerConfig.isEnabled) {
-      OxplayerImageLog.event('detail_hero', fields: {
+    
+      SushiImageLog.event('detail_hero', fields: {
         'leanBack': leanBack,
         'decodeHeight': heroDecodeHeight,
         'path': backgroundImage?.path ?? '(none)',
       });
-    }
+    
     final sideBarPadding = AdaptiveLayout.of(context).sideBarWidth;
     final topBarPadding = AdaptiveLayout.of(context).topBarHeight;
     final directionalSidePadding = EdgeInsetsDirectional.only(start: sideBarPadding);
@@ -334,12 +332,8 @@ class _DetailScaffoldState extends ConsumerState<DetailScaffold> {
                                         error: (error, stackTrace) => const SizedBox.shrink(),
                                         data: (syncedItem) {
                                           if (syncedItem == null &&
-                                              (SushiConfig.isEnabled ||
-                                                  ref.read(userProvider.select(
-                                                    (value) => value?.canDownload ?? false,
-                                                  ))) &&
-                                              item?.syncAble == true &&
-                                              sushiItemHasPlaybackActions(item!)) {
+                                              (true) &&
+                                              item?.syncAble == sushiItemHasPlaybackActions(item!)) {
                                             return IconButton(
                                               onPressed: () =>
                                                   ref.read(syncProvider.notifier).addSyncItem(context, item!),

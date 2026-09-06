@@ -4,7 +4,7 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/src/tdlib_bridge.g.dart',
     dartOptions: DartOptions(),
-    kotlinOut: 'android/app/src/main/kotlin/app/oxplayer/api/TdlibBridge.g.kt',
+    kotlinOut: 'android/app/src/main/kotlin/app/sushi/api/TdlibBridge.g.kt',
     kotlinOptions: KotlinOptions(
       includeErrorClass: false,
     ),
@@ -13,8 +13,8 @@ import 'package:pigeon/pigeon.dart';
 )
 
 /// Mirrors the subset of TdApi.AuthorizationState this module surfaces to Dart
-/// (see app.oxplayer.tdlibbridge.auth.TdlibAuthState on the Kotlin side).
-enum OxTdlibAuthStateKind {
+/// (see app.sushi.tdlibbridge.auth.TdlibAuthState on the Kotlin side).
+enum SushiTdlibAuthStateKind {
   uninitialized,
   waitingForPhoneNumber,
   waitingForCode,
@@ -26,13 +26,13 @@ enum OxTdlibAuthStateKind {
   failed,
 }
 
-/// Liveness of the MTProto socket — deliberately a different question from [OxTdlibAuthStateKind].
+/// Liveness of the MTProto socket — deliberately a different question from [SushiTdlibAuthStateKind].
 ///
 /// A device can hold perfectly valid credentials (auth `ready`) while its connection is dead, in
 /// which case every byte fetch fails. Treating that as "logged out" is what sent TV users to a
 /// login screen for something a silent reconnect fixes, so the two states are reported separately
-/// and only [OxTdlibAuthStateKind.failed] may ever drive a re-login prompt.
-enum OxTdlibConnectionHealth {
+/// and only [SushiTdlibAuthStateKind.failed] may ever drive a re-login prompt.
+enum SushiTdlibConnectionHealth {
   /// configure() has not completed successfully yet.
   uninitialized,
 
@@ -47,8 +47,8 @@ enum OxTdlibConnectionHealth {
   degraded,
 }
 
-class OxTdlibAuthState {
-  final OxTdlibAuthStateKind kind;
+class SushiTdlibAuthState {
+  final SushiTdlibAuthStateKind kind;
   // Set when kind == waitingForQrConfirmation: the tg:// login URL to render as a QR code.
   final String? qrLoginUrl;
   // Set when kind == waitingForPassword: TDLib's password hint for the account, if any.
@@ -56,7 +56,7 @@ class OxTdlibAuthState {
   // Set when kind == failed: human-readable message for the login UI.
   final String? errorMessage;
 
-  const OxTdlibAuthState({
+  const SushiTdlibAuthState({
     required this.kind,
     this.qrLoginUrl,
     this.passwordHint,
@@ -65,8 +65,8 @@ class OxTdlibAuthState {
 }
 
 /// One playback session's Telegram-backed video source, parsed from the PlaybackInfo Path
-/// `oxplayer-tg://{providerBotId}/{messageId}?loc={locator}`.
-class OxTdlibPlaybackSource {
+/// `sushi-tg://{providerBotId}/{messageId}?loc={locator}`.
+class SushiTdlibPlaybackSource {
   /// The delivery bot whose DM holds the video. 0 on a cold play: the backend round-robins across
   /// senders and may fail over mid-request, so it does not commit to one until the copy lands —
   /// the native side then learns the real sender from the update that carries [locator].
@@ -87,7 +87,7 @@ class OxTdlibPlaybackSource {
   /// Always present now — both login modes read out of a DM.
   final String locator;
 
-  const OxTdlibPlaybackSource({
+  const SushiTdlibPlaybackSource({
     required this.providerBotId,
     required this.messageId,
     required this.locator,
@@ -98,34 +98,34 @@ class OxTdlibPlaybackSource {
 /// One delivery sender, as published by the backend's GET /telegram/provider-bots. The username is
 /// needed only for first contact (contacts.resolveUsername -> startBot); afterwards everything
 /// addresses the bot by [id]. Tokens never reach the client.
-class OxTdlibProviderBot {
+class SushiTdlibProviderBot {
   final int id;
   final String username;
 
-  const OxTdlibProviderBot({required this.id, required this.username});
+  const SushiTdlibProviderBot({required this.id, required this.username});
 }
 
 /// Where a delivered video actually landed, as observed by THIS session. Both halves can only come
 /// from the receiving side: private-chat message ids are numbered per side, and the server
 /// round-robins across senders so it does not know which one won.
-class OxTdlibDeliveryRef {
+class SushiTdlibDeliveryRef {
   final int messageId;
   final int providerBotId;
 
-  const OxTdlibDeliveryRef({required this.messageId, required this.providerBotId});
+  const SushiTdlibDeliveryRef({required this.messageId, required this.providerBotId});
 }
 
 @HostApi()
-abstract class OxTdlibBridgeApi {
+abstract class SushiTdlibBridgeApi {
   /// Must be called once before any other method (idempotent) — starts the underlying
-  /// TDLib client with [apiId]/[apiHash] from OxplayerEnv (this module's own user-session
+  /// TDLib client with [apiId]/[apiHash] from SushiEnv (this module's own user-session
   /// credentials, distinct from the bot-based OX login's credentials).
   @async
   void configure(int apiId, String apiHash);
 
-  /// Current auth state; also pushed via OxTdlibBridgeEvents.onAuthStateChanged.
+  /// Current auth state; also pushed via SushiTdlibBridgeEvents.onAuthStateChanged.
   /// Synchronous — this just reads cached state, no TDLib round-trip.
-  OxTdlibAuthState currentAuthState();
+  SushiTdlibAuthState currentAuthState();
 
   /// Whether the CURRENT session — including one restored from disk at configure(), which never
   /// calls submitBotToken this process — is a bot rather than a phone/QR user account.
@@ -139,9 +139,9 @@ abstract class OxTdlibBridgeApi {
   /// reach that bot's own inbox. Synchronous — an in-memory read on the Go side.
   bool isNativeSessionBot();
 
-  /// Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
+  /// Current socket liveness; also pushed via SushiTdlibBridgeEvents.onConnectionHealthChanged.
   /// Synchronous — an in-memory read on the Go side, no round-trip.
-  OxTdlibConnectionHealth connectionHealth();
+  SushiTdlibConnectionHealth connectionHealth();
 
   /// Rebuilds the connection if its run loop has died; a no-op when already healthy.
   ///
@@ -158,7 +158,7 @@ abstract class OxTdlibBridgeApi {
   /// even one whose auth landed in `failed` — only a client object that never existed rebuilds
   /// cleanly from the on-disk session. Killing the process is the only way to guarantee that from
   /// here, since there is no "drop this client but keep the session file" call exposed yet (see
-  /// oxplayer_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
+  /// sushi_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
   /// relaunched process resumes the same signed-in session — this is not a logout.
   ///
   /// Never returns (the process exits); the return type exists only so Dart can await the call
@@ -183,7 +183,7 @@ abstract class OxTdlibBridgeApi {
   @async
   void requestQrLogin();
 
-  /// Bot-token login: an alternative to phone/QR for users who don't want to give OXPlayer
+  /// Bot-token login: an alternative to phone/QR for users who don't want to give Sushi
   /// access to their personal Telegram account. Logs in as a bot (gotd/td
   /// auth.importBotAuthorization) instead — goes straight to ready, no code/2FA step.
   @async
@@ -200,7 +200,7 @@ abstract class OxTdlibBridgeApi {
   /// Throws if no MTProto/TDLib session is logged in yet — callers should
   /// check currentAuthState() first and prompt login if not ready.
   @async
-  String startPlaybackSession(OxTdlibPlaybackSource source);
+  String startPlaybackSession(SushiTdlibPlaybackSource source);
 
   /// Where the last successful resolve of [locator] landed, or null if this session has not read
   /// one. Dart reports it to the backend (POST /me/telegram-delivery) so the NEXT play of the same
@@ -211,7 +211,7 @@ abstract class OxTdlibBridgeApi {
   /// the receiving session ever sees the id that can be re-read later — and only it knows which
   /// sender the backend's round-robin actually settled on.
   /// Synchronous — reads an in-memory map, no MTProto round-trip.
-  OxTdlibDeliveryRef? deliveryRefForLocator(String locator);
+  SushiTdlibDeliveryRef? deliveryRefForLocator(String locator);
 
   /// Registers interest in [locator] BEFORE the PlaybackInfo call that triggers the copy, so a
   /// delivery that lands while that HTTP request is still in flight is captured rather than raced
@@ -224,7 +224,7 @@ abstract class OxTdlibBridgeApi {
   /// thrown away. Resolving is enough: it makes the backend remember the message id, so the
   /// eventual play needs no Telegram call at all.
   @async
-  void warmDelivery(OxTdlibPlaybackSource source);
+  void warmDelivery(SushiTdlibPlaybackSource source);
 
   /// Starts, mutes and archives every delivery sender on this account, so delivery copies never
   /// land in the user's visible inbox. Called on every app enter (not just after login) because a
@@ -233,7 +233,7 @@ abstract class OxTdlibBridgeApi {
   /// No-op for a bot-token login: a bot is not a user account, has no dialog list to archive, and
   /// its B2B DM was already opened by main-bot's /connectbot.
   @async
-  void ensureProviderBotsReady(List<OxTdlibProviderBot> bots);
+  void ensureProviderBotsReady(List<SushiTdlibProviderBot> bots);
 
   /// Stops the active playback session's download and closes the TDLib client (does not log
   /// out — the on-disk session persists, next play just reconnects). Callers on every backend
@@ -247,7 +247,7 @@ abstract class OxTdlibBridgeApi {
   /// GetWebAppLinkUrl/GetWebAppUrl/GetMainWebApp — requires a Ready auth state (real Telegram
   /// login already completed) and a Mini App configured on that bot via @BotFather. Exchange the
   /// result with the backend's POST /auth/telegram to obtain OX session tokens; see
-  /// OxplayerTelegramAuthClient. [webAppShortName]/[hostedHttpsUrl] may be null/empty if unset —
+  /// SushiTelegramAuthClient. [webAppShortName]/[hostedHttpsUrl] may be null/empty if unset —
   /// at least one working WebApp path must be configured on the bot for this to succeed.
   @async
   String fetchWebAppInitData(String botUsername, String? webAppShortName, String? hostedHttpsUrl);
@@ -275,10 +275,10 @@ abstract class OxTdlibBridgeApi {
 }
 
 @FlutterApi()
-abstract class OxTdlibBridgeEvents {
-  void onAuthStateChanged(OxTdlibAuthState state);
+abstract class SushiTdlibBridgeEvents {
+  void onAuthStateChanged(SushiTdlibAuthState state);
 
   /// Pushed whenever socket liveness changes. Independent of onAuthStateChanged — see
-  /// [OxTdlibConnectionHealth] for why the two must not be collapsed into one signal.
-  void onConnectionHealthChanged(OxTdlibConnectionHealth health);
+  /// [SushiTdlibConnectionHealth] for why the two must not be collapsed into one signal.
+  void onConnectionHealthChanged(SushiTdlibConnectionHealth health);
 }

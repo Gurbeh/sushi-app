@@ -9,9 +9,7 @@ import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/screens/metadata/refresh_metadata.dart';
 import 'package:fladder/screens/shared/animated_fade_size.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
@@ -20,7 +18,6 @@ import 'package:fladder/widgets/navigation_scaffold/components/adaptive_fab.dart
 import 'package:fladder/widgets/navigation_scaffold/components/destination_model.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/drawer_list_button.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/settings_user_icon.dart';
-import 'package:fladder/widgets/shared/item_actions.dart';
 
 class NestedNavigationDrawer extends ConsumerWidget {
   final bool isExpanded;
@@ -89,16 +86,7 @@ class NestedNavigationDrawer extends ConsumerWidget {
         ),
         if (views.isNotEmpty) ...{
           const Divider(indent: 28, endIndent: 28),
-          if (!SushiConfig.isEnabled)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 16, 16, 10),
-              child: Text(
-                context.localized.library(2),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            )
-          else
-            const SizedBox(height: 8),
+          const SizedBox(height: 8),
           ...views.map((library) {
             var selected = context.router.currentUrl.contains(library.id);
             final Widget? posterIcon = useLibraryPosters
@@ -120,14 +108,7 @@ class NestedNavigationDrawer extends ConsumerWidget {
             return DrawerListButton(
                 label: library.name,
                 selected: selected,
-                actions: [
-                  if (!SushiConfig.isEnabled)
-                    ItemActionButton(
-                      label: Text(context.localized.scanLibrary),
-                      icon: const Icon(IconsaxPlusLinear.refresh),
-                      action: () => showRefreshPopup(context, library.id, library.name),
-                    ),
-                ],
+                actions: const [],
                 onPressed: () {
                   context.router.push(LibrarySearchRoute(viewModelId: library.id));
                   Scaffold.of(context).closeDrawer();

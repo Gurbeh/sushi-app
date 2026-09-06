@@ -8,14 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:fladder/oxplayer/services/ox_update_service.dart';
-import 'package:fladder/oxplayer/widgets/ox_dialog_focus_trap.dart';
+import 'package:fladder/sushi/widgets/sushi_dialog_focus_trap.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_app_update_transport.dart';
 
 export 'package:fladder/sushi/sushi_app_update_pb.dart' show SushiLatestApp;
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_semver.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 const _kSkippedVersionKey = 'sushi_skipped_app_version';
@@ -39,8 +39,8 @@ void sushiNoteLatestApp(SushiLatestApp? latest) {
 }
 
 bool sushiIsNewerApp(String currentVersion, String latestVersion) {
-  final current = OxSemver.parse(currentVersion) ?? const OxSemver(major: 0, minor: 0, patch: 0);
-  final latest = OxSemver.parse(latestVersion);
+  final current = SushiSemver.parse(currentVersion) ?? const SushiSemver(major: 0, minor: 0, patch: 0);
+  final latest = SushiSemver.parse(latestVersion);
   return latest != null && latest.isNewerThan(current);
 }
 
@@ -66,7 +66,7 @@ Future<void> sushiInstallLatestApp({
     throw StateError('appupdate: no file');
   }
   await sushiArmDeliveryWaiter(res.locator);
-  final url = await sushiStartPlaybackSession(OxTdlibPlaybackSource(
+  final url = await sushiStartPlaybackSession(SushiTdlibPlaybackSource(
     providerBotId: res.botId,
     messageId: res.messageId,
     preferHttpBridge: true,
@@ -186,7 +186,7 @@ Future<void> sushiShowUpdateDialog({
   await showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => OxDialogFocusTrap(
+    builder: (ctx) => SushiDialogFocusTrap(
       child: _SushiUpdateDialog(
         copy: copy,
         currentVersion: currentVersion,

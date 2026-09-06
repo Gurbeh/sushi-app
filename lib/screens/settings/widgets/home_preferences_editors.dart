@@ -5,8 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/providers/home_preferences_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/ox_home_dashboard_order.dart';
+import 'package:fladder/sushi/sushi_home_dashboard_order.dart';
 import 'package:fladder/screens/settings/settings_list_tile.dart';
 import 'package:fladder/screens/settings/widgets/settings_label_divider.dart';
 import 'package:fladder/screens/settings/widgets/settings_list_group.dart';
@@ -20,7 +19,7 @@ class LibraryOrderEditor extends ConsumerWidget {
     this.showGroupedFoldersSection = true,
   });
 
-  /// When true, only the grouped-libraries section is shown (OXPlayer).
+  /// When true, only the grouped-libraries section is shown (Sushi).
   final bool groupedFoldersOnly;
 
   /// When false, the grouped-libraries section is omitted.
@@ -52,7 +51,7 @@ class LibraryOrderEditor extends ConsumerWidget {
                 included: includedIds,
                 itemBuilder: (id) {
                   final dashboardLabel =
-                      OxplayerConfig.isEnabled ? OxHomeDashboardOrder.label(context, id) : null;
+                      SushiHomeDashboardOrder.label(context, id);
                   if (dashboardLabel != null) return Text(dashboardLabel);
                   final view = views.firstWhereOrNull((v) => v.id == id);
                   return Text(view?.name ?? id);

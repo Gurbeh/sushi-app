@@ -1,5 +1,4 @@
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/library_search_provider.dart';
 import 'package:fladder/screens/shared/outlined_text_field.dart';
 import 'package:fladder/theme.dart';
@@ -48,14 +47,14 @@ class _SearchBarState extends ConsumerState<SuggestionSearchBar> {
 
   /// On TV (dPad), keep the suggestion list short so the on-screen keyboard stays visible.
   int _dropdownSuggestionLimit(BuildContext context) {
-    if (OxplayerConfig.isEnabled && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
+    if (AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
       return 3;
     }
     return 25;
   }
 
   int _inlineSuggestionLimit(BuildContext context) {
-    if (OxplayerConfig.isEnabled && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
+    if (AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
       return 3;
     }
     return 5;

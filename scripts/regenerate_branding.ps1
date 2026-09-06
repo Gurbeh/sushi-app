@@ -1,10 +1,10 @@
-# Regenerate all OXPlayer branding assets from icons/oxplayer_icon.svg
+# Regenerate all Sushi branding assets from icons/sushi_icon.svg
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 Write-Host "==> Normalize SVG (requires source file argument if re-importing)"
 if (Test-Path "logo (2).svg") {
-    python scripts/normalize_oxplayer_icon.py "logo (2).svg"
+    python scripts/normalize_sushi_icon.py "logo (2).svg"
 }
 
 Write-Host "==> Export PNGs (launcher, banner, monochrome, notification, dev sync)"

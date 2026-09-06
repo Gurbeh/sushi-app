@@ -7,7 +7,7 @@ part of 'user_provider.dart';
 // **************************************************************************
 
 String _$showSyncButtonProviderHash() =>
-    r'c09f42cd6536425bf9417da41c83e15c135d0edb';
+    r'88750426c636f2429bf7563f274fa5b06be6d647';
 
 /// See also [showSyncButtonProvider].
 @ProviderFor(showSyncButtonProvider)
@@ -24,7 +24,7 @@ final showSyncButtonProviderProvider = AutoDisposeProvider<bool>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ShowSyncButtonProviderRef = AutoDisposeProviderRef<bool>;
-String _$userHash() => r'ff397a875dd91a8015c6a8ba545b1b082d7c717c';
+String _$userHash() => r'af53d2ff18bc7a560b862007a0f3ef8806e0afa2';
 
 /// See also [User].
 @ProviderFor(User)

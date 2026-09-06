@@ -5,7 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 import 'package:fladder/sushi/sushi_assignment_pb.dart';
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
@@ -195,7 +195,7 @@ abstract final class SushiAssignmentStore {
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   assert(SushiConfig.isEnabled);
 
-  final botSession = await OxplayerTdlibBridgeController.instance()
+  final botSession = await SushiTdlibBridgeController.instance()
       .isNativeSessionActuallyBot();
   if (!botSession) {
     try {
@@ -238,7 +238,7 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
     );
 
     // Keep every Sushi bot except main-bot out of the visible chat list — same start+mute+archive
-    // treatment oxplayer already gives its delivery senders (OxplayerProviderBotsBootstrap).
+    // treatment sushi already gives its delivery senders (SushiProviderBotsBootstrap).
     // main-bot is deliberately excluded: it's the one bot a person may actually want to open.
     //
     // The whole API pool is warmed so protocol DMs can round-robin (ADR 0011). Delivery bots ride
@@ -248,12 +248,12 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
       final apiBots = assignment.apiSendTargets;
       if (apiBots.isNotEmpty || assignment.deliveryBots.isNotEmpty) {
         unawaited(sushiEnsureProviderBotsReady([
-          OxTdlibProviderBot(id: 0, username: SushiConfig.initBotUsername),
+          SushiTdlibProviderBot(id: 0, username: SushiConfig.initBotUsername),
           for (final username in apiBots)
-            OxTdlibProviderBot(id: 0, username: username),
+            SushiTdlibProviderBot(id: 0, username: username),
           for (final username in assignment.deliveryBots)
             if (username.trim().isNotEmpty)
-              OxTdlibProviderBot(id: 0, username: username),
+              SushiTdlibProviderBot(id: 0, username: username),
         ]));
       }
     }

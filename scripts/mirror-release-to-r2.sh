@@ -6,14 +6,14 @@
 #   CLOUDFLARE_S3_ACCESS_KEY_ID
 #   CLOUDFLARE_S3_SECRET_ACCESS_KEY
 #   CLOUDFLARE_S3_API_ENDPOINT   (e.g. https://<accountid>.r2.cloudflarestorage.com)
-#   CLOUDFLARE_R2_BUCKET         (default: oxplayer-channel-news)
+#   CLOUDFLARE_R2_BUCKET         (default: sushi-channel-news)
 #   VERSION                      (e.g. 1.1.123)
 #
 # Optional:
-#   RELEASE_FILES                space-separated local filenames (default: staged OXPlayer-* assets)
+#   RELEASE_FILES                space-separated local filenames (default: staged Sushi-* assets)
 set -euo pipefail
 
-BUCKET="${CLOUDFLARE_R2_BUCKET:-oxplayer-channel-news}"
+BUCKET="${CLOUDFLARE_R2_BUCKET:-sushi-channel-news}"
 ENDPOINT="${CLOUDFLARE_S3_API_ENDPOINT:?CLOUDFLARE_S3_API_ENDPOINT required}"
 VERSION="${VERSION:?VERSION required}"
 
@@ -30,28 +30,28 @@ export AWS_DEFAULT_REGION=auto
 FILES=(${RELEASE_FILES:-})
 if ((${#FILES[@]} == 0)); then
   FILES=(
-    "OXPlayer-Android-${VERSION}-arm64-v8a.apk"
-    "OXPlayer-Android-${VERSION}-armeabi-v7a.apk"
-    "OXPlayer-Android-${VERSION}-x86_64.apk"
-    "OXPlayer-Windows-${VERSION}-Setup.exe"
-    "OXPlayer-Windows-${VERSION}.zip"
-    "OXPlayer-iOS-${VERSION}.ipa"
-    "OXPlayer-macOS-${VERSION}.dmg"
-    "OXPlayer-Linux-${VERSION}.AppImage"
+    "Sushi-Android-${VERSION}-arm64-v8a.apk"
+    "Sushi-Android-${VERSION}-armeabi-v7a.apk"
+    "Sushi-Android-${VERSION}-x86_64.apk"
+    "Sushi-Windows-${VERSION}-Setup.exe"
+    "Sushi-Windows-${VERSION}.zip"
+    "Sushi-iOS-${VERSION}.ipa"
+    "Sushi-macOS-${VERSION}.dmg"
+    "Sushi-Linux-${VERSION}.AppImage"
   )
 fi
 
 latest_key_for() {
   local f="$1"
   case "$f" in
-    OXPlayer-Android-*-arm64-v8a.apk) echo "releases/latest/OXPlayer-Android-arm64-v8a.apk" ;;
-    OXPlayer-Android-*-armeabi-v7a.apk) echo "releases/latest/OXPlayer-Android-armeabi-v7a.apk" ;;
-    OXPlayer-Android-*-x86_64.apk) echo "releases/latest/OXPlayer-Android-x86_64.apk" ;;
-    OXPlayer-Windows-*-Setup.exe) echo "releases/latest/OXPlayer-Windows-Setup.exe" ;;
-    OXPlayer-Windows-*.zip) echo "releases/latest/OXPlayer-Windows.zip" ;;
-    OXPlayer-iOS-*.ipa) echo "releases/latest/OXPlayer-iOS.ipa" ;;
-    OXPlayer-macOS-*.dmg) echo "releases/latest/OXPlayer-macOS.dmg" ;;
-    OXPlayer-Linux-*.AppImage) echo "releases/latest/OXPlayer-Linux.AppImage" ;;
+    Sushi-Android-*-arm64-v8a.apk) echo "releases/latest/Sushi-Android-arm64-v8a.apk" ;;
+    Sushi-Android-*-armeabi-v7a.apk) echo "releases/latest/Sushi-Android-armeabi-v7a.apk" ;;
+    Sushi-Android-*-x86_64.apk) echo "releases/latest/Sushi-Android-x86_64.apk" ;;
+    Sushi-Windows-*-Setup.exe) echo "releases/latest/Sushi-Windows-Setup.exe" ;;
+    Sushi-Windows-*.zip) echo "releases/latest/Sushi-Windows.zip" ;;
+    Sushi-iOS-*.ipa) echo "releases/latest/Sushi-iOS.ipa" ;;
+    Sushi-macOS-*.dmg) echo "releases/latest/Sushi-macOS.dmg" ;;
+    Sushi-Linux-*.AppImage) echo "releases/latest/Sushi-Linux.AppImage" ;;
     *) echo "" ;;
   esac
 }

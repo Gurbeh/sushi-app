@@ -1,14 +1,12 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_navigation.dart';
-import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
+import 'package:fladder/sushi/sushi_navigation.dart';
+import 'package:fladder/sushi/sushi_pending_route.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/login/lock_screen.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/navigation_body.dart';
 
 const settingsPageRoute = "settings";
@@ -55,12 +53,6 @@ class AutoRouter extends RootStackRouter {
           path: settingsPageRoute,
           children: _settingsChildren,
         ),
-        if (!SushiConfig.isEnabled)
-          AutoRoute(
-            page: ControlPanelRoute.page,
-            path: controlPanelPageRoute,
-            children: _controlPanelRoutes,
-          ),
       ],
     ),
     AutoRoute(page: LockRoute.page, path: '/locked'),
@@ -76,48 +68,31 @@ final List<AutoRoute> homeRoutes = [
     initial: true,
     path: 'dashboard',
   ),
-  if (!SushiConfig.isEnabled)
-    AutoRoute(
-      page: SeerrRoute.page,
-      path: 'seerr',
-    ),
   AutoRoute(
     page: FavouritesRoute.page,
     path: 'favourites',
   ),
-  if (SushiConfig.isEnabled)
-    AutoRoute(
-      page: WatchLaterRoute.page,
-      path: 'watch-later',
-    ),
+  AutoRoute(
+    page: WatchLaterRoute.page,
+    path: 'watch-later',
+  ),
   AutoRoute(
     page: SyncedRoute.page,
     path: 'synced',
   ),
-  if (!SushiConfig.isEnabled)
-    AutoRoute(
-      page: LibraryRoute.page,
-      path: 'libraries',
-    ),
 ];
 
 final List<AutoRoute> detailsRoutes = [
   AutoRoute(page: DetailsRoute.page, path: 'details'),
-  if (SushiConfig.isEnabled) AutoRoute(page: SearchRoute.page, path: 'search'),
-  if (!SushiConfig.isEnabled) AutoRoute(page: PhotoViewerRoute.page, path: "album"),
+  AutoRoute(page: SearchRoute.page, path: 'search'),
   AutoRoute(page: LibrarySearchRoute.page, path: 'library'),
-  if (!SushiConfig.isEnabled) ...[
-    AutoRoute(page: LiveTvRoute.page, path: 'live-tv'),
-    AutoRoute(page: SeerrSearchRoute.page, path: 'seerr-search'),
-    AutoRoute(page: SeerrDetailsRoute.page, path: 'seerr/:mediaType/:tmdbId'),
-  ],
 ];
 
 final List<AutoRoute> _defaultRoutes = [
   AutoRoute(page: SplashRoute.page, path: '/splash'),
   AutoRoute(page: LoginRoute.page, path: '/login', maintainState: false),
-  AutoRoute(page: OxplayerLoginRoute.page, path: '/ox-login', maintainState: false),
-  AutoRoute(page: OxplayerHelpRoute.page, path: '/ox-help'),
+  AutoRoute(page: SushiLoginRoute.page, path: '/sushi-login', maintainState: false),
+  AutoRoute(page: SushiHelpRoute.page, path: '/sushi-help'),
 ];
 
 final List<AutoRoute> _settingsChildren = [
@@ -126,19 +101,7 @@ final List<AutoRoute> _settingsChildren = [
   AutoRoute(page: ProfileSettingsRoute.page, path: 'security', maintainState: false),
   AutoRoute(page: PlayerSettingsRoute.page, path: 'player', maintainState: false),
   AutoRoute(page: AboutSettingsRoute.page, path: 'about'),
-  AutoRoute(page: OxplayerPlaybackDiagRoute.page, path: 'playback-diag'),
-  AutoRoute(page: OxplayerDeveloperModeRoute.page, path: 'developer-mode'),
-];
-
-final List<AutoRoute> _controlPanelRoutes = [
-  AutoRoute(page: ControlPanelSelectionRoute.page, path: 'list'),
-  AutoRoute(page: ControlDashboardRoute.page, path: 'dashboard', maintainState: false),
-  AutoRoute(page: ControlActiveTasksRoute.page, path: 'active-tasks', maintainState: false),
-  AutoRoute(page: ControlServerRoute.page, path: 'server-settings', maintainState: false),
-  AutoRoute(page: ControlUsersRoute.page, path: 'user-management', maintainState: false),
-  AutoRoute(page: ControlUserEditRoute.page, path: 'edit-user', maintainState: false),
-  AutoRoute(page: ControlLibrariesRoute.page, path: 'library-management', maintainState: false),
-  AutoRoute(page: ControlLiveTvRoute.page, path: 'live-tv', maintainState: false),
+  AutoRoute(page: SushiPlaybackDiagRoute.page, path: 'playback-diag'),
 ];
 
 class LockScreenGuard extends AutoRouteGuard {
@@ -170,8 +133,8 @@ class AuthGuard extends AutoRouteGuard {
 
     if (ref.read(userProvider) != null ||
         resolver.routeName == LoginRoute().routeName ||
-        resolver.routeName == const OxplayerLoginRoute().routeName ||
-        resolver.routeName == const OxplayerHelpRoute().routeName ||
+        resolver.routeName == const SushiLoginRoute().routeName ||
+        resolver.routeName == const SushiHelpRoute().routeName ||
         resolver.routeName == SplashRoute().routeName) {
       // We assume the last main focus is no longer active after navigating
       lastMainFocus = null;
@@ -182,13 +145,9 @@ class AuthGuard extends AutoRouteGuard {
       if (value) {
         resolver.next(true);
       } else {
-        if (OxplayerConfig.isEnabled) {
-          oxplayerFlushBufferedPendingPath(ref);
-          router.replaceAll(oxplayerSignOutRouteList());
-          ref.read(authProvider.notifier).initModel();
-        } else {
-          router.replace(LoginRoute());
-        }
+        sushiFlushBufferedPendingPath(ref);
+        router.replaceAll(sushiSignOutRouteList());
+        ref.read(authProvider.notifier).initModel();
       }
     }));
 

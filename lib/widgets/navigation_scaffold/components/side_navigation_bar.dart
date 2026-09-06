@@ -7,7 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/settings/client_settings_model.dart';
-import 'package:fladder/oxplayer/oxplayer_search_navigation.dart';
+import 'package:fladder/sushi/sushi_search_navigation.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
@@ -240,14 +240,7 @@ class _SideNavigationRail extends ConsumerState<SideNavigationRail> {
                                       children: views.map(
                                         (view) {
                                           final selected = context.router.currentUrl.contains(view.id);
-                                          final actions = [
-                                            if (!SushiConfig.isEnabled)
-                                              ItemActionButton(
-                                                label: Text(context.localized.scanLibrary),
-                                                icon: const Icon(IconsaxPlusLinear.refresh),
-                                                action: () => showRefreshPopup(context, view.id, view.name),
-                                              )
-                                          ];
+                                          final actions = <ItemActionButton>[];
                                           return CustomTooltip(
                                             tooltipContent: expandedSideBar
                                                 ? null
@@ -436,9 +429,6 @@ class _SideNavigationRail extends ConsumerState<SideNavigationRail> {
   }
 
   AdaptiveFab actionButton(BuildContext context) {
-    final seerrConfigured = ref.watch(
-      userProvider.select((user) => user?.seerrCredentials?.isConfigured ?? false),
-    );
     return ((widget.currentIndex >= 0 && widget.currentIndex < widget.destinations.length)
             ? widget.destinations[widget.currentIndex].floatingActionButton
             : null) ??
@@ -446,10 +436,7 @@ class _SideNavigationRail extends ConsumerState<SideNavigationRail> {
           context: context,
           title: context.localized.search,
           key: const Key("Search"),
-          onPressed: () => oxplayerNavigateToSearch(
-            context,
-            seerrConfigured: seerrConfigured,
-          ),
+          onPressed: () => sushiNavigateToSearch(context),
           child: const Icon(IconsaxPlusLinear.search_normal_1),
         );
   }

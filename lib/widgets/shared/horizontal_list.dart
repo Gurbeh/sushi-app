@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_dialog_focus_trap.dart';
+import 'package:fladder/sushi/widgets/sushi_dialog_focus_trap.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/screens/shared/media/poster_widget.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -107,7 +106,7 @@ class _HorizontalListState extends ConsumerState<HorizontalList> with TickerProv
         _scrollToPosition(widget.startIndex ?? 0);
       }
 
-      if (OxplayerConfig.isEnabled && OxDialogFocusTrap.isActive) {
+      if (SushiDialogFocusTrap.isActive) {
         return;
       }
       if ((FocusProvider.autoFocusOf(context) || widget.autoFocus) &&

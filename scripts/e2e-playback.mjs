@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * OXPlayer playback E2E runner — drives integration_test/oxplayer_playback_e2e_test.dart
+ * Sushi playback E2E runner — drives integration_test/sushi_playback_e2e_test.dart
  * against a real, already-logged-in dev build on Windows or Android. This is the "always easy
  * to re-run" tool the suite exists for.
  *
@@ -172,7 +172,7 @@ if (args.platform === "windows") {
 const testArgs = [
   "drive",
   "--driver=test_driver/integration_test.dart",
-  "--target=integration_test/oxplayer_playback_e2e_test.dart",
+  "--target=integration_test/sushi_playback_e2e_test.dart",
   "--dart-define-from-file=dart_defines.dev.json",
 ];
 if (args.show1) testArgs.push(`--dart-define=E2E_SHOW_1=${args.show1}`);

@@ -20,8 +20,8 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_segments_model.dart';
 import 'package:fladder/models/items/photos_model.dart';
 import 'package:fladder/models/items/trick_play_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_info_polling.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_playback_info_polling.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
@@ -608,8 +608,8 @@ class JellyService {
           body: body,
         );
 
-    if (OxplayerEnv.isEnabled) {
-      return oxplayerPollPlaybackInfoUntilReady(request);
+    if (SushiEnv.isEnabled) {
+      return sushiPollPlaybackInfoUntilReady(request);
     }
     return request();
   }

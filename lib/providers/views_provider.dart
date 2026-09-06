@@ -6,15 +6,14 @@ import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/models/views_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_home_detail_prefetch.dart';
-import 'package:fladder/oxplayer/oxplayer_provider_bots_bootstrap.dart';
-import 'package:fladder/oxplayer/oxplayer_home_feed.dart';
-import 'package:fladder/oxplayer/oxplayer_view_labels.dart';
-import 'package:fladder/oxplayer/providers/ox_favorites_dashboard.dart';
-import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
-import 'package:fladder/oxplayer/providers/ox_watchlist_dashboard.dart';
-import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
+import 'package:fladder/sushi/sushi_home_detail_prefetch.dart';
+import 'package:fladder/sushi/sushi_provider_bots_bootstrap.dart';
+import 'package:fladder/sushi/sushi_home_feed.dart';
+import 'package:fladder/sushi/sushi_view_labels.dart';
+import 'package:fladder/sushi/providers/sushi_favorites_dashboard.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
+import 'package:fladder/sushi/providers/sushi_watchlist_dashboard.dart';
+import 'package:fladder/sushi/sushi_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -56,7 +55,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       _fetchInFlight = true;
       try {
         // Sushi: synthetic library views (Movies/Series/Box sets/Playlists) + empty home rails.
-        if (SushiConfig.isEnabled) {
+        
           final sushiViews = sushiSyntheticViews();
           state = state.copyWith(
             views: sushiViews,
@@ -65,19 +64,19 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
             loaded: true,
           );
           return state;
-        }
+        
 
         final showAllCollections = ref.read(clientSettingsProvider.select((value) => value.showAllCollectionTypes));
 
-        if (OxplayerConfig.isEnabled) {
+        
           var user = ref.read(userProvider);
           if (user?.userConfiguration == null) {
             await ref.read(userProvider.notifier).updateInformation();
           }
-          unawaited(ref.read(oxItemFlagsProvider.notifier).load());
+          unawaited(ref.read(sushiCatalogItemFlagsProvider.notifier).load());
 
           // Disk SWR: paint last Home/Feed immediately, then revalidate.
-          final cachedFeed = await OxplayerHomeFeed.loadCached(ref);
+          final cachedFeed = await SushiHomeFeed.loadCached(ref);
           if (cachedFeed != null) {
             _applyHomeFeed(cachedFeed, showAllCollections: showAllCollections);
           }
@@ -88,7 +87,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
             state = state.copyWith(loading: true);
           }
 
-          final feed = await OxplayerHomeFeed.fetch(ref);
+          final feed = await SushiHomeFeed.fetch(ref);
           if (feed != null) {
             _applyHomeFeed(feed, showAllCollections: showAllCollections);
             return state;
@@ -97,12 +96,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
             state = state.copyWith(loading: false, loaded: true);
             return state;
           }
-        } else {
-          if (state.loading) return null;
-          if (!(background && state.loaded)) {
-            state = state.copyWith(loading: true);
-          }
-        }
+        
 
         final response = await api.usersUserIdViewsGet();
         final createdViews = response.body?.items?.map((e) => ViewModel.fromBodyDto(e, ref)).where((element) {
@@ -112,11 +106,11 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
         List<ViewModel> newList = [];
 
         if (createdViews != null) {
-          if (OxplayerConfig.isEnabled) {
+          
             newList = createdViews.toList();
             _publishViews(newList, loading: true);
 
-            OxWatchlistDashboardData watchLaterData = OxWatchlistDashboardData.empty;
+            SushiWatchlistDashboardData watchLaterData = SushiWatchlistDashboardData.empty;
             await Future.wait([
               Future.wait(
                 newList.map((view) async {
@@ -126,15 +120,11 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
                   newList[index] = updated;
                 }),
               ),
-              ref.read(oxWatchlistDashboardProvider.future).then((data) => watchLaterData = data),
+              ref.read(sushiWatchlistDashboardProvider.future).then((data) => watchLaterData = data),
               ref.read(dashboardProvider.notifier).fetchNextUpAndResume(),
             ]);
-            oxApplyWatchlistFromHomeFeedRef(ref, watchLaterData);
-          } else {
-            newList = await Future.wait(
-              createdViews.map((e) => _fetchRecentlyAdded(e, showAllCollections: showAllCollections)),
-            );
-          }
+            sushiApplyWatchlistFromHomeFeedRef(ref, watchLaterData);
+          
         }
 
         state = state.copyWith(
@@ -150,24 +140,24 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       }
     }
 
-    if (OxplayerConfig.isEnabled) {
-      return OxplayerScreenTelemetry.trackLoad(screen: 'home', phase: 'views', load: load);
-    }
+    
+      return SushiScreenTelemetry.trackLoad(screen: 'home', phase: 'views', load: load);
+    
     return load();
   }
 
-  void _applyHomeFeed(OxHomeFeedResult feed, {required bool showAllCollections}) {
+  void _applyHomeFeed(SushiHomeFeedResult feed, {required bool showAllCollections}) {
     final filtered = feed.views
         .where((v) => showAllCollections || enableCollectionTypes.contains(v.collectionType))
         .toList();
     final ordered = _applyLibraryOrdering(filtered);
-    OxplayerHomeFeed.applyWatchLater(ref, feed.watchLater);
+    SushiHomeFeed.applyWatchLater(ref, feed.watchLater);
     if (feed.favoritesInFeed) {
-      OxplayerHomeFeed.applyFavorites(ref, feed.favorites);
+      SushiHomeFeed.applyFavorites(ref, feed.favorites);
     } else {
-      oxResetFavoritesHomeFeedRef(ref);
+      sushiResetFavoritesHomeFeedRef(ref);
     }
-    OxplayerHomeFeed.applyDashboard(ref, feed.dashboard);
+    SushiHomeFeed.applyDashboard(ref, feed.dashboard);
     state = state.copyWith(
       views: ordered,
       dashboardViews: _applyLibraryOrdering(
@@ -180,8 +170,8 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
     );
     // App enter: start+mute+archive every delivery sender. Prefetch/play await [ensureReady]
     // so copyMessage cannot race ahead of startBot (Telegram 400 chat not found).
-    OxplayerProviderBotsBootstrap.schedule();
-    OxplayerHomeDetailPrefetch.schedule(ref, dashboardViews: state.dashboardViews);
+    SushiProviderBotsBootstrap.schedule();
+    SushiHomeDetailPrefetch.schedule(ref, dashboardViews: state.dashboardViews);
   }
 
   Future<ViewModel> _fetchRecentlyAdded(ViewModel view, {required bool showAllCollections}) async {
@@ -223,7 +213,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
 
   List<ViewModel> _applyLibraryOrdering(List<ViewModel> views) {
     final orderedViews = ref.read(userProvider)?.userConfiguration?.orderedViews ?? [];
-    if (orderedViews.isEmpty) return OxplayerViewLabels.applyAll(views);
+    if (orderedViews.isEmpty) return SushiViewLabels.applyAll(views);
 
     final viewMap = {for (var v in views) v.id: v};
     final ordered = <ViewModel>[];
@@ -233,7 +223,7 @@ class ViewsNotifier extends StateNotifier<ViewsModel> {
       if (view != null) ordered.add(view);
     }
     ordered.addAll(viewMap.values);
-    return OxplayerViewLabels.applyAll(ordered);
+    return SushiViewLabels.applyAll(ordered);
   }
 
   void clear() {

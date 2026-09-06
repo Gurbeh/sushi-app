@@ -13,7 +13,7 @@ import 'package:fladder/src/tdlib_bridge.g.dart';
 typedef SushiWarmupPlayFn = Future<SushiPlayRes?> Function({required int fileId, bool force});
 typedef SushiWarmupArmFn = Future<void> Function(String locator);
 typedef SushiWarmupAckFn = Future<void> Function({required int fileId, required int messageId});
-typedef SushiWarmupPollFn = Future<OxTdlibDeliveryRef?> Function(String locator);
+typedef SushiWarmupPollFn = Future<SushiTdlibDeliveryRef?> Function(String locator);
 
 /// Docs/05 §5: `/play` + ack, no playback session. Default Play-button file, or a newly picked
 /// quality. Cached [SushiDelivered] lets the tap skip a second `/play` and go straight to
@@ -58,7 +58,7 @@ class SushiPlayWarmup {
   }
 
   void schedule(int? fileId) {
-    if (!SushiConfig.isEnabled) return;
+    
     if (fileId == null || fileId <= 0) return;
     if (_cache.containsKey(fileId) || _inFlight.containsKey(fileId)) return;
     if (_paused) {
@@ -111,7 +111,7 @@ class SushiPlayWarmup {
   }
 }
 
-Future<OxTdlibDeliveryRef?> _defaultPoll(String locator) async {
+Future<SushiTdlibDeliveryRef?> _defaultPoll(String locator) async {
   const timeout = Duration(seconds: 15);
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {

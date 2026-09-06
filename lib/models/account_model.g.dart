@@ -21,7 +21,7 @@ _AccountModel _$AccountModelFromJson(Map<String, dynamic> json) =>
       seerrCredentials: json['seerrCredentials'] == null
           ? null
           : SeerrCredentialsModel.fromJson(
-              json['seerrCredentials'] as Map<String, dynamic>),
+              json['seerrCredentials'] as Map<String, dynamic>?),
       latestItemsExcludes: (json['latestItemsExcludes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??

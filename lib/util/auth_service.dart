@@ -8,7 +8,7 @@ import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 
 import 'package:fladder/models/account_model.dart';
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 class AuthService {
@@ -23,7 +23,7 @@ class AuthService {
               context.localized.scanYourFingerprintToAuthenticate("(${user.name} - ${user.credentials.serverName})"),
           authMessages: <AuthMessages>[
             AndroidAuthMessages(
-              signInTitle: OxplayerBrand.appName,
+              signInTitle: SushiBrand.appName,
               biometricHint: context.localized.scanBiometricHint,
             ),
             IOSAuthMessages(

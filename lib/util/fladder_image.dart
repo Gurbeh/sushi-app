@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transparent_image/transparent_image.dart';
 
 import 'package:fladder/models/items/images_models.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_image_log.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
+import 'package:fladder/sushi/sushi_image_log.dart';
+import 'package:fladder/sushi/sushi_tv_image_sizes.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 
@@ -50,10 +49,10 @@ class FladderImage extends ConsumerWidget {
     // OX TV: decodeHeight was unused — TMDB 302 returns full-tier bitmaps; ResizeImage
     // keeps Flutter ImageCache from holding w1280 RGBA on leanback grids. Heroes pass 720.
     ImageProvider? imageProvider = rawProvider;
-    if (OxplayerConfig.isEnabled && leanBackMode && rawProvider != null) {
-      final maxH = OxplayerTvImageSizes.clampDecodeHeight(decodeHeight);
-      if (decodeHeight >= OxplayerTvImageSizes.decodeHeroHeight) {
-        OxplayerImageLog.event('tv_hero_decode', fields: {
+    if (leanBackMode && rawProvider != null) {
+      final maxH = SushiTvImageSizes.clampDecodeHeight(decodeHeight);
+      if (decodeHeight >= SushiTvImageSizes.decodeHeroHeight) {
+        SushiImageLog.event('tv_hero_decode', fields: {
           'decodeHeight': maxH,
           'path': image?.path ?? '',
         });
@@ -86,7 +85,7 @@ class FladderImage extends ConsumerWidget {
               fit: fit,
               placeholderFit: fit,
               alignment: alignment ?? Alignment.center,
-              filterQuality: OxplayerConfig.isEnabled ? FilterQuality.medium : FilterQuality.low,
+              filterQuality: FilterQuality.medium,
               imageErrorBuilder: imageErrorBuilder,
               image: imageProvider,
             )

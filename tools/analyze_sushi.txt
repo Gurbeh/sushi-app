@@ -1,0 +1,315 @@
+﻿Analyzing sushi...                                              
+
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:drift/drift.dart' - lib\sushi\cache\sushi_catalog.dart:2:8 - unnecessary_import
+   info - Use 'const' with the constructor to improve performance - lib\sushi\cache\sushi_catalog.dart:65:15 - prefer_const_constructors
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:2 - expected_executable
+   info - Missing type annotation - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:3 - strict_top_level_inference
+   info - The function 'sushi_hls_web_buffer_config_stub' should have a return type but doesn't - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:3 - always_declare_return_types
+   info - The variable name 'sushi_hls_web_buffer_config_stub' isn't a lowerCamelCase identifier - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:35 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:35 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:36 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:36 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:36 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:36 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:40 - expected_executable
+  error - Unterminated string literal - lib\sushi\playback\sushi_hls_web_buffer_config.dart:1:40 - unterminated_string_literal
+   info - Missing type annotation - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:5 - strict_top_level_inference
+   info - The function 'if' should have a return type but doesn't - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:5 - always_declare_return_types
+  error - 'if' can't be used as an identifier because it's a keyword - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:5 - expected_identifier_but_got_keyword
+  error - The prefix 'dart' can't be used here because it's shadowed by a local declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:9 - prefix_shadowed_by_local_declaration
+  error - Expected an identifier - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:21 - missing_identifier
+  error - Expected to find ')' - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:22 - expected_token
+  error - A function body must be provided - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:34 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:34 - expected_executable
+  error - Unexpected text ';' - lib\sushi\playback\sushi_hls_web_buffer_config.dart:2:69 - unexpected_token
+warning - Unused import: 'package:fladder/wrappers/players/base_player.dart' - lib\sushi\playback\sushi_subtitle_font.dart:9:8 - unused_import
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_catalog_interest.dart:14:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_catalog_interest.dart:14:2 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_catalog_interest.dart:14:3 - strict_top_level_inference
+   info - The function 'sushi_catalog_interest' should have a return type but doesn't - lib\sushi\providers\sushi_catalog_interest.dart:14:3 - always_declare_return_types
+   info - The variable name 'sushi_catalog_interest' isn't a lowerCamelCase identifier - lib\sushi\providers\sushi_catalog_interest.dart:14:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_catalog_interest.dart:14:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_catalog_interest.dart:14:25 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_catalog_interest.dart:14:25 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_catalog_interest.dart:14:26 - strict_top_level_inference
+   info - The function 'g' should have a return type but doesn't - lib\sushi\providers\sushi_catalog_interest.dart:14:26 - always_declare_return_types
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_catalog_interest.dart:14:26 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_catalog_interest.dart:14:27 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_catalog_interest.dart:14:27 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\providers\sushi_catalog_interest.dart:14:28 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\providers\sushi_catalog_interest.dart:14:28 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\providers\sushi_catalog_interest.dart:14:28 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\providers\sushi_catalog_interest.dart:14:28 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_catalog_interest.dart:14:32 - expected_executable
+  error - Unterminated string literal - lib\sushi\providers\sushi_catalog_interest.dart:14:33 - unterminated_string_literal
+  error - Classes can only extend other classes - lib\sushi\providers\sushi_catalog_interest.dart:36:36 - extends_non_class
+warning - The method doesn't override an inherited method - lib\sushi\providers\sushi_catalog_interest.dart:38:37 - override_on_non_overriding_member
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:40:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:42:44 - undefined_identifier
+  error - Undefined name 'catalogId' - lib\sushi\providers\sushi_catalog_interest.dart:63:32 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:64:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:66:44 - undefined_identifier
+  error - Undefined name 'catalogId' - lib\sushi\providers\sushi_catalog_interest.dart:69:49 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_catalog_interest.dart:80:21 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_catalog_interest.dart:81:5 - undefined_identifier
+  error - Undefined name 'catalogId' - lib\sushi\providers\sushi_catalog_interest.dart:86:32 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:87:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:89:44 - undefined_identifier
+  error - Undefined name 'catalogId' - lib\sushi\providers\sushi_catalog_interest.dart:92:51 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_catalog_interest.dart:103:21 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_catalog_interest.dart:104:5 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:105:36 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:106:5 - undefined_identifier
+  error - Undefined name 'sushiWatchlistDashboardProvider' - lib\sushi\providers\sushi_catalog_interest.dart:106:20 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_catalog_interest.dart:107:15 - undefined_identifier
+  error - Undefined name 'future' - lib\sushi\providers\sushi_catalog_interest.dart:112:27 - undefined_identifier
+  error - Undefined name 'future' - lib\sushi\providers\sushi_catalog_interest.dart:117:27 - undefined_identifier
+  error - Undefined name 'sushiWatchlistDashboardProvider' - lib\sushi\providers\sushi_catalog_item_flags.dart:181:20 - undefined_identifier
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_context.dart:5:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_context.dart:5:2 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_context.dart:5:3 - strict_top_level_inference
+   info - The function 'sushi_media_issue_context' should have a return type but doesn't - lib\sushi\providers\sushi_media_issue_context.dart:5:3 - always_declare_return_types
+   info - The variable name 'sushi_media_issue_context' isn't a lowerCamelCase identifier - lib\sushi\providers\sushi_media_issue_context.dart:5:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_media_issue_context.dart:5:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_media_issue_context.dart:5:28 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_context.dart:5:28 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_context.dart:5:29 - strict_top_level_inference
+   info - The function 'g' should have a return type but doesn't - lib\sushi\providers\sushi_media_issue_context.dart:5:29 - always_declare_return_types
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_media_issue_context.dart:5:29 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_media_issue_context.dart:5:30 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_context.dart:5:30 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\providers\sushi_media_issue_context.dart:5:31 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_context.dart:5:31 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\providers\sushi_media_issue_context.dart:5:31 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\providers\sushi_media_issue_context.dart:5:31 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_context.dart:5:35 - expected_executable
+  error - Unterminated string literal - lib\sushi\providers\sushi_media_issue_context.dart:5:36 - unterminated_string_literal
+  error - Undefined class 'SushiMediaIssueContextRef' - lib\sushi\providers\sushi_media_issue_context.dart:22:3 - undefined_class
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_submit.dart:6:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_submit.dart:6:2 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_submit.dart:6:3 - strict_top_level_inference
+   info - The function 'sushi_media_issue_submit' should have a return type but doesn't - lib\sushi\providers\sushi_media_issue_submit.dart:6:3 - always_declare_return_types
+   info - The variable name 'sushi_media_issue_submit' isn't a lowerCamelCase identifier - lib\sushi\providers\sushi_media_issue_submit.dart:6:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_media_issue_submit.dart:6:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_media_issue_submit.dart:6:27 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_submit.dart:6:27 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_submit.dart:6:28 - strict_top_level_inference
+   info - The function 'g' should have a return type but doesn't - lib\sushi\providers\sushi_media_issue_submit.dart:6:28 - always_declare_return_types
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_media_issue_submit.dart:6:28 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_media_issue_submit.dart:6:29 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_submit.dart:6:29 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\providers\sushi_media_issue_submit.dart:6:30 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\providers\sushi_media_issue_submit.dart:6:30 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\providers\sushi_media_issue_submit.dart:6:30 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\providers\sushi_media_issue_submit.dart:6:30 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_media_issue_submit.dart:6:34 - expected_executable
+  error - Unterminated string literal - lib\sushi\providers\sushi_media_issue_submit.dart:6:35 - unterminated_string_literal
+  error - Classes can only extend other classes - lib\sushi\providers\sushi_media_issue_submit.dart:9:37 - extends_non_class
+warning - The method doesn't override an inherited method - lib\sushi\providers\sushi_media_issue_submit.dart:11:18 - override_on_non_overriding_member
+  error - Undefined name 'state' - lib\sushi\providers\sushi_media_issue_submit.dart:18:5 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_media_issue_submit.dart:19:5 - undefined_identifier
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_tmdb_interest.dart:16:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_tmdb_interest.dart:16:2 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_tmdb_interest.dart:16:3 - strict_top_level_inference
+   info - The function 'sushi_tmdb_interest' should have a return type but doesn't - lib\sushi\providers\sushi_tmdb_interest.dart:16:3 - always_declare_return_types
+   info - The variable name 'sushi_tmdb_interest' isn't a lowerCamelCase identifier - lib\sushi\providers\sushi_tmdb_interest.dart:16:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_tmdb_interest.dart:16:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_tmdb_interest.dart:16:22 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_tmdb_interest.dart:16:22 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_tmdb_interest.dart:16:23 - strict_top_level_inference
+   info - The function 'g' should have a return type but doesn't - lib\sushi\providers\sushi_tmdb_interest.dart:16:23 - always_declare_return_types
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_tmdb_interest.dart:16:23 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_tmdb_interest.dart:16:24 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_tmdb_interest.dart:16:24 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\providers\sushi_tmdb_interest.dart:16:25 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\providers\sushi_tmdb_interest.dart:16:25 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\providers\sushi_tmdb_interest.dart:16:25 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\providers\sushi_tmdb_interest.dart:16:25 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_tmdb_interest.dart:16:29 - expected_executable
+  error - Unterminated string literal - lib\sushi\providers\sushi_tmdb_interest.dart:16:30 - unterminated_string_literal
+  error - Classes can only extend other classes - lib\sushi\providers\sushi_tmdb_interest.dart:50:33 - extends_non_class
+warning - The method doesn't override an inherited method - lib\sushi\providers\sushi_tmdb_interest.dart:52:34 - override_on_non_overriding_member
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:56:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:57:25 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:64:66 - undefined_identifier
+  error - Undefined name 'tmdbId' - lib\sushi\providers\sushi_tmdb_interest.dart:100:32 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:101:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:102:25 - undefined_identifier
+  error - Undefined name 'mediaType' - lib\sushi\providers\sushi_tmdb_interest.dart:107:49 - undefined_identifier
+  error - Undefined name 'tmdbId' - lib\sushi\providers\sushi_tmdb_interest.dart:108:66 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:118:31 - undefined_identifier
+  error - Undefined name 'state' - lib\sushi\providers\sushi_tmdb_interest.dart:130:5 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:138:38 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:139:7 - undefined_identifier
+  error - Undefined name 'sushiWatchlistDashboardProvider' - lib\sushi\providers\sushi_tmdb_interest.dart:139:22 - undefined_identifier
+  error - Undefined name 'ref' - lib\sushi\providers\sushi_tmdb_interest.dart:140:17 - undefined_identifier
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:1 - expected_executable
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:2 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:3 - strict_top_level_inference
+   info - The function 'sushi_watchlist_dashboard' should have a return type but doesn't - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:3 - always_declare_return_types
+   info - The variable name 'sushi_watchlist_dashboard' isn't a lowerCamelCase identifier - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:3 - non_constant_identifier_names
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:3 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:28 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:28 - expected_executable
+   info - Missing type annotation - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:29 - strict_top_level_inference
+   info - The function 'g' should have a return type but doesn't - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:29 - always_declare_return_types
+  error - Functions must have an explicit list of parameters - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:29 - missing_function_parameters
+  error - A function body must be provided - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:30 - missing_function_body
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:30 - expected_executable
+   info - An uninitialized variable should have an explicit type annotation - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:31 - prefer_typing_uninitialized_variables
+   info - Missing type annotation - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:31 - strict_top_level_inference
+  error - Expected to find ';' - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:31 - expected_token
+  error - Variables must be declared using the keywords 'const', 'final', 'var' or a type name - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:31 - missing_const_final_var_or_type
+  error - Expected a method, getter, setter or operator declaration - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:35 - expected_executable
+  error - Unterminated string literal - lib\sushi\providers\sushi_watchlist_dashboard.dart:8:36 - unterminated_string_literal
+   info - Use 'const' with the constructor to improve performance - lib\sushi\subtitles\sushi_opensubtitles.dart:147:30 - prefer_const_constructors
+   info - Dangling library doc comment - lib\sushi\subtitles\sushi_srt.dart:1:1 - dangling_library_doc_comments
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_dialog_focus_trap.dart' - lib\sushi\sushi_app_update.dart:11:8 - uri_does_not_exist
+  error - The function 'SushiDialogFocusTrap' isn't defined - lib\sushi\sushi_app_update.dart:189:23 - undefined_function
+   info - Dangling library doc comment - lib\sushi\sushi_config.dart:1:1 - dangling_library_doc_comments
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_dashboard_skeleton.dart:10:8 - unused_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_skeleton_box.dart' - lib\sushi\sushi_dashboard_skeleton.dart:11:8 - uri_does_not_exist
+warning - Dead code - lib\sushi\sushi_dashboard_skeleton.dart:64:3 - dead_code
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiHomeBannerSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:128:28 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiHomeBannerSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:139:17 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiHomeBannerSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:141:17 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiHomeBannerSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:151:30 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiHomeBannerSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:173:22 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiPosterRowSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:216:20 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiPosterRowSkeleton' - lib\sushi\sushi_dashboard_skeleton.dart:231:24 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_home_dashboard_order.dart' - lib\sushi\sushi_dashboard_watchlist.dart:12:8 - uri_does_not_exist
+  error - Undefined name 'SushiHomeDashboardOrder' - lib\sushi\sushi_dashboard_watchlist.dart:36:9 - undefined_identifier
+  error - Undefined name 'SushiHomeDashboardOrder' - lib\sushi\sushi_dashboard_watchlist.dart:45:15 - undefined_identifier
+  error - Undefined name 'SushiHomeDashboardOrder' - lib\sushi\sushi_dashboard_watchlist.dart:55:15 - undefined_identifier
+  error - Undefined name 'sushiWatchlistDashboardProvider' - lib\sushi\sushi_dashboard_watchlist.dart:245:38 - undefined_identifier
+warning - Unused import: 'package:fladder/sushi/sushi_pending_route.dart' - lib\sushi\sushi_desktop_deep_link.dart:3:8 - unused_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_media_play_button_skeleton.dart' - lib\sushi\sushi_detail_loading.dart:4:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_skeleton_box.dart' - lib\sushi\sushi_detail_loading.dart:5:8 - uri_does_not_exist
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiDetailLoadingContent' - lib\sushi\sushi_detail_loading.dart:47:19 - undefined_method
+  error - The name 'SushiMediaPlayButtonSkeleton' isn't a class - lib\sushi\sushi_detail_loading.dart:54:23 - creation_with_non_type
+  error - The name 'SushiSkeletonBox' isn't a class - lib\sushi\sushi_detail_loading.dart:62:34 - creation_with_non_type
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiDetailLoadingContent' - lib\sushi\sushi_detail_loading.dart:70:17 - undefined_method
+  error - The method 'SushiSkeletonBox' isn't defined for the type 'SushiDetailLoadingContent' - lib\sushi\sushi_detail_loading.dart:76:17 - undefined_method
+  error - The name 'SushiSkeletonBox' isn't a class - lib\sushi\sushi_detail_loading.dart:85:32 - creation_with_non_type
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_library_item_ratings.dart' - lib\sushi\sushi_home_detail_prefetch.dart:12:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_details_loader.dart' - lib\sushi\sushi_home_detail_prefetch.dart:13:8 - uri_does_not_exist
+  error - The method 'sushiLoadCachedLibraryItemJson' isn't defined for the type 'SushiHomeDetailPrefetch' - lib\sushi\sushi_home_detail_prefetch.dart:80:26 - undefined_method
+  error - The method 'sushiFetchLibraryItemJson' isn't defined for the type 'SushiHomeDetailPrefetch' - lib\sushi\sushi_home_detail_prefetch.dart:82:13 - undefined_method
+  error - The method 'sushiFetchSeriesCatalogBySeason' isn't defined for the type 'SushiHomeDetailPrefetch' - lib\sushi\sushi_home_detail_prefetch.dart:101:11 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/playback/ox_persian_language.dart' - lib\sushi\sushi_iran_content.dart:3:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/playback/ox_subtitle_font.dart' - lib\sushi\sushi_iran_content.dart:4:8 - uri_does_not_exist
+  error - Undefined name 'SushiSubtitleFont' - lib\sushi\sushi_iran_content.dart:26:25 - undefined_identifier
+  error - Undefined name 'SushiSubtitleFont' - lib\sushi\sushi_iran_content.dart:27:34 - undefined_identifier
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\sushi_iran_content.dart:29:12 - undefined_identifier
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_library_item_ratings.dart' - lib\sushi\sushi_library_detail_labels.dart:5:8 - uri_does_not_exist
+  error - The function 'sushiSeerrRatingLabels' isn't defined - lib\sushi\sushi_library_detail_labels.dart:18:10 - undefined_function
+  error - The function 'sushiLibraryItemRatingsProvider' isn't defined - lib\sushi\sushi_library_detail_labels.dart:18:52 - undefined_function
+warning - Unused import: 'package:fladder/models/collection_types.dart' - lib\sushi\sushi_library_feed.dart:7:8 - unused_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_item_ratings.dart' - lib\sushi\sushi_library_item_ratings.dart:12:8 - uri_does_not_exist
+  error - The name 'SushiItemRatings' isn't a type, so it can't be used as a type argument - lib\sushi\sushi_library_item_ratings.dart:21:62 - non_type_as_type_argument
+  error - Undefined class 'SushiItemRatings' - lib\sushi\sushi_library_item_ratings.dart:24:1 - undefined_class
+  error - The function 'sushiParseItemRatingsJson' isn't defined - lib\sushi\sushi_library_item_ratings.dart:25:10 - undefined_function
+  error - Undefined class 'SushiItemRatings' - lib\sushi\sushi_library_item_ratings.dart:28:59 - undefined_class
+  error - Undefined class 'SushiItemRatings' - lib\sushi\sushi_library_item_ratings.dart:178:31 - undefined_class
+  error - Undefined class 'SushiItemRatings' - lib\sushi\sushi_library_item_ratings.dart:192:31 - undefined_class
+  error - Undefined class 'SushiItemRatings' - lib\sushi\sushi_library_item_ratings.dart:211:64 - undefined_class
+warning - Dead code - lib\sushi\sushi_library_loading.dart:10:3 - dead_code
+warning - Unused import: 'package:flutter_svg/flutter_svg.dart' - lib\sushi\sushi_login_logo.dart:2:8 - unused_import
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_login_logo.dart:5:8 - unused_import
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_login_method_chooser.dart:4:8 - unused_import
+warning - Dead code - lib\sushi\sushi_login_method_chooser.dart:29:38 - dead_code
+   info - The private field _starting could be 'final' - lib\sushi\sushi_main_bot_login_panel.dart:54:8 - prefer_final_fields
+warning - Unused import: 'package:fladder/sushi/sushi_variant_label.dart' - lib\sushi\sushi_media_streams.dart:3:8 - unused_import
+warning - Dead code - lib\sushi\sushi_media_streams.dart:16:3 - dead_code
+warning - Dead code - lib\sushi\sushi_media_streams.dart:27:3 - dead_code
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_media_variant.dart:10:8 - unused_import
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_patch_playback_progress.dart:12:8 - unused_import
+warning - Dead code - lib\sushi\sushi_patch_playback_progress.dart:72:5 - dead_code
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_play_warmup.dart:7:8 - unused_import
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_playback_details_refresh.dart:9:8 - unused_import
+warning - Unused import: 'package:flutter/foundation.dart' - lib\sushi\sushi_playback_prefetch.dart:3:8 - unused_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_next_up.dart' - lib\sushi\sushi_playback_prefetch.dart:8:8 - uri_does_not_exist
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_playback_prefetch.dart:19:8 - unused_import
+  error - The method 'sushiSeriesPlayableNextUp' isn't defined for the type 'SushiPlaybackPrefetch' - lib\sushi\sushi_playback_prefetch.dart:33:21 - undefined_method
+warning - Dead code - lib\sushi\sushi_playback_prefetch.dart:68:5 - dead_code
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_playback_queue.dart:13:8 - unused_import
+warning - Dead code - lib\sushi\sushi_playback_queue.dart:40:5 - dead_code
+  error - Target of URI doesn't exist: 'package:fladder/sushi/playback/ox_persian_language.dart' - lib\sushi\sushi_playback_subtitle.dart:4:8 - uri_does_not_exist
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\sushi_playback_subtitle.dart:66:8 - undefined_identifier
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\sushi_playback_subtitle.dart:67:11 - undefined_identifier
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\sushi_playback_subtitle.dart:91:9 - undefined_identifier
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\sushi_playback_subtitle.dart:92:9 - undefined_identifier
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' - lib\sushi\sushi_prefs_transport.dart:1:8 - unnecessary_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_virtual_episode_images.dart' - lib\sushi\sushi_series_details_loader.dart:4:8 - uri_does_not_exist
+  error - The function 'sushiEpisodeListFields' isn't defined - lib\sushi\sushi_series_details_loader.dart:20:10 - undefined_function
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_next_up.dart' - lib\sushi\sushi_series_episode_actions.dart:6:8 - uri_does_not_exist
+  error - The function 'sushiSeriesPlayableNextUp' isn't defined - lib\sushi\sushi_series_episode_actions.dart:63:55 - undefined_function
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_series_episode_picker_sheet.dart' - lib\sushi\sushi_series_episode_picker.dart:6:8 - uri_does_not_exist
+  error - The function 'SushiSeriesEpisodePickerSheet' isn't defined - lib\sushi\sushi_series_episode_picker.dart:18:45 - undefined_function
+warning - Unused import: 'package:fladder/models/items/media_streams_model.dart' - lib\sushi\sushi_share.dart:7:8 - unused_import
+warning - Duplicate import - lib\sushi\sushi_splash_auth.dart:3:8 - duplicate_import
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\sushi_splash_auth.dart:9:8 - unused_import
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_library_item_ratings.dart' - lib\sushi\sushi_staged_detail_load.dart:16:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_season_user_data.dart' - lib\sushi\sushi_staged_detail_load.dart:17:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_details_loader.dart' - lib\sushi\sushi_staged_detail_load.dart:18:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_virtual_episode_images.dart' - lib\sushi\sushi_staged_detail_load.dart:20:8 - uri_does_not_exist
+  error - The function 'sushiFetchLibraryItemDetails' isn't defined - lib\sushi\sushi_staged_detail_load.dart:58:29 - undefined_function
+  error - The function 'sushiFetchLibraryItemJson' isn't defined - lib\sushi\sushi_staged_detail_load.dart:81:25 - undefined_function
+  error - The function 'sushiApplyLibraryItemRatings' isn't defined - lib\sushi\sushi_staged_detail_load.dart:82:7 - undefined_function
+  error - The function 'sushiRatingsFromItemJson' isn't defined - lib\sushi\sushi_staged_detail_load.dart:82:71 - undefined_function
+  error - The function 'sushiFetchLibraryItemDetails' isn't defined - lib\sushi\sushi_staged_detail_load.dart:95:29 - undefined_function
+  error - The function 'sushiFetchLibraryItemJson' isn't defined - lib\sushi\sushi_staged_detail_load.dart:112:25 - undefined_function
+  error - The function 'sushiApplyLibraryItemRatings' isn't defined - lib\sushi\sushi_staged_detail_load.dart:113:7 - undefined_function
+  error - The function 'sushiRatingsFromItemJson' isn't defined - lib\sushi\sushi_staged_detail_load.dart:113:64 - undefined_function
+  error - The name 'SushiSeriesCatalogLoad' isn't a type, so it can't be used as a type argument - lib\sushi\sushi_staged_detail_load.dart:123:10 - non_type_as_type_argument
+  error - The function 'sushiFetchSeriesCatalogBySeason' isn't defined - lib\sushi\sushi_staged_detail_load.dart:132:17 - undefined_function
+  error - The function 'sushiEpisodeListFields' isn't defined - lib\sushi\sushi_staged_detail_load.dart:143:15 - undefined_function
+  error - The function 'sushiApplyVirtualEpisodeImages' isn't defined - lib\sushi\sushi_staged_detail_load.dart:155:5 - undefined_function
+  error - The function 'sushiSeasonUserDataFromEpisodes' isn't defined - lib\sushi\sushi_staged_detail_load.dart:169:15 - undefined_function
+   info - Missing a newline at the end of the file - lib\sushi\sushi_staged_detail_load.dart:255:2 - eol_at_end_of_file
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_splash_brand.dart' - lib\sushi\sushi_tdlib_connecting_experience.dart:5:8 - uri_does_not_exist
+  error - The name 'SushiSplashBrand' isn't a class - lib\sushi\sushi_tdlib_connecting_experience.dart:152:19 - creation_with_non_type
+  error - Target of URI doesn't exist: 'package:fladder/sushi/playback/ox_persian_language.dart' - lib\sushi\widgets\sushi_labeled_iran_flag.dart:5:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_iran_flag_icon.dart' - lib\sushi\widgets\sushi_labeled_iran_flag.dart:6:8 - uri_does_not_exist
+  error - Undefined name 'SushiPersianLanguage' - lib\sushi\widgets\sushi_labeled_iran_flag.dart:34:10 - undefined_identifier
+  error - The name 'SushiIranFlagIcon' isn't a class - lib\sushi\widgets\sushi_labeled_iran_flag.dart:48:15 - creation_with_non_type
+  error - Undefined name 'sushiMediaIssueSubmitProvider' - lib\sushi\widgets\sushi_media_issue_sheet.dart:77:31 - undefined_identifier
+  error - Undefined name 'sushiMediaIssueSubmitProvider' - lib\sushi\widgets\sushi_media_issue_sheet.dart:85:28 - undefined_identifier
+  error - The method 'sushiMediaIssueContextProvider' isn't defined for the type '_OxMediaIssueSheetState' - lib\sushi\widgets\sushi_media_issue_sheet.dart:102:36 - undefined_method
+  error - Undefined name 'sushiMediaIssueSubmitProvider' - lib\sushi\widgets\sushi_media_issue_sheet.dart:103:35 - undefined_identifier
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_skeleton_box.dart' - lib\sushi\widgets\sushi_media_play_button_skeleton.dart:3:8 - uri_does_not_exist
+  error - The name 'SushiSkeletonBox' isn't a class - lib\sushi\widgets\sushi_media_play_button_skeleton.dart:11:18 - creation_with_non_type
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_movie_boxset_siblings.dart' - lib\sushi\widgets\sushi_movie_boxset_row.dart:5:8 - uri_does_not_exist
+  error - The method 'sushiMovieBoxSetSiblingsProvider' isn't defined for the type 'SushiMovieBoxSetRow' - lib\sushi\widgets\sushi_movie_boxset_row.dart:21:37 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_episode_actions.dart' - lib\sushi\widgets\sushi_series_detail_play_buttons.dart:7:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/widgets/ox_series_episode_picker_icon_button.dart' - lib\sushi\widgets\sushi_series_detail_play_buttons.dart:8:8 - uri_does_not_exist
+warning - Unused import: 'package:fladder/sushi/sushi_config.dart' - lib\sushi\widgets\sushi_series_detail_play_buttons.dart:10:8 - unused_import
+  error - The method 'sushiSeriesPickerSeasons' isn't defined for the type 'SushiSeriesDetailPlayButtons' - lib\sushi\widgets\sushi_series_detail_play_buttons.dart:30:27 - undefined_method
+  error - The method 'SushiSeriesEpisodePickerIconButton' isn't defined for the type 'SushiSeriesDetailPlayButtons' - lib\sushi\widgets\sushi_series_detail_play_buttons.dart:47:11 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_episode_actions.dart' - lib\sushi\widgets\sushi_series_episode_picker_button.dart:7:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_episode_picker.dart' - lib\sushi\widgets\sushi_series_episode_picker_button.dart:8:8 - uri_does_not_exist
+  error - The method 'sushiSeriesPickerSeasons' isn't defined for the type 'SushiSeriesEpisodePickerButton' - lib\sushi\widgets\sushi_series_episode_picker_button.dart:27:21 - undefined_method
+  error - The method 'sushiShowSeriesEpisodePicker' isn't defined for the type 'SushiSeriesEpisodePickerButton' - lib\sushi\widgets\sushi_series_episode_picker_button.dart:79:11 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_episode_picker.dart' - lib\sushi\widgets\sushi_series_episode_picker_icon_button.dart:7:8 - uri_does_not_exist
+  error - The method 'sushiShowSeriesEpisodePicker' isn't defined for the type 'SushiSeriesEpisodePickerIconButton' - lib\sushi\widgets\sushi_series_episode_picker_icon_button.dart:28:20 - undefined_method
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_episode_actions.dart' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:8:8 - uri_does_not_exist
+  error - Target of URI doesn't exist: 'package:fladder/sushi/ox_series_selected_episode.dart' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:9:8 - uri_does_not_exist
+  error - The name 'SushiSeriesPickerSeason' isn't a type, so it can't be used as a type argument - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:33:19 - non_type_as_type_argument
+  error - The method 'sushiSeriesPickerSeasons' isn't defined for the type '_OxSeriesEpisodePickerSheetState' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:33:55 - undefined_method
+  error - Undefined class 'SushiSeriesPickerSeason' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:37:3 - undefined_class
+  error - Undefined class 'SushiSeriesPickerSeason' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:80:22 - undefined_class
+  error - Undefined class 'SushiSeriesPickerSeason' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:99:49 - undefined_class
+  error - Undefined class 'SushiSeriesPickerSeason' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:107:52 - undefined_class
+  error - The method 'sushiSetSeriesSelectedEpisode' isn't defined for the type '_OxSeriesEpisodePickerSheetState' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:114:5 - undefined_method
+  error - Undefined class 'SushiSeriesPickerSeason' - lib\sushi\widgets\sushi_series_episode_picker_sheet.dart:205:52 - undefined_class
+
+flutter : 305 issues found. (ran in 4.2s)
+At C:\Users\Aryan\AppData\Local\Temp\ps-script-4caa6036-86c7-42ce-8bd5-abc7eba9c8d1.ps1:89 char:1
++ flutter analyze lib\sushi 2>&1 | Out-File -FilePath tools\analyze_sus ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (305 issues found. (ran in 4.2s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

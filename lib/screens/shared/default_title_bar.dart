@@ -4,7 +4,7 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -208,7 +208,7 @@ class _DefaultTitleBarState extends ConsumerState<DefaultTitleBar> with WindowLi
                           ),
                         ),
                       TargetPlatform.macOS => const SizedBox.expand(),
-                      _ => Text(widget.label ?? OxplayerBrand.appName),
+                      _ => Text(widget.label ?? SushiBrand.appName),
                     },
                     const OfflineBanner()
                   ],

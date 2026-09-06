@@ -10,14 +10,12 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
-import 'package:fladder/providers/seerr_api_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/login/lock_screen.dart';
 import 'package:fladder/screens/login/login_code_dialog.dart';
 import 'package:fladder/screens/login/login_user_grid.dart';
-import 'package:fladder/screens/login/widgets/advanced_login_options_dialog.dart';
 import 'package:fladder/screens/login/widgets/connect_link_dialog.dart';
 import 'package:fladder/screens/login/widgets/discover_servers_widget.dart';
 import 'package:fladder/screens/shared/animated_fade_size.dart';
@@ -26,10 +24,8 @@ import 'package:fladder/screens/shared/outlined_text_field.dart';
 import 'package:fladder/screens/shared/passcode_input.dart';
 import 'package:fladder/util/auth_service.dart';
 import 'package:fladder/util/deep_link_helper.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
-import 'package:fladder/oxplayer/oxplayer_seerr_auto_config.dart';
-import 'package:fladder/util/fladder_config.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_pending_route.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 class LoginScreenCredentials extends ConsumerStatefulWidget {
@@ -278,20 +274,6 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
                                 ),
                         ),
                       ),
-                      if (!OxplayerEnv.isEnabled && FladderConfig.seerrBaseUrl?.isNotEmpty != true)
-                        IconButton.filledTonal(
-                          onPressed: () async {
-                            final tempSeerrUrl = ref.read(authProvider.select((value) => value.tempSeerrUrl));
-                            final result = await showAdvancedLoginOptionsDialog(
-                              context,
-                              initialSeerrUrl: tempSeerrUrl,
-                            );
-                            if (result != null) {
-                              ref.read(authProvider.notifier).setTempSeerrUrl(result);
-                            }
-                          },
-                          icon: const Icon(IconsaxPlusLinear.setting_3),
-                        ),
                     ],
                   ),
                   if (hasQuickConnect)
@@ -368,45 +350,8 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
       return;
     }
 
-    final tempSeerrUrl = ref.read(authProvider.select((value) => value.tempSeerrUrl));
-    if (tempSeerrUrl != null && tempSeerrUrl.isNotEmpty) {
-      await _tryAuthenticateSeerr(tempSeerrUrl);
-    }
-
     if (context.mounted) {
       await loggedInGoToHome(context, ref);
-    }
-  }
-
-  Future<void> _tryAuthenticateSeerr(String seerrUrl) async {
-    try {
-      final username = usernameController.text.trim();
-      final password = passwordController.text;
-
-      final effectiveSeerrUrl = FladderConfig.seerrBaseUrl ?? seerrUrl;
-      ref.read(userProvider.notifier).setSeerrServerUrl(effectiveSeerrUrl);
-
-      final tempCookie = ref.read(authProvider.select((value) => value.tempSeerrSessionCookie));
-      final cookie = tempCookie ??
-          await ref.read(seerrApiProvider).authenticateJellyfin(
-                username: username,
-                password: password,
-              );
-
-      ref.read(userProvider.notifier).setSeerrSessionCookie(cookie);
-      ref.read(userProvider.notifier).setSeerrApiKey('');
-      ref.read(authProvider.notifier).setTempSeerrSessionCookie(null);
-
-      if (context.mounted) {
-        FladderSnack.show(context.localized.seerrLoggedIn, context: context);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        FladderSnack.show(
-          "${context.localized.seerrAuthenticateLocal}: ${e.toString()}",
-          context: context,
-        );
-      }
     }
   }
 
@@ -429,8 +374,8 @@ class _LoginScreenCredentialsState extends ConsumerState<LoginScreenCredentials>
 }
 
 Future<void> loggedInGoToHome(BuildContext context, WidgetRef ref) async {
-  if (OxplayerEnv.isEnabled) {
-    await oxplayerNavigateAfterLogin(context, ref);
+  if (SushiEnv.isEnabled) {
+    await sushiNavigateAfterLogin(context, ref);
     return;
   }
   ref.read(lockScreenActiveProvider.notifier).update((state) => false);

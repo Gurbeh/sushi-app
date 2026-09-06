@@ -12,7 +12,6 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/last_seen_notifications_model.dart';
 import 'package:fladder/models/notification_model.dart';
 import 'package:fladder/providers/shared_provider.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/services/notification_service.dart';
 import 'package:fladder/util/notification_helpers.dart';
 
@@ -55,7 +54,7 @@ Future<LastSeenNotificationsModel?> performHeadlessUpdateCheck(
 
     final accounts = sharedHelper
         .getAccounts()
-        .where((element) => element.updateNotificationsEnabled || element.seerrRequestsEnabled)
+        .where((element) => element.updateNotificationsEnabled)
         .toList();
     if (accounts.isEmpty) return null;
 
@@ -74,7 +73,7 @@ Future<LastSeenNotificationsModel?> performHeadlessUpdateCheck(
     for (final account in accounts) {
       final baseUrl =
           account.credentials.url.isNotEmpty ? account.credentials.url : (account.credentials.localUrl ?? '');
-      if (baseUrl.isEmpty && !(account.seerrRequestsEnabled && account.seerrCredentials?.isConfigured == true)) {
+      if (baseUrl.isEmpty) {
         continue;
       }
 
@@ -95,17 +94,6 @@ Future<LastSeenNotificationsModel?> performHeadlessUpdateCheck(
             lastUpdateCheck,
           );
           accountNotifications.addAll(newNotifications);
-        }
-
-        if (account.seerrRequestsEnabled && account.seerrCredentials?.isConfigured == true) {
-          final seerrNotifications = await _fetchAndNotifySeerrRequestsForAccount(
-            account,
-            l10n,
-            10,
-            debug,
-            lastUpdateCheck,
-          );
-          accountNotifications.addAll(seerrNotifications);
         }
 
         if (accountNotifications.isNotEmpty) {
@@ -187,99 +175,6 @@ Future<List<NotificationModel>> _fetchAndNotifyLatestItemsForAccount(
     return newNotifications;
   } catch (e) {
     log('Error fetching latest items for account ${account.id}: $e');
-    return [];
-  }
-}
-
-Future<List<NotificationModel>> _fetchAndNotifySeerrRequestsForAccount(
-  AccountModel account,
-  AppLocalizations l10n,
-  int limit,
-  bool debug,
-  DateTime lastUpdateCheck,
-) async {
-  try {
-    final seerrCredentials = account.seerrCredentials;
-    if (seerrCredentials == null || !seerrCredentials.isConfigured) return [];
-
-    final seerrBase = seerrCredentials.serverUrl.endsWith('/')
-        ? seerrCredentials.serverUrl.substring(0, seerrCredentials.serverUrl.length - 1)
-        : seerrCredentials.serverUrl;
-
-    final seerrApi = NotificationHelpers.createSeerrClient(
-      seerrCredentials,
-      oxBearerToken: account.credentials.token,
-    );
-
-    final newRequests = await NotificationHelpers.fetchSeerrRequests(
-      seerrApi,
-      seerrBase,
-      lastUpdateCheck,
-      debug,
-      limit,
-      seerrCredentials,
-    );
-
-    if (newRequests.isEmpty) return [];
-
-    final List<NotificationModel> seerrNotifications = [];
-
-    for (final request in newRequests) {
-      try {
-        final tmdbId = request.media?.tmdbId;
-        String? title;
-        String? image;
-        String? payload;
-
-        if (tmdbId != null) {
-          final mediaTypeRaw = (request.media?.mediaType ?? '').toLowerCase();
-          if (mediaTypeRaw.contains('tv')) {
-            final detailsResp = await seerrApi.getTvDetails(tmdbId);
-            if (detailsResp.isSuccessful && detailsResp.body != null) {
-              final SeerrTvDetails details = detailsResp.body!;
-              title = details.name;
-              image = details.posterUrl;
-              payload = NotificationHelpers.buildSeerrDeepLink('tvshow', tmdbId);
-            }
-          } else {
-            final detailsResp = await seerrApi.getMovieDetails(tmdbId);
-            if (detailsResp.isSuccessful && detailsResp.body != null) {
-              final SeerrMovieDetails details = detailsResp.body!;
-              title = details.title;
-              image = details.posterUrl;
-              payload = NotificationHelpers.buildSeerrDeepLink('movie', tmdbId);
-            }
-          }
-        }
-
-        final notif = NotificationModel.fromSeerrRequest(
-          request,
-          l10n,
-          title: title,
-          image: image,
-          detailedPayload: payload,
-        );
-        if (notif != null) seerrNotifications.add(notif);
-      } catch (e) {
-        log('Error fetching Seerr request parent items ${request.id}: $e');
-        final fallback = NotificationModel.fromSeerrRequest(request, l10n);
-        if (fallback != null) seerrNotifications.add(fallback);
-      }
-    }
-
-    final serverName = seerrCredentials.serverUrl;
-    final summaryText = l10n.notificationNewRequests(seerrNotifications.length);
-
-    await NotificationService.showGroupedNotifications(
-      '${account.id}_seerr',
-      serverName,
-      seerrNotifications,
-      summaryText,
-    );
-
-    return seerrNotifications;
-  } catch (e) {
-    log('Error fetching Seerr requests for account ${account.id}: $e');
     return [];
   }
 }

@@ -6,7 +6,6 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:reorderable_grid/reorderable_grid.dart';
 
 import 'package:fladder/models/account_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/screens/shared/user_icon.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -97,7 +96,7 @@ class LoginUserGrid extends ConsumerWidget {
                               )),
                             ],
                           ),
-                          if (!OxplayerConfig.isEnabled && user.credentials.serverName.isNotEmpty)
+                          if (!user.credentials.serverName.isNotEmpty)
                             Opacity(
                               opacity: 0.75,
                               child: Row(

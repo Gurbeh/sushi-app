@@ -6,7 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/models/settings/arguments_model.dart';
 import 'package:fladder/models/settings/client_settings_model.dart';
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 
 extension WindowHelperSetup on WindowManager {
   Future<void> setupFladderWindowChrome(
@@ -22,7 +22,7 @@ extension WindowHelperSetup on WindowManager {
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.hidden,
-      title: OxplayerBrand.appName,
+      title: SushiBrand.appName,
     );
 
     // Apply window chrome consistently; only skip waitUntilReadyToShow on macOS debug to avoid breaking full-screen during hot reloads.
@@ -43,7 +43,7 @@ extension WindowHelperSetup on WindowManager {
       await windowManager.setBackgroundColor(options.backgroundColor!);
       await windowManager.setSkipTaskbar(options.skipTaskbar ?? false);
       await windowManager.setTitleBarStyle(options.titleBarStyle!);
-      await windowManager.setTitle(options.title ?? OxplayerBrand.appName);
+      await windowManager.setTitle(options.title ?? SushiBrand.appName);
       await applyWindowState();
     } else {
       await windowManager.waitUntilReadyToShow(options, applyWindowState);

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universal_html/html.dart' as html;
 
-import 'package:fladder/oxplayer/oxplayer_provider_read.dart';
+import 'package:fladder/sushi/sushi_provider_read.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/widgets/full_screen_helpers/full_screen_wrapper.dart';
 
@@ -18,7 +18,7 @@ class FullScreenHelper implements FullScreenWrapper {
   }
 
   @override
-  Future<void> closeFullScreenRead(OxplayerRead read) async {
+  Future<void> closeFullScreenRead(SushiRead read) async {
     if (html.document.fullscreenElement != null) {
       html.document.exitFullscreen();
       await Future.delayed(const Duration(milliseconds: 500));

@@ -10,14 +10,11 @@ import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/library_filter_model.dart';
 import 'package:fladder/models/recommended_model.dart';
 import 'package:fladder/models/view_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
-import 'package:fladder/oxplayer/oxplayer_library_loading.dart';
+import 'package:fladder/sushi/sushi_dashboard_skeleton.dart';
+import 'package:fladder/sushi/sushi_library_loading.dart';
 import 'package:fladder/providers/library_screen_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/screens/home_screen.dart';
-import 'package:fladder/screens/metadata/refresh_metadata.dart';
 import 'package:fladder/screens/shared/media/poster_row.dart';
 import 'package:fladder/screens/shared/nested_scaffold.dart';
 import 'package:fladder/screens/shared/nested_sliver_appbar.dart';
@@ -51,15 +48,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    if (OxplayerConfig.isEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOnMount());
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOnMount());
   }
 
   Future<void> _fetchOnMount() async {
     if (!mounted || refreshing) return;
     final state = ref.read(libraryScreenProvider);
-    if (oxLibraryHasCachedContent(state)) return;
+    if (sushiLibraryHasCachedContent(state)) return;
     setState(() => refreshing = true);
     try {
       await ref.read(libraryScreenProvider.notifier).fetchAllLibraries();
@@ -80,8 +75,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     final padding = AdaptiveLayout.adaptivePadding(context);
 
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
-    final libraryCached = oxLibraryHasCachedContent(libraryScreenState);
-    final showListSkeleton = oxShowLibraryListSkeleton(
+    final libraryCached = sushiLibraryHasCachedContent(libraryScreenState);
+    final showListSkeleton = sushiShowLibraryListSkeleton(
       refreshing: refreshing,
       state: libraryScreenState,
     );
@@ -94,7 +89,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         ],
       ),
       body: PullToRefresh(
-        refreshOnStart: OxplayerConfig.isEnabled ? !libraryCached : true,
+        refreshOnStart: !libraryCached,
         refreshKey: refreshKey,
         onRefresh: () async {
           if (refreshing) return;
@@ -112,7 +107,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           duration: const Duration(milliseconds: 175),
           child: SizedBox.expand(
             child: CustomScrollView(
-              controller: AdaptiveLayout.scrollOf(context, HomeTabs.library),
+              controller: PrimaryScrollController.maybeOf(context),
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 const DefaultSliverTopBadding(),
@@ -182,28 +177,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                 }
                               },
                             ),
-                            if (!OxplayerConfig.isEnabled) ...[
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 4.0),
-                                child: VerticalDivider(),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: () => showRefreshPopup(context, selectedView.id, selectedView.name),
-                                label: Text(context.localized.scanLibrary),
-                                icon: const Icon(IconsaxPlusLinear.refresh),
-                              ),
-                            ],
                           ],
                         ),
                       ),
                     ),
                   ),
                 if (showListSkeleton) ...[
-                  SliverToBoxAdapter(child: OxPosterRowSkeleton(contentPadding: padding)),
-                  SliverToBoxAdapter(child: OxPosterRowSkeleton(contentPadding: padding)),
-                  SliverToBoxAdapter(child: OxPosterRowSkeleton(contentPadding: padding)),
+                  SliverToBoxAdapter(child: SushiPosterRowSkeleton(contentPadding: padding)),
+                  SliverToBoxAdapter(child: SushiPosterRowSkeleton(contentPadding: padding)),
+                  SliverToBoxAdapter(child: SushiPosterRowSkeleton(contentPadding: padding)),
                 ],
-                if (oxShowLibraryRecommended(libraryScreenState) && recommendations.isNotEmpty) ...[
+                if (sushiShowLibraryRecommended(libraryScreenState) && recommendations.isNotEmpty) ...[
                   ...recommendations.where((element) => element.posters.isNotEmpty).map(
                     (element) {
                       return SliverToBoxAdapter(
@@ -320,12 +304,6 @@ class LibraryRow extends ConsumerWidget {
             icon: const Icon(IconsaxPlusLinear.search_normal),
             action: () => context.pushRoute(LibrarySearchRoute(viewModelId: view.id)),
           ),
-          if (!OxplayerConfig.isEnabled)
-            ItemActionButton(
-              label: Text(context.localized.scanLibrary),
-              icon: const Icon(IconsaxPlusLinear.refresh),
-              action: () => showRefreshPopup(context, view.id, view.name),
-            ),
           ...?viewActions?.call(view),
         ];
         return Column(

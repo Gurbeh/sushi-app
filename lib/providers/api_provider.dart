@@ -10,17 +10,15 @@ import 'package:punycoder/punycoder.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_force_repair_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_http_performance_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_http_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_reader_kind_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_session_interceptor.dart';
-import 'package:fladder/oxplayer/oxplayer_swr_http_client.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_force_repair_interceptor.dart';
+import 'package:fladder/sushi/sushi_http_performance_interceptor.dart';
+import 'package:fladder/sushi/sushi_playback_http_interceptor.dart';
+import 'package:fladder/sushi/sushi_reader_kind_interceptor.dart';
+import 'package:fladder/sushi/sushi_session_interceptor.dart';
+import 'package:fladder/sushi/sushi_swr_http_client.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/connectivity_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 part 'api_provider.g.dart';
@@ -33,14 +31,8 @@ final serverUrlProvider = StateProvider<String?>((ref) {
 
   if (localUrlAvailable && userCredentials?.localUrl?.isNotEmpty == true) {
     newUrl = userCredentials?.localUrl;
-  } else if (OxplayerConfig.isEnabled) {
-    newUrl = userCredentials?.url ?? tempUrl ?? OxplayerEnv.apiBaseUrl;
-  } else if (userCredentials?.url.isNotEmpty == true) {
-    newUrl = userCredentials?.url;
-  } else if (tempUrl?.isNotEmpty == true) {
-    newUrl = tempUrl;
   } else {
-    newUrl = null;
+    newUrl = userCredentials?.url ?? tempUrl ?? SushiEnv.apiBaseUrl;
   }
 
   return normalizeUrl(newUrl ?? "");
@@ -51,8 +43,8 @@ class JellyApi extends _$JellyApi {
   @override
   JellyService build() {
     http.Client? httpClient;
-    if (OxplayerEnv.isEnabled) {
-      httpClient = OxplayerSwrHttpClient(
+    if (SushiEnv.isEnabled) {
+      httpClient = SushiSwrHttpClient(
         inner: http.Client(),
         userId: () => ref.read(userProvider)?.id ?? '',
       );
@@ -63,11 +55,11 @@ class JellyApi extends _$JellyApi {
         httpClient: httpClient,
         interceptors: [
           JellyRequest(ref),
-          if (OxplayerEnv.isEnabled) OxplayerHttpPerformanceInterceptor(),
-          if (OxplayerEnv.isEnabled) OxplayerPlaybackHttpInterceptor(ref),
-          if (OxplayerEnv.isEnabled) OxplayerForceRepairInterceptor(ref),
-          if (OxplayerEnv.isEnabled) OxplayerReaderKindInterceptor(),
-          OxplayerSessionInterceptor(ref),
+          if (SushiEnv.isEnabled) SushiHttpPerformanceInterceptor(),
+          if (SushiEnv.isEnabled) SushiPlaybackHttpInterceptor(ref),
+          if (SushiEnv.isEnabled) SushiForceRepairInterceptor(ref),
+          if (SushiEnv.isEnabled) SushiReaderKindInterceptor(),
+          SushiSessionInterceptor(ref),
           JellyResponse(ref),
           HttpLoggingInterceptor(level: Level.basic),
         ],
@@ -125,52 +117,8 @@ class JellyRequest implements Interceptor {
   @override
   FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) async {
     // Sushi has no HTTP API at all (R-API-4) — "sushi://local" is a placeholder credential URL,
-    // not a real server. Fail immediately rather than actually dialing it: letting it fall
-    // through to the retry loop below wastes ~1.2s per call and, on the final failed attempt,
-    // explicitly flips connectivityStatusProvider to offline as a side effect — which is wrong
-    // here (the device has a real connection; there is just no Jellyfin server to ask).
-    if (SushiConfig.isEnabled) {
-      throw const HttpException('Sushi has no HTTP API');
-    }
-
-    final connectivityNotifier = ref.read(connectivityStatusProvider.notifier);
-    final serverUrl = ref.read(serverUrlProvider);
-
-    if (serverUrl == null || serverUrl.isEmpty) {
-      throw const HttpException('No server URL provided');
-    }
-
-    // Use current logged in user otherwise use the authProvider
-    final loginModel = ref.read(userProvider)?.credentials ?? ref.read(authProvider).serverLoginModel?.tempCredentials;
-    if (loginModel == null) {
-      throw UnimplementedError();
-    }
-
-    final headers = loginModel.header(ref);
-
-    for (var attempt = 0; attempt <= _maxRetries; attempt++) {
-      try {
-        final response = await chain.proceed(
-          applyHeaders(
-            chain.request.copyWith(baseUri: Uri.parse(serverUrl)),
-            headers,
-          ),
-        );
-
-        connectivityNotifier.checkConnectivity();
-        return response;
-      } catch (e) {
-        if (!_isConnectionError(e) || attempt == _maxRetries) {
-          connectivityNotifier.onStateChange([ConnectivityResult.none]);
-          rethrow;
-        }
-
-        final delay = Duration(milliseconds: 200 * (attempt + 1));
-        log('Connection failed (attempt ${attempt + 1}/$_maxRetries), retrying in ${delay.inMilliseconds}ms: $e');
-        await Future.delayed(delay);
-      }
-    }
-    throw StateError('Unexpected state in JellyRequest.intercept');
+    // not a real server. Fail immediately rather than dialing it.
+    throw const HttpException('Sushi has no HTTP API');
   }
 }
 
@@ -214,8 +162,6 @@ Future<String?> _probeUrl(String baseUrl, String endpoint) async {
   return null;
 }
 
-/// Probes a Seerr server URL by hitting /api/v1/status.
-Future<String?> probeSeerrUrl(String baseUrl) => _probeUrl(baseUrl, '/api/v1/status');
 
 /// Probes a Jellyfin server URL by hitting /System/Info/Public.
 Future<String?> probeJellyfinUrl(String baseUrl) => _probeUrl(baseUrl, '/System/Info/Public');
@@ -265,7 +211,7 @@ Uri? buildServerUriFromBase(
     relative = Uri.tryParse(relativeUrl.trim());
   }
 
-  if (relative?.hasScheme == true && relative?.host.isNotEmpty == true) {
+  if (relative != null && relative.hasScheme && relative.host.isNotEmpty) {
     return relative;
   }
 

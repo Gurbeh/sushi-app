@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Static checks before pushing oxplayer-client (catches compile errors CI would hit).
+# Static checks before pushing sushi-client (catches compile errors CI would hit).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-echo "=== oxplayer-client verify-all ==="
+echo "=== sushi-client verify-all ==="
 flutter pub get
 
 analyze_log="$(mktemp)"

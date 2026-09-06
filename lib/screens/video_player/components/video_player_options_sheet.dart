@@ -13,12 +13,10 @@ import 'package:fladder/models/playback/offline_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_labeled_iran_flag.dart';
+import 'package:fladder/sushi/widgets/sushi_labeled_iran_flag.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
-import 'package:fladder/screens/collections/add_to_collection.dart';
 import 'package:fladder/screens/metadata/info_screen.dart';
 import 'package:fladder/screens/playlists/add_to_playlists.dart';
 import 'package:fladder/screens/video_player/components/video_player_quality_controls.dart';
@@ -315,16 +313,6 @@ class _VideoOptionsMobileState extends ConsumerState<VideoOptions> {
             },
             title: Text(context.localized.showDetails),
           ),
-          if (!OxplayerConfig.isEnabled && currentItem.type != FladderItemType.boxset)
-            ListTile(
-              onTap: () async {
-                await addItemToCollection(context, [currentItem]);
-                if (context.mounted) {
-                  context.refreshData();
-                }
-              },
-              title: Text(context.localized.addToCollection),
-            ),
           if (currentItem.type != FladderItemType.playlist)
             ListTile(
               onTap: () async {
@@ -443,7 +431,7 @@ Future<void> showSubSelection(BuildContext context) {
                   final selected = !sushiSubActive &&
                       playbackModel.mediaStreams?.defaultSubStreamIndex == subModel.index;
                   return ListTile(
-                    title: OxLabeledIranFlag(
+                    title: SushiLabeledIranFlag(
                       label: subModel.label(context),
                       subtitleLanguage: subModel.language,
                       playbackModel: playbackModel,

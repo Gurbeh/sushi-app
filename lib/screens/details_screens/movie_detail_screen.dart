@@ -7,17 +7,11 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
-import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
-import 'package:fladder/oxplayer/widgets/ox_movie_boxset_row.dart';
-import 'package:fladder/oxplayer/widgets/ox_movie_request_button.dart';
-import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
-import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_detail_loading.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
+import 'package:fladder/sushi/sushi_media_variant.dart';
+import 'package:fladder/sushi/widgets/sushi_detail_action_layout.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
@@ -25,7 +19,6 @@ import 'package:fladder/sushi/sushi_request_button.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
-import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/chapter_row.dart';
 import 'package:fladder/screens/shared/media/components/media_play_button.dart';
@@ -64,18 +57,12 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
     final wrapAlignment = AdaptiveLayout.viewSizeOf(context) != ViewSize.phone
         ? WrapAlignment.start
         : WrapAlignment.center;
-    final hasPlayableMedia = details != null && oxMovieHasPlayableMedia(details);
-    final showMovieRequest = OxplayerEnv.isEnabled &&
-        details?.overview.seerrUrl?.isNotEmpty == true &&
-        details?.tmdbId != null &&
-        !hasPlayableMedia;
-    // Sushi: no Seerr — a native /request replaces play when there is nothing to play (ADR 0014).
+    final hasPlayableMedia = details != null && sushiMovieHasPlayableMedia(details);
     // Only after /item has resolved (sushiTitleResolved): before that the placeholder card cannot
     // tell "no file" from "not loaded", which flashed Request before Play. Until resolved,
     // mainButton is null — neither Play nor Request.
-    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: SushiConfig.isEnabled);
-    final sushiRequestTmdb = SushiConfig.isEnabled &&
-            details != null &&
+    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: true);
+    final sushiRequestTmdb = details != null &&
             sushiResolved &&
             details.canDownload == false &&
             !hasPlayableMedia
@@ -123,14 +110,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 showPlaybackOption: true,
                                 startPosition: restart ? Duration.zero : null,
                               );
-                              if (!mounted) return;
-                              // Sushi has no watch-progress endpoint yet (docs/11's local DB is
-                              // deferred), so refetching /item+/files here would just be another
-                              // bot round-trip for data that hasn't changed.
-                              if (SushiConfig.isEnabled) return;
-                              ref
-                                  .read(providerInstance.notifier)
-                                  .fetchDetails(widget.item);
+                              // Sushi has no watch-progress endpoint yet — skip refetch.
                             },
                             onPressed: (restart) async {
                               await details.play(
@@ -138,11 +118,6 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 ref,
                                 startPosition: restart ? Duration.zero : null,
                               );
-                              if (!mounted) return;
-                              if (SushiConfig.isEnabled) return;
-                              ref
-                                  .read(providerInstance.notifier)
-                                  .fetchDetails(widget.item);
                             },
                           )
                         : sushiRequestTmdb != null
@@ -154,42 +129,26 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                     .read(providerInstance.notifier)
                                     .fetchDetails(widget.item),
                               )
-                            : showMovieRequest
-                                ? OxMovieRequestButton(
-                                    tmdbId: details.tmdbId!,
-                                    prominent: true,
-                                  )
-                                : null,
-                    centerButtons: OxDetailActionLayout(
+                            : null,
+                    centerButtons: SushiDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
-                        if (SushiConfig.isEnabled)
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                  const SushiItemFlags();
-                              return SelectableIconButton(
-                                onPressed: () async {
-                                  await ref
-                                      .read(sushiItemFlagsProvider.notifier)
-                                      .setWatchLater(details, !flags.watchLater);
-                                },
-                                selected: flags.watchLater,
-                                selectedIcon: IconsaxPlusBold.clock,
-                                icon: IconsaxPlusLinear.clock,
-                              );
-                            },
-                          )
-                        else
-                          SelectableIconButton(
-                            onPressed: () async {
-                              await ref.read(userProvider.notifier).setAsFavorite(
-                                  !details.userData.isFavourite, details.id);
-                            },
-                            selected: details.userData.isFavourite,
-                            selectedIcon: IconsaxPlusBold.heart,
-                            icon: IconsaxPlusLinear.heart,
-                          ),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                                const SushiItemFlags();
+                            return SelectableIconButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(sushiItemFlagsProvider.notifier)
+                                    .setWatchLater(details, !flags.watchLater);
+                              },
+                              selected: flags.watchLater,
+                              selectedIcon: IconsaxPlusBold.clock,
+                              icon: IconsaxPlusLinear.clock,
+                            );
+                          },
+                        ),
                         SelectableIconButton(
                           onPressed: () async {
                             await ref.read(userProvider.notifier).markAsPlayed(
@@ -232,18 +191,18 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     officialRating: details.overview.parentalRating,
                     communityRating: details.overview.communityRating,
                     contentTags: details.overview.tags,
-                    additionalLabels: oxLibraryDetailLabels(
+                    additionalLabels: sushiLibraryDetailLabels(
                       context,
                       ref,
                       widget.item.id,
                       details.overview,
                     ),
                     mediaStreamHelper:
-                        oxplayerShowMediaStreamHelper(details.mediaStreams)
+                        sushiShowMediaStreamHelper(details.mediaStreams)
                             ? MediaStreamHelper(
                                 mediaStream: details.mediaStreams,
                                 onItemChanged: (changed) {
-                                  oxplayerOnUserMediaStreamsChanged(
+                                  sushiOnUserMediaStreamsChanged(
                                     ref,
                                     changed,
                                     itemId: details.id,
@@ -272,16 +231,10 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       },
                     ),
                   if (details.overview.people.isNotEmpty)
-                    (OxplayerConfig.isEnabled && !SushiConfig.isEnabled)
-                        ? OxSeerrPeopleRow(
-                            people: details.overview.people,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: details.overview.people,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: details.overview.people,
+                      contentPadding: padding,
+                    ),
                   if (details.specialFeatures.isNotEmpty)
                     SpecialFeaturesRow(
                         contentPadding: padding,
@@ -293,10 +246,9 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       posters: details.related,
                       contentPadding: padding,
                       label: detailsContext.localized.related,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
+                      sushiDetailBadges: true,
                     ),
-                  if (SushiConfig.isEnabled &&
-                      (sushiCollectionFor(details.id)?.items.isNotEmpty ?? false))
+                  if (sushiCollectionFor(details.id)?.items.isNotEmpty ?? false)
                     PosterRow(
                       posters: sushiCollectionFor(details.id)!.items,
                       contentPadding: padding,
@@ -304,28 +256,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                         final name = sushiCollectionFor(details.id)!.name;
                         return name.isEmpty ? 'Collection' : name;
                       }(),
-                      oxDetailBadges: false,
-                    ),
-                  if (OxplayerConfig.isEnabled && !SushiConfig.isEnabled)
-                    OxMovieBoxSetRow(
-                      itemId: widget.item.id,
-                      contentPadding: padding,
-                    ),
-                  if (details.seerrRecommended.isNotEmpty)
-                    SeerrPosterRow(
-                      posters: details.seerrRecommended,
-                      label:
-                          "${detailsContext.localized.discover} ${detailsContext.localized.recommended.toLowerCase()}",
-                      contentPadding: padding,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
-                    ),
-                  if (details.seerrRelated.isNotEmpty)
-                    SeerrPosterRow(
-                      posters: details.seerrRelated,
-                      label:
-                          "${detailsContext.localized.discover} ${detailsContext.localized.related.toLowerCase()}",
-                      contentPadding: padding,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
+                      sushiDetailBadges: false,
                     ),
                   if (details.overview.externalUrls?.isNotEmpty == true)
                     Padding(
@@ -337,9 +268,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
             )
-          : OxplayerConfig.isEnabled
-              ? OxDetailLoadingContent(item: widget.item, padding: padding)
-              : Container(),
+          : SushiDetailLoadingContent(item: widget.item, padding: padding),
     );
   }
 }

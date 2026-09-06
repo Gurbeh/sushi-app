@@ -46,7 +46,7 @@ class UpdateNotifications {
     final accounts = ref
         .read(sharedUtilityProvider)
         .getAccounts()
-        .where((a) => a.updateNotificationsEnabled || a.seerrRequestsEnabled)
+        .where((a) => a.updateNotificationsEnabled)
         .toList();
     if (accounts.isEmpty) {
       await unregisterBackgroundTask();
@@ -105,7 +105,7 @@ class UpdateNotifications {
       final accounts = ref
           .read(sharedUtilityProvider)
           .getAccounts()
-          .where((a) => a.updateNotificationsEnabled || a.seerrRequestsEnabled)
+          .where((a) => a.updateNotificationsEnabled)
           .toList();
       if (accounts.isEmpty) {
         _desktopTimer?.cancel();

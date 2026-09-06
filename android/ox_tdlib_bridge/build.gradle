@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "app.oxplayer.tdlibbridge"
+    namespace = "app.sushi.tdlibbridge"
 
     // This module does not apply dev.flutter.flutter-gradle-plugin, so it can't read the
     // `flutter.*` extension app/build.gradle uses. Keep these in sync with

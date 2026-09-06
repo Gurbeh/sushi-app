@@ -7,8 +7,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_detail_unavailable_telemetry.dart';
+import 'package:fladder/sushi/sushi_detail_unavailable_telemetry.dart';
 import 'package:fladder/providers/items/item_details_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
@@ -65,9 +64,9 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
               currentWidget = fetch.item!.detailScreenWidget;
             });
           } else {
-            if (OxplayerConfig.isEnabled) {
+            
               unawaited(
-                OxplayerDetailUnavailableTelemetry.report(
+                SushiDetailUnavailableTelemetry.report(
                   itemId: widget.id,
                   hadInlineItem: widget.item != null,
                   fetchTrace: fetch.trace,
@@ -76,8 +75,8 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                   lastHttpStatus: fetch.lastHttpStatus,
                 ),
               );
-            }
-            if (OxplayerConfig.isEnabled && context.mounted) {
+            
+            if (context.mounted) {
               FladderSnack.show(context.localized.shareItemUnavailable, context: context);
             }
             if (context.mounted) {

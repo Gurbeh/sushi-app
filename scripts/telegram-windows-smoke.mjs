@@ -11,8 +11,8 @@
  * Still needs ONE short manual/UI pass for: pause/play, subtitle off/on,
  * episode next/prev with real account (Telegram network + MPV).
  *
- * Usage (from oxplayer-be or oxplayer-client):
- *   node ../oxplayer-client/scripts/telegram-windows-smoke.mjs
+ * Usage (from oxplayer-be or sushi-client):
+ *   node ../sushi-client/scripts/telegram-windows-smoke.mjs
  *   pnpm run test:telegram-windows-smoke   # from oxplayer-be
  */
 import { spawnSync } from "node:child_process";

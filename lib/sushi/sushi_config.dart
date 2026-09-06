@@ -6,7 +6,7 @@
 /// (`sushiMovieBot` / `sushiInit01Bot` unless `--dart-define`).
 /// `development` (and flavor-less local runs) read `assets/env/default.env`
 /// (`OXPLAYER_BOT_USERNAME` / `OXPLAYER_INIT_BOT_USERNAME` from `npm run env:pull`).
-import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
+import 'package:fladder/sushi/sushi_dotenv.dart';
 
 abstract final class SushiConfig {
   static const bool isEnabled = true;
@@ -31,7 +31,7 @@ abstract final class SushiConfig {
   /// Public main-bot handle (no @).
   static String get mainBotUsername {
     if (_allowEnvHandles) {
-      final fromEnv = _handle(OxplayerDotenv.get('OXPLAYER_BOT_USERNAME'));
+      final fromEnv = _handle(SushiDotenv.get('OXPLAYER_BOT_USERNAME'));
       if (fromEnv.isNotEmpty) return fromEnv;
     }
     return _handle(_bakedMain);
@@ -40,7 +40,7 @@ abstract final class SushiConfig {
   /// Init-bot handle (no @). Machine handshake only (`/initbot`).
   static String get initBotUsername {
     if (_allowEnvHandles) {
-      final fromEnv = _handle(OxplayerDotenv.get('OXPLAYER_INIT_BOT_USERNAME'));
+      final fromEnv = _handle(SushiDotenv.get('OXPLAYER_INIT_BOT_USERNAME'));
       if (fromEnv.isNotEmpty) return fromEnv;
     }
     return _handle(_bakedInit);
@@ -60,7 +60,7 @@ abstract final class SushiConfig {
   /// 5/day per IP. Empty skips that translate fallback.
   static String get openSubtitlesApiKey {
     if (_bakedOpenSubtitlesKey.trim().isNotEmpty) return _bakedOpenSubtitlesKey.trim();
-    if (_allowEnvHandles) return OxplayerDotenv.get('OPENSUBTITLES_API_KEY').trim();
+    if (_allowEnvHandles) return SushiDotenv.get('OPENSUBTITLES_API_KEY').trim();
     return '';
   }
 }

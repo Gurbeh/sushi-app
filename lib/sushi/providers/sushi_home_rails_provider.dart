@@ -32,6 +32,6 @@ class SushiHomeRailsData {
 
 final sushiHomeRailsProvider = StateProvider<SushiHomeRailsData>((ref) => SushiHomeRailsData.empty);
 
-void oxApplySushiHomeRailsRef(Ref ref, SushiHomeRailsData data) {
+void sushiApplySushiHomeRailsRef(Ref ref, SushiHomeRailsData data) {
   ref.read(sushiHomeRailsProvider.notifier).state = data;
 }

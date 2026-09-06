@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// OXPlayer: inject Dart defines before `:app` is evaluated (Flutter Gradle
+// Sushi: inject Dart defines before `:app` is evaluated (Flutter Gradle
 // plugin reads project.findProperty("dart-defines") from the app project).
 // Same encoding as Flutter BuildInfo.toGradleConfig (comma-separated Base64
 // of UTF-8 "KEY=value"). Merge order: CLI -Pdart-defines, then
@@ -10,12 +10,12 @@ gradle.beforeProject { proj ->
         return
     }
     def flutterProjectDir = proj.rootProject.projectDir.parentFile
+    // Bot usernames (BOT_USERNAME / OXPLAYER_BOT_USERNAME) intentionally omitted —
+    // store/direct builds use baked SUSHI_* handles; do not inject from default.env.
     def keysFromEnv = [
             "OXPLAYER",
             "OXPLAYER_API_BASE",
             "OXPLAYER_API_BASE_URL",
-            "BOT_USERNAME",
-            "OXPLAYER_BOT_USERNAME",
     ] as Set
 
     def stripQuotes = { String s ->
@@ -81,16 +81,6 @@ gradle.beforeProject { proj ->
 
     def envMap = parseEnvFile(new File(flutterProjectDir, "assets/env/default.env"))
     def ngrokMap = parseNgrokJson(new File(flutterProjectDir, "dart_defines.ngrok.json"))
-
-    // Store APKs must not inherit local default.env bot handles (dev @sushiMovieDevBot).
-    def taskBlob = (gradle.startParameter.taskNames ?: []).join(" ").toLowerCase()
-    def storeFlavor = taskBlob.contains("production") || taskBlob.contains("direct")
-    if (storeFlavor) {
-        ["OXPLAYER_BOT_USERNAME", "BOT_USERNAME"].each { k ->
-            envMap.remove(k)
-            ngrokMap.remove(k)
-        }
-    }
 
     def mergedMap = new LinkedHashMap()
     mergedMap.putAll(envMap)

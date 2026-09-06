@@ -4,9 +4,9 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-import 'package:fladder/oxplayer/oxplayer_slider_image.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_image_sizes.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
+import 'package:fladder/sushi/sushi_slider_image.dart';
+import 'package:fladder/sushi/sushi_tv_image_sizes.dart';
+import 'package:fladder/sushi/sushi_tv_ui_limits.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/screens/shared/media/banner_play_button.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
@@ -42,7 +42,7 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
   @override
   Widget build(BuildContext context) {
     final parentContext = context;
-    final items = OxplayerTvUiLimits.capHomeSliderForTv(ref, widget.items);
+    final items = SushiTvUiLimits.capHomeSliderForTv(ref, widget.items);
     return MouseRegion(
       onEnter: (event) => setState(() => showControls = true),
       onExit: (event) => setState(() => showControls = false),
@@ -115,8 +115,8 @@ class _CarouselBannerState extends ConsumerState<CarouselBanner> {
                               child: Stack(
                                 children: [
                                   FladderImage(
-                                    image: oxplayerSliderImage(item),
-                                    decodeHeight: OxplayerTvImageSizes.decodeHeroHeight,
+                                    image: sushiSliderImage(item),
+                                    decodeHeight: SushiTvImageSizes.decodeHeroHeight,
                                   ),
                                   Container(
                                     decoration: BoxDecoration(

@@ -21,7 +21,7 @@ class PosterRow extends ConsumerWidget {
   final bool primaryPosters;
   final bool tvMode;
   final bool showSyncStatus;
-  final bool oxDetailBadges;
+  final bool sushiDetailBadges;
 
   /// Adds an "Add / Remove Continue Watching" entry to each poster's overflow menu. Sushi-only
   /// (the continue rail is client-owned) and deliberately scoped to the home rows that pass it.
@@ -36,7 +36,7 @@ class PosterRow extends ConsumerWidget {
     this.primaryPosters = false,
     this.tvMode = false,
     this.showSyncStatus = false,
-    this.oxDetailBadges = false,
+    this.sushiDetailBadges = false,
     this.sushiContinueToggle = false,
     super.key,
   });
@@ -79,7 +79,7 @@ class PosterRow extends ConsumerWidget {
           aspectRatio: dominantRatio,
           primaryPosters: primaryPosters,
           showSyncStatus: showSyncStatus,
-          oxDetailBadges: oxDetailBadges,
+          sushiDetailBadges: sushiDetailBadges,
           sushiContinueToggle: sushiContinueToggle,
         );
       },

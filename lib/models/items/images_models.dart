@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart' as enums;
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart' as dto;
-import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
 
@@ -241,7 +240,7 @@ class ImageData {
   ImageProvider get imageProvider {
     if (path.startsWith("http")) {
       return CachedNetworkImageProvider(
-        cacheKey: OxplayerConfig.isEnabled ? path : key,
+        cacheKey: path,
         cacheManager: CustomCacheManager.instance,
         path,
       );

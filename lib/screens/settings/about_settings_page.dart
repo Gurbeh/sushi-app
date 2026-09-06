@@ -6,8 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/funding_model.dart' as funding;
-import 'package:fladder/oxplayer/oxplayer_about_settings_page.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
+import 'package:fladder/sushi/sushi_about_settings_page.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
 import 'package:fladder/screens/settings/widgets/settings_update_information.dart';
 import 'package:fladder/screens/shared/fladder_icon.dart';
@@ -44,9 +43,9 @@ class AboutSettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (OxplayerConfig.isEnabled) {
-      return const OxplayerAboutSettingsPage();
-    }
+    
+      return const SushiAboutSettingsPage();
+    
 
     final applicationInfo = ref.watch(applicationInfoProvider);
 

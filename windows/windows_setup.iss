@@ -42,10 +42,10 @@ Name: "{autoprograms}\Sushi"; Filename: "{app}\fladder.exe"
 Name: "{autodesktop}\Sushi"; Filename: "{app}\fladder.exe"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\oxplayer"; ValueType: string; ValueName: ""; ValueData: "URL:Sushi Protocol"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\oxplayer"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKCU; Subkey: "Software\Classes\oxplayer\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\fladder.exe,0"
-Root: HKCU; Subkey: "Software\Classes\oxplayer\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\fladder.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\sushi"; ValueType: string; ValueName: ""; ValueData: "URL:Sushi Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\sushi"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\sushi\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\fladder.exe,0"
+Root: HKCU; Subkey: "Software\Classes\sushi\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\fladder.exe"" ""%1"""
 
 [Run]
 ; Do not use skipifsilent — in-app updates run Setup with /VERYSILENT and must

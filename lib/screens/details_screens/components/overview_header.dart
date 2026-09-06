@@ -9,14 +9,13 @@ import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
-import 'package:fladder/oxplayer/oxplayer_adult_content.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_iran_content.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/playback/ox_persian_language.dart';
-import 'package:fladder/oxplayer/widgets/ox_iran_flag_icon.dart';
-import 'package:fladder/oxplayer/widgets/ox_enum_box.dart';
-import 'package:fladder/oxplayer/widgets/ox_labeled_iran_flag.dart';
+import 'package:fladder/sushi/sushi_adult_content.dart';
+import 'package:fladder/sushi/sushi_iran_content.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
+import 'package:fladder/sushi/playback/sushi_persian_language.dart';
+import 'package:fladder/sushi/widgets/sushi_iran_flag_icon.dart';
+import 'package:fladder/sushi/widgets/sushi_enum_box.dart';
+import 'package:fladder/sushi/widgets/sushi_labeled_iran_flag.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/shared/media/components/chip_button.dart';
 import 'package:fladder/screens/shared/media/components/media_header.dart';
@@ -102,7 +101,7 @@ class OverviewHeader extends ConsumerWidget {
     final streamHeight = 43.0;
 
     final mediaStreams = mediaStreamHelper?.mediaStream;
-    final showIranFlag = OxplayerIranContent.isIranian(
+    final showIranFlag = SushiIranContent.isIranian(
       tags: contentTags,
       genres: genres,
       name: name,
@@ -120,7 +119,7 @@ class OverviewHeader extends ConsumerWidget {
         ),
         Text(
           mediaStreamHelper?.mediaStream.currentVersionStream != null
-              ? oxplayerVersionStreamLabel(
+              ? sushiVersionStreamLabel(
                   mediaStreamHelper!.mediaStream.currentVersionStream!,
                   l10n: context.localized,
                 )
@@ -132,7 +131,7 @@ class OverviewHeader extends ConsumerWidget {
         .mapIndexed(
           (index, e) => ItemActionButton(
             selected: mediaStreamHelper!.mediaStream.currentVersionStream == e,
-            label: Text(oxplayerVersionStreamLabel(e, l10n: context.localized)),
+            label: Text(sushiVersionStreamLabel(e, l10n: context.localized)),
             action: () {
               final newItem = mediaStreamHelper!.mediaStream.copyWith(
                 versionStreamIndex: e.index,
@@ -144,20 +143,10 @@ class OverviewHeader extends ConsumerWidget {
         .toList();
 
     final streamOptionsButtons = [
-      if (mediaStreamHelper != null && oxplayerShowVersionStreamPicker(mediaStreamHelper!.mediaStream))
+      if (mediaStreamHelper != null && sushiShowVersionStreamPicker(mediaStreamHelper!.mediaStream))
         SizedBox(
           height: streamHeight,
-          child: OxplayerConfig.isEnabled
-              ? OxEnumBox(
-                  onFocusChanged: (focused) {
-                    if (focused) {
-                      context.ensureVisible(alignment: 1.0);
-                    }
-                  },
-                  currentWidget: versionCurrentWidget,
-                  itemBuilder: versionItemBuilder,
-                )
-              : EnumBox(
+          child: SushiEnumBox(
                   onFocusChanged: (focused) {
                     if (focused) {
                       context.ensureVisible(alignment: 1.0);
@@ -192,10 +181,10 @@ class OverviewHeader extends ConsumerWidget {
             itemBuilder: (context) => [AudioStreamModel.no(), ...mediaStreamHelper!.mediaStream.audioStreams]
                 .mapIndexed((index, e) => ItemActionButton(
                       selected: mediaStreamHelper!.mediaStream.currentAudioStream == e,
-                      label: OxLabeledIranFlag(
+                      label: SushiLabeledIranFlag(
                         label: e.displayTitle,
-                        showFlag: OxPersianLanguage.isPersianLanguage(e.language) ||
-                            OxPersianLanguage.isPersianLanguage(e.displayTitle),
+                        showFlag: SushiPersianLanguage.isPersianLanguage(e.language) ||
+                            SushiPersianLanguage.isPersianLanguage(e.displayTitle),
                       ),
                       action: () {
                         final newItem = mediaStreamHelper!.mediaStream.copyWith(
@@ -224,7 +213,7 @@ class OverviewHeader extends ConsumerWidget {
                 IconsaxPlusLinear.subtitle,
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
-              OxLabeledIranFlag(
+              SushiLabeledIranFlag(
                 label: (mediaStreamHelper?.mediaStream.currentSubStream?.shortTitle ?? context.localized.off)
                     .toUpperCase(),
                 subtitleLanguage: mediaStreamHelper?.mediaStream.currentSubStream?.language,
@@ -236,7 +225,7 @@ class OverviewHeader extends ConsumerWidget {
           itemBuilder: (context) => [SubStreamModel.no(), ...mediaStreamHelper!.mediaStream.subStreams]
               .mapIndexed((index, e) => ItemActionButton(
                     selected: mediaStreamHelper!.mediaStream.currentSubStream == e,
-                    label: OxLabeledIranFlag(
+                    label: SushiLabeledIranFlag(
                       label: e.displayTitle,
                       subtitleLanguage: e.language,
                       mediaStreams: mediaStreams,
@@ -394,8 +383,7 @@ class OverviewHeader extends ConsumerWidget {
               Flexible(
                 child: FocusRow(
                   ensureVisibleAlignment: 1.0,
-                  child: OxplayerConfig.isEnabled &&
-                          AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad
+                  child: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad
                       // Still a single logical focus group (d-pad left/right walks every
                       // button in reading order), but a [Wrap] so the row after the play +
                       // subtitle panel spills onto the next line instead of overflowing.
@@ -463,13 +451,11 @@ class _OxGenresWithAdultChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final genreChips = genres.take(6).toList();
-    final adultLabels = OxplayerConfig.isEnabled
-        ? OxplayerAdultContent.labels(
+    final adultLabels = SushiAdultContent.labels(
             tags: contentTags,
             officialRating: officialRating,
             keywords: tmdbKeywords,
-          )
-        : const <SimpleLabel>[];
+          );
 
     if (genreChips.isEmpty && adultLabels.isEmpty) {
       return const SizedBox.shrink();
@@ -535,12 +521,12 @@ class MetadataLabels extends StatelessWidget {
               spacing: 4,
               children: [
                 Text(officialRating.toString()),
-                if (OxplayerConfig.isEnabled && OxplayerAdultContent.ratingConveysAdult(officialRating))
-                  OxplayerAdultContent.adultEmoji,
+                if (SushiAdultContent.ratingConveysAdult(officialRating))
+                  SushiAdultContent.adultEmoji,
               ],
             ),
           ),
-        if (showIranFlag) const SimpleLabel(iconWidget: OxIranFlagIcon(size: 18)),
+        if (showIranFlag) const SimpleLabel(iconWidget: SushiIranFlagIcon(size: 18)),
         if (productionYear != null)
           SimpleLabel(
             icon: IconsaxPlusBold.calendar,

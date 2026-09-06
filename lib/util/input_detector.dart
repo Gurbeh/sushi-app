@@ -3,7 +3,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_helper.dart';
 
@@ -37,7 +36,7 @@ class _InputDetectorState extends State<InputDetector> {
 
   /// OX phone/tablet/emulator: stay on touch/pointer so login TextFields stay editable.
   bool get _oxLockTouchInput =>
-      OxplayerConfig.isEnabled && !widget.htpcMode && !widget.leanBackMode;
+      !widget.htpcMode && !widget.leanBackMode;
 
   @override
   void initState() {

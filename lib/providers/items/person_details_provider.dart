@@ -2,20 +2,8 @@ import 'package:chopper/chopper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
-import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/person_model.dart';
-import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/models/seerr/seerr_dashboard_model.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/providers/api_provider.dart';
-import 'package:fladder/providers/seerr_api_provider.dart';
-import 'package:fladder/providers/seerr_service_provider.dart';
-import 'package:fladder/providers/service_provider.dart';
-import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/seerr/seerr_models.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 
@@ -32,162 +20,25 @@ class PersonDetailsNotifier extends StateNotifier<PersonModel?> {
   final Ref ref;
   var _disposed = false;
 
-  late final JellyService api = ref.read(jellyApiProvider);
-  late final SeerrService seerrApi = ref.read(seerrApiProvider);
-
   Future<Response?> fetchPerson(Person person) async {
-    if (SushiConfig.isEnabled) {
-      if (_disposed) return null;
-      state = sushiPersonModel(person);
-      final tmdbId = sushiPersonTmdbIdFromId(person.id);
-      if (tmdbId == null) {
-        debugPrint('[sushi] person: missing tmdb_id id=${person.id}');
-        return null;
-      }
-      final page = await sushiFetchPerson(tmdbId: tmdbId);
-      if (_disposed) return null;
-      if (page == null) {
-        debugPrint('[sushi] person: fetch returned null tmdbId=$tmdbId');
-        return null;
-      }
-      state = sushiPersonModel(person, page: page);
+    if (_disposed) return null;
+    state = sushiPersonModel(person);
+    final tmdbId = sushiPersonTmdbIdFromId(person.id);
+    if (tmdbId == null) {
+      debugPrint('[sushi] person: missing tmdb_id id=${person.id}');
       return null;
     }
-    final response = await api.usersUserIdItemsItemIdGet(itemId: person.id);
-    if (_disposed) return response;
-
-    if (response.isSuccessful && response.body != null) {
-      state = response.bodyOrThrow as PersonModel;
-      await fetchMovies();
-    }
-
-    return response;
-  }
-
-  Future<void> toggleFavorite() async {
-    if (SushiConfig.isEnabled) return;
-    final current = state;
-    if (current == null || _disposed) return;
-    final next = !current.userData.isFavourite;
-    final response = await ref.read(userProvider.notifier).setAsFavorite(next, current.id);
-    if (_disposed || response?.isSuccessful != true) return;
-    state = current.copyWith(userData: current.userData.copyWith(isFavourite: next));
-  }
-
-  Future<Response?> fetchMovies() async {
+    final page = await sushiFetchPerson(tmdbId: tmdbId);
     if (_disposed) return null;
-
-    final movies = await api.itemsGet(
-      personIds: [state?.id ?? ""],
-      limit: 25,
-      sortBy: [ItemSortBy.premieredate, ItemSortBy.communityrating, ItemSortBy.sortname, ItemSortBy.productionyear],
-      sortOrder: [SortOrder.descending],
-      recursive: true,
-      fields: [
-        ItemFields.primaryimageaspectratio,
-      ],
-      includeItemTypes: [
-        BaseItemKind.movie,
-      ],
-    );
-    if (_disposed) return movies;
-
-    final series = await api.itemsGet(
-      personIds: [state?.id ?? ""],
-      limit: 25,
-      sortBy: [ItemSortBy.premieredate, ItemSortBy.communityrating, ItemSortBy.sortname, ItemSortBy.productionyear],
-      sortOrder: [SortOrder.descending],
-      recursive: true,
-      fields: [
-        ItemFields.primaryimageaspectratio,
-      ],
-      includeItemTypes: [
-        BaseItemKind.series,
-      ],
-    );
-    if (_disposed) return movies;
-
-    state = state?.copyWith(
-      movies: movies.body?.items.whereType<MovieModel>().toList(),
-      series: series.body?.items.whereType<SeriesModel>().toList(),
-    );
-
-    await fetchSeerrCredits();
-    return movies;
-  }
-
-  int? _tmdbPersonId() {
-    final ids = state?.providerIds;
-    if (ids == null) return null;
-
-    final dynamic rawId = ids['Tmdb'] ?? ids['tmdb'] ?? ids['TMDB'] ?? ids['tmdbId'];
-    if (rawId == null) return null;
-    if (rawId is int) return rawId;
-    if (rawId is num) return rawId.toInt();
-    if (rawId is String) return int.tryParse(rawId);
+    if (page == null) {
+      debugPrint('[sushi] person: fetch returned null tmdbId=$tmdbId');
+      return null;
+    }
+    state = sushiPersonModel(person, page: page);
     return null;
   }
 
-  Future<void> fetchSeerrCredits() async {
-    if (_disposed || state == null) return;
-    if (SushiConfig.isEnabled || OxplayerEnv.isEnabled) {
-      state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
-      return;
-    }
-
-    final seerrCredentials = ref.read(userProvider)?.seerrCredentials;
-    if (seerrCredentials?.isConfigured != true) {
-      state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
-      return;
-    }
-
-    final tmdbPersonId = _tmdbPersonId();
-    if (tmdbPersonId == null) {
-      state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
-      return;
-    }
-
-    final response = await seerrApi.personCombinedCredits(personId: tmdbPersonId);
-    if (_disposed) return;
-    if (!response.isSuccessful || response.body == null) {
-      state = state?.copyWith(seerrMovies: const [], seerrSeries: const []);
-      return;
-    }
-
-    final credits = response.body!;
-    final creditItems = <SeerrPersonCredit>[
-      ...credits.cast ?? <SeerrPersonCredit>[],
-      ...credits.crew ?? <SeerrPersonCredit>[],
-    ];
-
-    final posters = creditItems
-        .where((credit) => credit.mediaInfo?.primaryJellyfinMediaId == null)
-        .map((credit) => seerrApi.posterFromPersonCredit(credit))
-        .whereType<SeerrDashboardPosterModel>()
-        .toList();
-
-    posters.sort(_sortPostersByNewestFirst);
-
-    final seenIds = <String>{};
-    final uniquePosters = posters.where((poster) => seenIds.add(poster.id)).toList();
-
-    state = state?.copyWith(
-      seerrMovies: uniquePosters.where((poster) => poster.type == SeerrMediaType.movie).toList(),
-      seerrSeries: uniquePosters.where((poster) => poster.type == SeerrMediaType.tvshow).toList(),
-    );
-  }
-
-  int _posterReleaseYear(SeerrDashboardPosterModel poster) {
-    final year = poster.releaseYear;
-    if (year == null) return 0;
-    return int.tryParse(year) ?? 0;
-  }
-
-  int _sortPostersByNewestFirst(SeerrDashboardPosterModel a, SeerrDashboardPosterModel b) {
-    final yearA = _posterReleaseYear(a);
-    final yearB = _posterReleaseYear(b);
-    final yearComparison = yearB.compareTo(yearA);
-    if (yearComparison != 0) return yearComparison;
-    return b.title.compareTo(a.title);
+  Future<void> toggleFavorite() async {
+    // Sushi person favourites not wired yet.
   }
 }

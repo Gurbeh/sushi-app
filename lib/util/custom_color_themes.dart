@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 
 enum ColorThemes {
   fladder(
-    name: OxplayerBrand.appName,
+    name: SushiBrand.appName,
     color: kDebugMode ? Colors.purpleAccent : Colors.orange,
   ),
   deepOrange(

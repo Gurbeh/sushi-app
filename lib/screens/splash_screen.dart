@@ -6,20 +6,17 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/account_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_pending_route.dart';
-import 'package:fladder/oxplayer/oxplayer_session.dart';
-import 'package:fladder/oxplayer/oxplayer_splash_auth.dart';
-import 'package:fladder/oxplayer/oxplayer_splash_telemetry.dart';
+import 'package:fladder/sushi/sushi_pending_route.dart';
+import 'package:fladder/sushi/sushi_session.dart';
+import 'package:fladder/sushi/sushi_splash_auth.dart';
+import 'package:fladder/sushi/sushi_splash_telemetry.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/oxplayer/ox_splash_brand.dart';
-import 'package:fladder/screens/shared/fladder_logo.dart';
+import 'package:fladder/sushi/sushi_splash_brand.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_local_account.dart';
 
 @RoutePage()
@@ -32,7 +29,7 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  final _splashTiming = OxplayerSplashTiming();
+  final _splashTiming = SushiSplashTiming();
 
   @override
   void initState() {
@@ -40,12 +37,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     _splashTiming.markStarted();
     WidgetsBinding.instance.addPostFrameCallback((value) async {
       _splashTiming.markFirstFrame();
-      if (OxplayerConfig.isEnabled && mounted) {
+      if (mounted) {
         await precacheImage(
           ResizeImage.resizeIfNeeded(
-            OxSplashBrand.displaySize.round(),
-            OxSplashBrand.displaySize.round(),
-            const AssetImage(OxSplashBrand.assetPath),
+            SushiSplashBrand.displaySize.round(),
+            SushiSplashBrand.displaySize.round(),
+            const AssetImage(SushiSplashBrand.assetPath),
           ),
           context,
         );
@@ -55,10 +52,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       _splashTiming.markAfterInitialDelay();
 
-      final AccountModel? lastUsedAccount = OxplayerConfig.isEnabled
-          ? ref.read(sharedUtilityProvider).getMostRecentAccount()
-          : ref.read(sharedUtilityProvider).getActiveAccount();
-      final accountForSession = SushiConfig.isEnabled && lastUsedAccount != null && sushiIsLocalAccount(lastUsedAccount)
+      final AccountModel? lastUsedAccount = ref.read(sharedUtilityProvider).getMostRecentAccount();
+      final accountForSession = lastUsedAccount != null && sushiIsLocalAccount(lastUsedAccount)
           ? sushiWithDownloadPolicy(lastUsedAccount)
           : lastUsedAccount;
       ref.read(userProvider.notifier).updateUser(accountForSession);
@@ -77,49 +72,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         return;
       }
 
-      if (OxplayerConfig.isEnabled) {
+      
         _splashTiming.markSessionRestoreStarted();
-        late final OxplayerSplashAuthResult result;
+        late final SushiSplashAuthResult result;
         try {
-          result = await oxplayerResolveSplashAuth(ref, lastUsedAccount)
+          result = await sushiResolveSplashAuth(ref, lastUsedAccount)
               .timeout(const Duration(seconds: 40));
         } catch (_) {
-          result = OxplayerSplashAuthResult.needsLogin;
+          result = SushiSplashAuthResult.needsLogin;
           try {
-            await oxplayerLogoutLocallySkippingServer(ref.read, fallbackAccount: lastUsedAccount);
+            await sushiLogoutLocallySkippingServer(ref.read, fallbackAccount: lastUsedAccount);
           } catch (_) {}
         }
-        _splashTiming.markSessionRestoreEnded(result != OxplayerSplashAuthResult.needsLogin);
+        _splashTiming.markSessionRestoreEnded(result != SushiSplashAuthResult.needsLogin);
         if (!context.mounted) return;
         switch (result) {
-          case OxplayerSplashAuthResult.needsLogin:
+          case SushiSplashAuthResult.needsLogin:
             callBackOrNavigate(false);
-          case OxplayerSplashAuthResult.sessionReady:
+          case SushiSplashAuthResult.sessionReady:
             callBackOrNavigate(true);
-          case OxplayerSplashAuthResult.sessionWithLock:
+          case SushiSplashAuthResult.sessionWithLock:
             navigateWithLockOnLaunch();
         }
         return;
-      }
-
-      switch (lastUsedAccount.authMethod) {
-        case Authentication.autoLogin:
-          var sessionOk = false;
-          _splashTiming.markSessionRestoreStarted();
-          try {
-            sessionOk = await oxplayerRestoreSession(ref, lastUsedAccount);
-          } catch (_) {
-            sessionOk = false;
-          }
-          _splashTiming.markSessionRestoreEnded(sessionOk);
-          if (context.mounted) callBackOrNavigate(sessionOk);
-          break;
-        case Authentication.biometrics:
-        case Authentication.none:
-        case Authentication.passcode:
-          callBackOrNavigate(false);
-          break;
-      }
     });
   }
 
@@ -141,20 +116,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (widget.loggedIn == null) {
       if (loggedIn) {
-        if (OxplayerConfig.isEnabled) {
-          oxplayerFlushBufferedPendingPath(ref);
-          unawaited(oxplayerNavigateAfterLogin(context, ref));
-        } else {
-          context.router.replace(const DashboardRoute());
-        }
+        
+          sushiFlushBufferedPendingPath(ref);
+          unawaited(sushiNavigateAfterLogin(context, ref));
+        
       } else {
-        oxplayerFlushBufferedPendingPath(ref);
-        if (OxplayerConfig.isEnabled) {
-          context.router.replace(const OxplayerLoginRoute());
+        sushiFlushBufferedPendingPath(ref);
+        
+          context.router.replace(const SushiLoginRoute());
           ref.read(authProvider.notifier).initModel();
-        } else {
-          context.router.replace(LoginRoute());
-        }
+        
       }
     } else {
       // AuthGuard [redirectUntil] completes via this callback only.
@@ -172,14 +143,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     if (widget.loggedIn == null) {
-      if (OxplayerConfig.isEnabled) {
-        oxplayerFlushBufferedPendingPath(ref);
-        unawaited(oxplayerNavigateAfterLogin(context, ref));
+      
+        sushiFlushBufferedPendingPath(ref);
+        unawaited(sushiNavigateAfterLogin(context, ref));
         WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
-      } else {
-        context.router.replace(const DashboardRoute());
-        WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
-      }
+      
     } else {
       widget.loggedIn?.call(true);
       WidgetsBinding.instance.addPostFrameCallback((_) => pushLock());
@@ -190,12 +158,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     return NotificationManagerInitializer(
       child: Scaffold(
-        backgroundColor: OxplayerConfig.isEnabled ? OxSplashBrand.splashBackground : null,
+        backgroundColor: SushiSplashBrand.splashBackground,
         body: Center(
-          child: OxplayerConfig.isEnabled ? const OxSplashBrand() : const FractionallySizedBox(
-            heightFactor: 0.4,
-            child: FladderLogo(),
-          ),
+          child: const SushiSplashBrand(),
         ),
       ),
     );

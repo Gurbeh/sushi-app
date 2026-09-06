@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:PRODUCTION_HASH",
         "android_client_info": {
-          "package_name": "app.oxplayer"
+          "package_name": "app.sushi"
         }
       },
       "oauth_client": [],
@@ -28,7 +28,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:DEVELOPMENT_HASH",
         "android_client_info": {
-          "package_name": "app.oxplayer.dev"
+          "package_name": "app.sushi.dev"
         }
       },
       "oauth_client": [],

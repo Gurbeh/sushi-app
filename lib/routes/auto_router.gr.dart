@@ -17,11 +17,9 @@ import 'package:fladder/models/item_base_model.dart' as _i39;
 import 'package:fladder/models/items/photos_model.dart' as _i43;
 import 'package:fladder/models/library_search/library_search_options.dart'
     as _i41;
-import 'package:fladder/models/seerr/seerr_dashboard_model.dart' as _i45;
-import 'package:fladder/oxplayer/oxplayer_developer_mode_screen.dart' as _i21;
-import 'package:fladder/oxplayer/oxplayer_help_screen.dart' as _i22;
-import 'package:fladder/oxplayer/oxplayer_login_screen.dart' as _i23;
-import 'package:fladder/oxplayer/oxplayer_playback_diag_screen.dart' as _i24;
+import 'package:fladder/sushi/sushi_help_screen.dart' as _i22;
+import 'package:fladder/sushi/sushi_login_screen.dart' as _i23;
+import 'package:fladder/sushi/sushi_playback_diag_screen.dart' as _i24;
 import 'package:fladder/routes/nested_details_screen.dart' as _i13;
 import 'package:fladder/screens/control_panel/control_active_tasks_page.dart'
     as _i3;
@@ -48,9 +46,6 @@ import 'package:fladder/screens/login/lock_screen.dart' as _i19;
 import 'package:fladder/screens/login/login_screen.dart' as _i20;
 import 'package:fladder/screens/photo_viewer/photo_viewer_screen.dart' as _i25;
 import 'package:fladder/screens/search/search_screen.dart' as _i28;
-import 'package:fladder/screens/seerr/seerr_details_screen.dart' as _i29;
-import 'package:fladder/screens/seerr/seerr_screen.dart' as _i30;
-import 'package:fladder/screens/seerr/seerr_search_screen.dart' as _i31;
 import 'package:fladder/screens/settings/about_settings_page.dart' as _i1;
 import 'package:fladder/screens/settings/client_settings_page.dart' as _i2;
 import 'package:fladder/screens/settings/player_settings_page.dart' as _i26;
@@ -61,7 +56,6 @@ import 'package:fladder/screens/settings/settings_selection_screen.dart'
 import 'package:fladder/screens/splash_screen.dart' as _i34;
 import 'package:fladder/screens/syncing/synced_screen.dart' as _i35;
 import 'package:fladder/screens/watch_later/watch_later_screen.dart' as _i36;
-import 'package:fladder/seerr/seerr_models.dart' as _i46;
 import 'package:flutter/foundation.dart' as _i40;
 import 'package:flutter/material.dart' as _i38;
 
@@ -664,66 +658,51 @@ class LoginRouteArgs {
   int get hashCode => authLink.hashCode ^ key.hashCode;
 }
 
-/// generated route for
-/// [_i21.OxplayerDeveloperModeScreen]
-class OxplayerDeveloperModeRoute extends _i37.PageRouteInfo<void> {
-  const OxplayerDeveloperModeRoute({List<_i37.PageRouteInfo>? children})
-      : super(OxplayerDeveloperModeRoute.name, initialChildren: children);
 
-  static const String name = 'OxplayerDeveloperModeRoute';
+/// generated route for
+/// [_i22.SushiHelpScreen]
+class SushiHelpRoute extends _i37.PageRouteInfo<void> {
+  const SushiHelpRoute({List<_i37.PageRouteInfo>? children})
+      : super(SushiHelpRoute.name, initialChildren: children);
+
+  static const String name = 'SushiHelpRoute';
 
   static _i37.PageInfo page = _i37.PageInfo(
     name,
     builder: (data) {
-      return const _i21.OxplayerDeveloperModeScreen();
+      return const _i22.SushiHelpScreen();
     },
   );
 }
 
 /// generated route for
-/// [_i22.OxplayerHelpScreen]
-class OxplayerHelpRoute extends _i37.PageRouteInfo<void> {
-  const OxplayerHelpRoute({List<_i37.PageRouteInfo>? children})
-      : super(OxplayerHelpRoute.name, initialChildren: children);
+/// [_i23.SushiLoginScreen]
+class SushiLoginRoute extends _i37.PageRouteInfo<void> {
+  const SushiLoginRoute({List<_i37.PageRouteInfo>? children})
+      : super(SushiLoginRoute.name, initialChildren: children);
 
-  static const String name = 'OxplayerHelpRoute';
+  static const String name = 'SushiLoginRoute';
 
   static _i37.PageInfo page = _i37.PageInfo(
     name,
     builder: (data) {
-      return const _i22.OxplayerHelpScreen();
+      return const _i23.SushiLoginScreen();
     },
   );
 }
 
 /// generated route for
-/// [_i23.OxplayerLoginScreen]
-class OxplayerLoginRoute extends _i37.PageRouteInfo<void> {
-  const OxplayerLoginRoute({List<_i37.PageRouteInfo>? children})
-      : super(OxplayerLoginRoute.name, initialChildren: children);
+/// [_i24.SushiPlaybackDiagScreen]
+class SushiPlaybackDiagRoute extends _i37.PageRouteInfo<void> {
+  const SushiPlaybackDiagRoute({List<_i37.PageRouteInfo>? children})
+      : super(SushiPlaybackDiagRoute.name, initialChildren: children);
 
-  static const String name = 'OxplayerLoginRoute';
-
-  static _i37.PageInfo page = _i37.PageInfo(
-    name,
-    builder: (data) {
-      return const _i23.OxplayerLoginScreen();
-    },
-  );
-}
-
-/// generated route for
-/// [_i24.OxplayerPlaybackDiagScreen]
-class OxplayerPlaybackDiagRoute extends _i37.PageRouteInfo<void> {
-  const OxplayerPlaybackDiagRoute({List<_i37.PageRouteInfo>? children})
-      : super(OxplayerPlaybackDiagRoute.name, initialChildren: children);
-
-  static const String name = 'OxplayerPlaybackDiagRoute';
+  static const String name = 'SushiPlaybackDiagRoute';
 
   static _i37.PageInfo page = _i37.PageInfo(
     name,
     builder: (data) {
-      return const _i24.OxplayerPlaybackDiagScreen();
+      return const _i24.SushiPlaybackDiagScreen();
     },
   );
 }
@@ -854,162 +833,6 @@ class SearchRoute extends _i37.PageRouteInfo<void> {
       return const _i28.SearchScreen();
     },
   );
-}
-
-/// generated route for
-/// [_i29.SeerrDetailsScreen]
-class SeerrDetailsRoute extends _i37.PageRouteInfo<SeerrDetailsRouteArgs> {
-  SeerrDetailsRoute({
-    required String mediaType,
-    required int tmdbId,
-    _i45.SeerrDashboardPosterModel? poster,
-    _i38.Key? key,
-    List<_i37.PageRouteInfo>? children,
-  }) : super(
-          SeerrDetailsRoute.name,
-          args: SeerrDetailsRouteArgs(
-            mediaType: mediaType,
-            tmdbId: tmdbId,
-            poster: poster,
-            key: key,
-          ),
-          rawPathParams: {'mediaType': mediaType, 'tmdbId': tmdbId},
-          initialChildren: children,
-        );
-
-  static const String name = 'SeerrDetailsRoute';
-
-  static _i37.PageInfo page = _i37.PageInfo(
-    name,
-    builder: (data) {
-      final pathParams = data.inheritedPathParams;
-      final args = data.argsAs<SeerrDetailsRouteArgs>(
-        orElse: () => SeerrDetailsRouteArgs(
-          mediaType: pathParams.getString('mediaType'),
-          tmdbId: pathParams.getInt('tmdbId'),
-        ),
-      );
-      return _i29.SeerrDetailsScreen(
-        mediaType: args.mediaType,
-        tmdbId: args.tmdbId,
-        poster: args.poster,
-        key: args.key,
-      );
-    },
-  );
-}
-
-class SeerrDetailsRouteArgs {
-  const SeerrDetailsRouteArgs({
-    required this.mediaType,
-    required this.tmdbId,
-    this.poster,
-    this.key,
-  });
-
-  final String mediaType;
-
-  final int tmdbId;
-
-  final _i45.SeerrDashboardPosterModel? poster;
-
-  final _i38.Key? key;
-
-  @override
-  String toString() {
-    return 'SeerrDetailsRouteArgs{mediaType: $mediaType, tmdbId: $tmdbId, poster: $poster, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! SeerrDetailsRouteArgs) return false;
-    return mediaType == other.mediaType &&
-        tmdbId == other.tmdbId &&
-        poster == other.poster &&
-        key == other.key;
-  }
-
-  @override
-  int get hashCode =>
-      mediaType.hashCode ^ tmdbId.hashCode ^ poster.hashCode ^ key.hashCode;
-}
-
-/// generated route for
-/// [_i30.SeerrScreen]
-class SeerrRoute extends _i37.PageRouteInfo<void> {
-  const SeerrRoute({List<_i37.PageRouteInfo>? children})
-      : super(SeerrRoute.name, initialChildren: children);
-
-  static const String name = 'SeerrRoute';
-
-  static _i37.PageInfo page = _i37.PageInfo(
-    name,
-    builder: (data) {
-      return const _i30.SeerrScreen();
-    },
-  );
-}
-
-/// generated route for
-/// [_i31.SeerrSearchScreen]
-class SeerrSearchRoute extends _i37.PageRouteInfo<SeerrSearchRouteArgs> {
-  SeerrSearchRoute({
-    _i46.SeerrSearchMode? mode,
-    int? yearGte,
-    _i38.Key? key,
-    List<_i37.PageRouteInfo>? children,
-  }) : super(
-          SeerrSearchRoute.name,
-          args: SeerrSearchRouteArgs(mode: mode, yearGte: yearGte, key: key),
-          rawQueryParams: {'mode': mode, 'yearGte': yearGte},
-          initialChildren: children,
-        );
-
-  static const String name = 'SeerrSearchRoute';
-
-  static _i37.PageInfo page = _i37.PageInfo(
-    name,
-    builder: (data) {
-      final queryParams = data.queryParams;
-      final args = data.argsAs<SeerrSearchRouteArgs>(
-        orElse: () => SeerrSearchRouteArgs(
-          mode: queryParams.get('mode'),
-          yearGte: queryParams.optInt('yearGte'),
-        ),
-      );
-      return _i31.SeerrSearchScreen(
-        mode: args.mode,
-        yearGte: args.yearGte,
-        key: args.key,
-      );
-    },
-  );
-}
-
-class SeerrSearchRouteArgs {
-  const SeerrSearchRouteArgs({this.mode, this.yearGte, this.key});
-
-  final _i46.SeerrSearchMode? mode;
-
-  final int? yearGte;
-
-  final _i38.Key? key;
-
-  @override
-  String toString() {
-    return 'SeerrSearchRouteArgs{mode: $mode, yearGte: $yearGte, key: $key}';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! SeerrSearchRouteArgs) return false;
-    return mode == other.mode && yearGte == other.yearGte && key == other.key;
-  }
-
-  @override
-  int get hashCode => mode.hashCode ^ yearGte.hashCode ^ key.hashCode;
 }
 
 /// generated route for

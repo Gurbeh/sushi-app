@@ -22,7 +22,7 @@ class SearchNotifier extends StateNotifier<SearchModel> {
   Future<Response?> searchQuery() async {
     if (state.searchQuery.isEmpty) return null;
     state = state.copyWith(loading: true, failed: false);
-    if (SushiConfig.isEnabled) {
+    
       final q = state.searchQuery;
       final res = await sushiFetchSearch(query: q);
       if (state.searchQuery != q) return null;
@@ -46,7 +46,7 @@ class SearchNotifier extends StateNotifier<SearchModel> {
         failed: false,
       );
       return null;
-    }
+    
     final response = await api.itemsGet(
       recursive: true,
       searchTerm: state.searchQuery,

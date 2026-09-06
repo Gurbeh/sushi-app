@@ -1,6 +1,6 @@
 // Verifies Play-safe native ABI layout before uploading an AAB/APK.
 //
-// Usage (from oxplayer-client/):
+// Usage (from sushi-client/):
 //   dart run tool/android/verify_native_abi_parity.dart --aab path/to/app.aab
 //   dart run tool/android/verify_native_abi_parity.dart --dir build/app/intermediates/merged_native_libs/...
 //

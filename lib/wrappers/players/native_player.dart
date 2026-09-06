@@ -10,12 +10,11 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/transcode_playback_model.dart';
 import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
-import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
+import 'package:fladder/sushi/sushi_audio_log.dart';
+import 'package:fladder/sushi/sushi_playback_audio.dart';
+import 'package:fladder/sushi/sushi_playback_subtitle.dart';
+import 'package:fladder/sushi/sushi_memory_telemetry.dart';
+import 'package:fladder/sushi/sushi_playback_telemetry.dart';
 import 'package:fladder/src/video_player_helper.g.dart';
 import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
@@ -51,10 +50,8 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       return;
     }
 
-    final maxAttempts = OxplayerConfig.isEnabled ? 6 : 4;
-    final retryDelay = OxplayerConfig.isEnabled
-        ? const Duration(milliseconds: 500)
-        : const Duration(milliseconds: 350);
+    const maxAttempts = 6;
+    const retryDelay = Duration(milliseconds: 500);
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       final ok = await player.open(url, play);
@@ -62,7 +59,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       if (attempt < maxAttempts) {
         await Future<void>.delayed(retryDelay);
       } else {
-        unawaited(OxplayerPlaybackTelemetry.reportNativeOpenFailed(
+        unawaited(SushiPlaybackTelemetry.reportNativeOpenFailed(
           url: url,
           attempt: attempt,
         ));
@@ -72,7 +69,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   Future<StartResult> open(BuildContext newContext) async {
-    OxplayerMemoryTelemetry.trimBeforeNativePlayback();
+    SushiMemoryTelemetry.trimBeforeNativePlayback();
     nativeActivityStarted = true;
     _startPlaybackMemoryWatch();
     return activity.launchActivity();
@@ -80,10 +77,9 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   void _startPlaybackMemoryWatch() {
     _playbackMemoryTimer?.cancel();
-    if (!OxplayerConfig.isEnabled) return;
     _playbackMemoryTimer = Timer.periodic(
-      kOxNativePlaybackMemorySampleInterval,
-      (_) => unawaited(OxplayerMemoryTelemetry.sampleDuringNativePlayback()),
+      kSushiNativePlaybackMemorySampleInterval,
+      (_) => unawaited(SushiMemoryTelemetry.sampleDuringNativePlayback()),
     );
   }
 
@@ -136,7 +132,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   Future<void> setVolume(double volume) async {
     // Pigeon/ExoPlayer expect 0.0–1.0; settings store 0–100.
     final normalized = (volume / 100).clamp(0.0, 1.0);
-    OxplayerAudioLog.event('native_set_volume', fields: {
+    SushiAudioLog.event('native_set_volume', fields: {
       'backend': 'exo',
       'requested': volume,
       'exoVolume': normalized,
@@ -183,7 +179,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
     List<NativeMuxedAudioRow> audio,
     List<NativeMuxedSubtitleRow> subtitles,
   ) {
-    OxplayerAudioLog.event('native_muxed_tracks', fields: {
+    SushiAudioLog.event('native_muxed_tracks', fields: {
       'backend': 'exo',
       'exoAudioCount': audio.length,
       'exoSubCount': subtitles.length,
@@ -195,7 +191,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
 
   @override
   void onPlaybackError(int errorCode, String errorCodeName, String? message) {
-    unawaited(OxplayerPlaybackTelemetry.reportNativePlayerError(
+    unawaited(SushiPlaybackTelemetry.reportNativePlayerError(
       errorCode: errorCode,
       errorCodeName: errorCodeName,
       message: message,
@@ -220,7 +216,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       currentItem: model.item.toSimpleItem(context),
       startPosition: startPosition.inMilliseconds,
       description: model.item.overview.summary,
-      defaultAudioTrack: oxplayerDefaultAudioTrackIndex(model),
+      defaultAudioTrack: sushiDefaultAudioTrackIndex(model),
       nextVideo: model.nextVideo?.toSimpleItem(context),
       previousVideo: model.previousVideo?.toSimpleItem(context),
       audioTracks: model.audioStreams
@@ -235,7 +231,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
               )
               .toList() ??
           [],
-      defaultSubtrack: oxplayerResolveSubtitleStreamIndex(
+      defaultSubtrack: sushiResolveSubtitleStreamIndex(
             selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
             serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
             subStreams: model.subStreams,
@@ -294,7 +290,7 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
       url: model.media?.url ?? "",
     );
     await player.sendPlayableModel(playableData);
-    OxplayerAudioLog.event('native_playable_sent', fields: {
+    SushiAudioLog.event('native_playable_sent', fields: {
       'backend': 'exo',
       'defaultAudioIndex': playableData.defaultAudioTrack,
       'defaultSubIndex': playableData.defaultSubtrack,

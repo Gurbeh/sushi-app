@@ -8,16 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/models/playback/playback_model.dart';
-import 'package:fladder/oxplayer/oxplayer_bootstrap.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_crashlytics.dart';
-import 'package:fladder/oxplayer/oxplayer_image_notifier.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_queue.dart';
-import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
-import 'package:fladder/oxplayer/services/ox_update_service.dart';
-import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_sentry.dart';
+import 'package:fladder/sushi/sushi_bootstrap.dart';
+import 'package:fladder/sushi/sushi_image_notifier.dart';
+import 'package:fladder/sushi/sushi_playback_queue.dart';
+import 'package:fladder/sushi/sushi_memory_telemetry.dart';
+import 'package:fladder/sushi/sushi_screen_telemetry.dart';
 import 'package:fladder/bootstrap/platform/platform_app_wrapper.dart';
 import 'package:fladder/l10n/generated/app_localizations.dart';
 import 'package:fladder/localization_delegates.dart';
@@ -36,65 +31,36 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/themes_data.dart';
 import 'package:fladder/widgets/media_query_scaler.dart';
 
-bool get _supportsOxInAppUpdatePrompt {
-  if (kIsWeb) return false;
-  switch (defaultTargetPlatform) {
-    case TargetPlatform.android:
-    case TargetPlatform.windows:
-    case TargetPlatform.macOS:
-    case TargetPlatform.linux:
-      return true;
-    default:
-      return false;
-  }
-}
-
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Future<void> runOxApp() async {
-    await OxplayerBootstrap.beforeAppBootstrap(args);
-    if (!kIsWeb) {
-      await OxplayerCrashlytics.init();
-    }
+  await SushiBootstrap.beforeAppBootstrap(args);
 
-    final bootstrap = await bootstrapApplication(args);
+  final bootstrap = await bootstrapApplication(args);
 
-    await OxplayerBootstrap.afterAppBootstrap(bootstrap);
-    if (!kIsWeb) {
-      OxplayerSentry.chainErrorHandlers();
-      OxplayerCrashlytics.chainErrorHandlers();
-      await bootstrap.crashProvider.ready;
-      await bootstrap.crashProvider.flushUnreportedToSentry();
-    }
+  await SushiBootstrap.afterAppBootstrap(bootstrap);
+  if (!kIsWeb) {
+    await bootstrap.crashProvider.ready;
+  }
 
-    runApp(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWith((ref) => bootstrap.sharedPreferences),
-          applicationInfoProvider.overrideWith((ref) => bootstrap.applicationInfo),
-          crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
-          argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
-          syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
-          if (OxplayerConfig.isEnabled) ...[
-            imageUtilityProvider.overrideWith((ref) => OxplayerImageNotifier(ref: ref)),
-            playbackModelHelper.overrideWith((ref) => OxPlaybackModelHelper(ref: ref)),
-          ],
-        ],
-        child: OxplayerBootstrap.wrapRoot(
-          AdaptiveLayoutBuilder(
-            child: (context) => const Main(),
-          ),
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWith((ref) => bootstrap.sharedPreferences),
+        applicationInfoProvider.overrideWith((ref) => bootstrap.applicationInfo),
+        crashLogProvider.overrideWith((ref) => bootstrap.crashProvider),
+        argumentsStateProvider.overrideWith((ref) => bootstrap.argumentsModel),
+        syncProvider.overrideWith((ref) => SyncNotifier(ref, bootstrap.applicationDirectory)),
+        imageUtilityProvider.overrideWith((ref) => SushiImageNotifier(ref: ref)),
+        playbackModelHelper.overrideWith((ref) => SushiPlaybackModelHelper(ref: ref)),
+      ],
+      child: SushiBootstrap.wrapRoot(
+        AdaptiveLayoutBuilder(
+          child: (context) => const Main(),
         ),
       ),
-    );
-  }
-
-  if (!kIsWeb) {
-    await OxplayerSentry.init(runOxApp);
-  } else {
-    await runOxApp();
-  }
+    ),
+  );
 }
 
 class Main extends ConsumerWidget {
@@ -121,13 +87,6 @@ class _FladderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (OxplayerConfig.isEnabled && !kIsWeb && _supportsOxInAppUpdatePrompt) {
-      OxUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
-      OxUpdateService.registerRouter(autoRouter);
-      OxGitHubUpdateService.registerNavigatorKey(autoRouter.navigatorKey);
-      OxGitHubUpdateService.registerRouter(autoRouter);
-    }
-
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
     final themeMode = ref.watch(clientSettingsProvider.select((value) => value.themeMode));
     final themeColor = ref.watch(clientSettingsProvider.select((value) => value.themeColor));
@@ -137,11 +96,9 @@ class _FladderApp extends ConsumerWidget {
     final language = ref.watch(clientSettingsProvider
         .select((value) => value.selectedLocale ?? WidgetsBinding.instance.platformDispatcher.locale));
     final scrollBehaviour = const MaterialScrollBehavior();
-    if (OxplayerConfig.isEnabled) {
-      OxplayerMemoryTelemetry.syncDeviceProfile(
-        leanBack: ref.watch(argumentsStateProvider.select((value) => value.leanBackMode)),
-      );
-    }
+    SushiMemoryTelemetry.syncDeviceProfile(
+      leanBack: ref.watch(argumentsStateProvider.select((value) => value.leanBackMode)),
+    );
     return DynamicColorBuilder(
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         final baseLightTheme = themeColor == null
@@ -209,14 +166,7 @@ class _FladderApp extends ConsumerWidget {
             themeMode: themeMode,
             routerConfig: autoRouter.config(
               deepLinkBuilder: (deepLink) => deepLinkBuilder(deepLink.uri),
-              navigatorObservers: () => OxplayerConfig.isEnabled && _supportsOxInAppUpdatePrompt
-                  ? [
-                      OxplayerRouteTelemetryObserver(),
-                      OxUpdatePromptNavigatorObserver(),
-                    ]
-                  : OxplayerConfig.isEnabled
-                      ? [OxplayerRouteTelemetryObserver()]
-                      : const [],
+              navigatorObservers: () => [SushiRouteTelemetryObserver()],
             ),
           ),
         );

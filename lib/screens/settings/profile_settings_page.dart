@@ -8,35 +8,27 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart' as enums;
-import 'package:fladder/models/seerr_credentials_model.dart';
-import 'package:fladder/providers/connectivity_provider.dart';
 import 'package:fladder/providers/cultures_provider.dart';
 import 'package:fladder/providers/home_preferences_provider.dart';
-import 'package:fladder/providers/seerr_user_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/update_notifications_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/screens/settings/settings_list_tile.dart';
 import 'package:fladder/screens/settings/settings_scaffold.dart';
-import 'package:fladder/screens/settings/widgets/home_preferences_editors.dart';
 import 'package:fladder/screens/settings/widgets/password_reset_dialog.dart';
-import 'package:fladder/screens/settings/widgets/seerr_connection_dialog.dart';
 import 'package:fladder/screens/settings/widgets/settings_label_divider.dart';
 import 'package:fladder/screens/settings/widgets/settings_list_group.dart';
 import 'package:fladder/screens/settings/widgets/settings_message_box.dart';
 import 'package:fladder/screens/shared/authenticate_button_options.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
-import 'package:fladder/screens/shared/input_fields.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 import 'package:fladder/services/battery_optimization.dart';
 import 'package:fladder/services/notification_service.dart';
 import 'package:fladder/util/jellyfin_extension.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/simple_duration_picker.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_profile_delete_account.dart';
-import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
-import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_profile_delete_account.dart';
+import 'package:fladder/sushi/sushi_settings_visibility.dart';
 import 'package:fladder/widgets/shared/filled_button_await.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 
@@ -51,24 +43,6 @@ class ProfileSettingsPage extends ConsumerStatefulWidget {
 class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with WidgetsBindingObserver {
   bool? enabledBatteryOptimization;
 
-  String _seerrStatusLabel(
-    BuildContext context,
-    SeerrCredentialsModel? credentials,
-    SeerrUserModel? seerrUser,
-  ) {
-    if (credentials == null || credentials.serverUrl.isEmpty) return context.localized.seerrNotConfigured;
-
-    if (credentials.sessionCookie.isNotEmpty || credentials.apiKey.isNotEmpty) {
-      if (seerrUser == null) {
-        return context.localized.seerrLoadingUser;
-      }
-      final displayName =
-          seerrUser.displayName ?? seerrUser.username ?? seerrUser.email ?? context.localized.seerrUnknownUser;
-      return context.localized.loggedInAs(displayName);
-    }
-
-    return context.localized.none;
-  }
 
   @override
   void initState() {
@@ -108,7 +82,6 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userProvider);
-    final seerrUser = ref.watch(seerrUserProvider);
     final cultures = ref.watch(culturesProvider);
     final clientSettings = ref.watch(clientSettingsProvider);
     final lastUpdateAt = ref.watch(notificationsProvider).updatedAt;
@@ -123,7 +96,7 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
     return SettingsScaffold(
       label: context.localized.settingsProfileTitle,
       bottomActions: [
-        if (OxplayerSettingsVisibility.showProfileHomePreferencesSave)
+        if (SushiSettingsVisibility.showProfileHomePreferencesSave)
           FilledButtonAwait(
             onPressed: () async {
               await FladderSnack.showResponse(
@@ -162,14 +135,14 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
                     }
                   : null,
             ),
-            if (OxplayerSettingsVisibility.showProfilePasswordReset)
+            if (SushiSettingsVisibility.showProfilePasswordReset)
               SettingsListTile(
                 label: Text(context.localized.password),
                 onTap: () => openPasswordResetDialog(context),
               ),
           ],
         ),
-        if (OxplayerSettingsVisibility.showProfileSubtitlePreferences) ...[
+        if (SushiSettingsVisibility.showProfileSubtitlePreferences) ...[
           const SizedBox(height: 16),
           ...settingsListGroup(
             context,
@@ -229,7 +202,7 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        if (OxplayerSettingsVisibility.showProfileJellyfinNotifications &&
+        if (SushiSettingsVisibility.showProfileJellyfinNotifications &&
             ref.watch(supportsNotificationsProvider)) ...[
           const SizedBox(height: 16),
           ...settingsListGroup(
@@ -340,89 +313,9 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        if (!OxplayerEnv.isEnabled && !SushiConfig.isEnabled) ...[
+        if (SushiEnv.apiBaseUrl != null) ...[
           const SizedBox(height: 16),
-          ...settingsListGroup(
-            context,
-            const SettingsLabelDivider(label: "Seerr"),
-            [
-              SettingsListTile(
-                label: Text(context.localized.seerr),
-                subLabel: Text(_seerrStatusLabel(context, user?.seerrCredentials, seerrUser)),
-                onTap: () => showSeerrConnectionDialog(context),
-              ),
-              if (seerrUser?.canManageRequests ?? false)
-                SettingsListTileCheckbox(
-                  label: Text(context.localized.seerrRequestNotifications),
-                  value: user?.seerrRequestsEnabled ?? false,
-                  onChanged: (val) async {
-                    final current = ref.read(userProvider);
-                    if (current == null || val == null) return;
-
-                    ref.read(userProvider.notifier).userState = current.copyWith(seerrRequestsEnabled: val);
-
-                    if (val) {
-                      await NotificationService.requestPermission();
-                      await ref.read(updateNotificationsProvider).registerBackgroundTask();
-                    } else {
-                      await ref.read(updateNotificationsProvider).conditionallyUnregisterBackgroundTask();
-                    }
-                  },
-                ),
-            ],
-          ),
-        ],
-        if (OxplayerSettingsVisibility.showProfileLibraryOrder ||
-            OxplayerSettingsVisibility.showProfileGroupedFolders) ...[
-          const SizedBox(height: 16),
-          LibraryOrderEditor(
-            groupedFoldersOnly: !OxplayerSettingsVisibility.showProfileLibraryOrder &&
-                OxplayerSettingsVisibility.showProfileGroupedFolders,
-            showGroupedFoldersSection: OxplayerSettingsVisibility.showProfileGroupedFolders,
-          ),
-        ],
-        if (OxplayerSettingsVisibility.showProfileLocalUrl) ...[
-          const SizedBox(height: 16),
-          ...settingsListGroup(
-            context,
-            SettingsLabelDivider(label: context.localized.advanced),
-            [
-              SettingsListTile(
-                label: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  spacing: 8,
-                  children: [
-                    if (user?.credentials.localUrl?.isNotEmpty == true)
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: ref.watch(localConnectionAvailableProvider)
-                              ? Colors.greenAccent
-                              : Theme.of(context).colorScheme.error,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    Text(context.localized.settingsLocalUrlTitle),
-                  ],
-                ),
-                subLabel: Text(user?.credentials.localUrl ?? context.localized.none),
-                onTap: () {
-                  openSimpleTextInput(
-                    context,
-                    user?.credentials.localUrl,
-                    (value) => ref.read(userProvider.notifier).setLocalURL(value),
-                    context.localized.settingsLocalUrlSetTitle,
-                    context.localized.settingsLocalUrlSetDesc,
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-        if (OxplayerEnv.apiBaseUrl != null) ...[
-          const SizedBox(height: 16),
-          ...oxplayerProfileDeleteAccountGroup(context, ref),
+          ...sushiProfileDeleteAccountGroup(context, ref),
         ],
       ],
     );

@@ -14,7 +14,7 @@ script:
 AppDir:
   path: ./AppDir
   app_info:
-    id: app.oxplayer
+    id: app.sushi
     name: Sushi
     icon: sushi_icon_desktop
     version: latest

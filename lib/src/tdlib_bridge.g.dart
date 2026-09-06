@@ -40,8 +40,8 @@ bool _deepEquals(Object? a, Object? b) {
 
 
 /// Mirrors the subset of TdApi.AuthorizationState this module surfaces to Dart
-/// (see app.oxplayer.tdlibbridge.auth.TdlibAuthState on the Kotlin side).
-enum OxTdlibAuthStateKind {
+/// (see app.sushi.tdlibbridge.auth.TdlibAuthState on the Kotlin side).
+enum SushiTdlibAuthStateKind {
   uninitialized,
   waitingForPhoneNumber,
   waitingForCode,
@@ -53,13 +53,13 @@ enum OxTdlibAuthStateKind {
   failed,
 }
 
-/// Liveness of the MTProto socket — deliberately a different question from [OxTdlibAuthStateKind].
+/// Liveness of the MTProto socket — deliberately a different question from [SushiTdlibAuthStateKind].
 ///
 /// A device can hold perfectly valid credentials (auth `ready`) while its connection is dead, in
 /// which case every byte fetch fails. Treating that as "logged out" is what sent TV users to a
 /// login screen for something a silent reconnect fixes, so the two states are reported separately
-/// and only [OxTdlibAuthStateKind.failed] may ever drive a re-login prompt.
-enum OxTdlibConnectionHealth {
+/// and only [SushiTdlibAuthStateKind.failed] may ever drive a re-login prompt.
+enum SushiTdlibConnectionHealth {
   /// configure() has not completed successfully yet.
   uninitialized,
   /// A connection attempt (first connect, or a reconnect) is in flight.
@@ -71,15 +71,15 @@ enum OxTdlibConnectionHealth {
   degraded,
 }
 
-class OxTdlibAuthState {
-  OxTdlibAuthState({
+class SushiTdlibAuthState {
+  SushiTdlibAuthState({
     required this.kind,
     this.qrLoginUrl,
     this.passwordHint,
     this.errorMessage,
   });
 
-  OxTdlibAuthStateKind kind;
+  SushiTdlibAuthStateKind kind;
 
   String? qrLoginUrl;
 
@@ -99,10 +99,10 @@ class OxTdlibAuthState {
   Object encode() {
     return _toList();  }
 
-  static OxTdlibAuthState decode(Object result) {
+  static SushiTdlibAuthState decode(Object result) {
     result as List<Object?>;
-    return OxTdlibAuthState(
-      kind: result[0]! as OxTdlibAuthStateKind,
+    return SushiTdlibAuthState(
+      kind: result[0]! as SushiTdlibAuthStateKind,
       qrLoginUrl: result[1] as String?,
       passwordHint: result[2] as String?,
       errorMessage: result[3] as String?,
@@ -112,7 +112,7 @@ class OxTdlibAuthState {
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! OxTdlibAuthState || other.runtimeType != runtimeType) {
+    if (other is! SushiTdlibAuthState || other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
@@ -128,9 +128,9 @@ class OxTdlibAuthState {
 }
 
 /// One playback session's Telegram-backed video source, parsed from the PlaybackInfo Path
-/// `oxplayer-tg://{providerBotId}/{messageId}?loc={locator}`.
-class OxTdlibPlaybackSource {
-  OxTdlibPlaybackSource({
+/// `sushi-tg://{providerBotId}/{messageId}?loc={locator}`.
+class SushiTdlibPlaybackSource {
+  SushiTdlibPlaybackSource({
     required this.providerBotId,
     required this.messageId,
     required this.preferHttpBridge,
@@ -172,9 +172,9 @@ class OxTdlibPlaybackSource {
   Object encode() {
     return _toList();  }
 
-  static OxTdlibPlaybackSource decode(Object result) {
+  static SushiTdlibPlaybackSource decode(Object result) {
     result as List<Object?>;
-    return OxTdlibPlaybackSource(
+    return SushiTdlibPlaybackSource(
       providerBotId: result[0]! as int,
       messageId: result[1]! as int,
       preferHttpBridge: result[2]! as bool,
@@ -185,7 +185,7 @@ class OxTdlibPlaybackSource {
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! OxTdlibPlaybackSource || other.runtimeType != runtimeType) {
+    if (other is! SushiTdlibPlaybackSource || other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
@@ -203,8 +203,8 @@ class OxTdlibPlaybackSource {
 /// One delivery sender, as published by the backend's GET /telegram/provider-bots. The username is
 /// needed only for first contact (contacts.resolveUsername -> startBot); afterwards everything
 /// addresses the bot by [id]. Tokens never reach the client.
-class OxTdlibProviderBot {
-  OxTdlibProviderBot({
+class SushiTdlibProviderBot {
+  SushiTdlibProviderBot({
     required this.id,
     required this.username,
   });
@@ -223,9 +223,9 @@ class OxTdlibProviderBot {
   Object encode() {
     return _toList();  }
 
-  static OxTdlibProviderBot decode(Object result) {
+  static SushiTdlibProviderBot decode(Object result) {
     result as List<Object?>;
-    return OxTdlibProviderBot(
+    return SushiTdlibProviderBot(
       id: result[0]! as int,
       username: result[1]! as String,
     );
@@ -234,7 +234,7 @@ class OxTdlibProviderBot {
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! OxTdlibProviderBot || other.runtimeType != runtimeType) {
+    if (other is! SushiTdlibProviderBot || other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
@@ -252,8 +252,8 @@ class OxTdlibProviderBot {
 /// Where a delivered video actually landed, as observed by THIS session. Both halves can only come
 /// from the receiving side: private-chat message ids are numbered per side, and the server
 /// round-robins across senders so it does not know which one won.
-class OxTdlibDeliveryRef {
-  OxTdlibDeliveryRef({
+class SushiTdlibDeliveryRef {
+  SushiTdlibDeliveryRef({
     required this.messageId,
     required this.providerBotId,
   });
@@ -272,9 +272,9 @@ class OxTdlibDeliveryRef {
   Object encode() {
     return _toList();  }
 
-  static OxTdlibDeliveryRef decode(Object result) {
+  static SushiTdlibDeliveryRef decode(Object result) {
     result as List<Object?>;
-    return OxTdlibDeliveryRef(
+    return SushiTdlibDeliveryRef(
       messageId: result[0]! as int,
       providerBotId: result[1]! as int,
     );
@@ -283,7 +283,7 @@ class OxTdlibDeliveryRef {
   @override
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
-    if (other is! OxTdlibDeliveryRef || other.runtimeType != runtimeType) {
+    if (other is! SushiTdlibDeliveryRef || other.runtimeType != runtimeType) {
       return false;
     }
     if (identical(this, other)) {
@@ -306,22 +306,22 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is OxTdlibAuthStateKind) {
+    }    else if (value is SushiTdlibAuthStateKind) {
       buffer.putUint8(129);
       writeValue(buffer, value.index);
-    }    else if (value is OxTdlibConnectionHealth) {
+    }    else if (value is SushiTdlibConnectionHealth) {
       buffer.putUint8(130);
       writeValue(buffer, value.index);
-    }    else if (value is OxTdlibAuthState) {
+    }    else if (value is SushiTdlibAuthState) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibPlaybackSource) {
+    }    else if (value is SushiTdlibPlaybackSource) {
       buffer.putUint8(132);
       writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibProviderBot) {
+    }    else if (value is SushiTdlibProviderBot) {
       buffer.putUint8(133);
       writeValue(buffer, value.encode());
-    }    else if (value is OxTdlibDeliveryRef) {
+    }    else if (value is SushiTdlibDeliveryRef) {
       buffer.putUint8(134);
       writeValue(buffer, value.encode());
     } else {
@@ -334,29 +334,29 @@ class _PigeonCodec extends StandardMessageCodec {
     switch (type) {
       case 129: 
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : OxTdlibAuthStateKind.values[value];
+        return value == null ? null : SushiTdlibAuthStateKind.values[value];
       case 130: 
         final int? value = readValue(buffer) as int?;
-        return value == null ? null : OxTdlibConnectionHealth.values[value];
+        return value == null ? null : SushiTdlibConnectionHealth.values[value];
       case 131: 
-        return OxTdlibAuthState.decode(readValue(buffer)!);
+        return SushiTdlibAuthState.decode(readValue(buffer)!);
       case 132: 
-        return OxTdlibPlaybackSource.decode(readValue(buffer)!);
+        return SushiTdlibPlaybackSource.decode(readValue(buffer)!);
       case 133: 
-        return OxTdlibProviderBot.decode(readValue(buffer)!);
+        return SushiTdlibProviderBot.decode(readValue(buffer)!);
       case 134: 
-        return OxTdlibDeliveryRef.decode(readValue(buffer)!);
+        return SushiTdlibDeliveryRef.decode(readValue(buffer)!);
       default:
         return super.readValueOfType(type, buffer);
     }
   }
 }
 
-class OxTdlibBridgeApi {
-  /// Constructor for [OxTdlibBridgeApi].  The [binaryMessenger] named argument is
+class SushiTdlibBridgeApi {
+  /// Constructor for [SushiTdlibBridgeApi].  The [binaryMessenger] named argument is
   /// available for dependency injection.  If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  OxTdlibBridgeApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
+  SushiTdlibBridgeApi({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
       : pigeonVar_binaryMessenger = binaryMessenger,
         pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
@@ -366,10 +366,10 @@ class OxTdlibBridgeApi {
   final String pigeonVar_messageChannelSuffix;
 
   /// Must be called once before any other method (idempotent) — starts the underlying
-  /// TDLib client with [apiId]/[apiHash] from OxplayerEnv (this module's own user-session
+  /// TDLib client with [apiId]/[apiHash] from SushiEnv (this module's own user-session
   /// credentials, distinct from the bot-based OX login's credentials).
   Future<void> configure(int apiId, String apiHash) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.configure$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.configure$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -391,10 +391,10 @@ class OxTdlibBridgeApi {
     }
   }
 
-  /// Current auth state; also pushed via OxTdlibBridgeEvents.onAuthStateChanged.
+  /// Current auth state; also pushed via SushiTdlibBridgeEvents.onAuthStateChanged.
   /// Synchronous — this just reads cached state, no TDLib round-trip.
-  Future<OxTdlibAuthState> currentAuthState() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.currentAuthState$pigeonVar_messageChannelSuffix';
+  Future<SushiTdlibAuthState> currentAuthState() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.currentAuthState$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -417,7 +417,7 @@ class OxTdlibBridgeApi {
         message: 'Host platform returned null value for non-null return value.',
       );
     } else {
-      return (pigeonVar_replyList[0] as OxTdlibAuthState?)!;
+      return (pigeonVar_replyList[0] as SushiTdlibAuthState?)!;
     }
   }
 
@@ -432,7 +432,7 @@ class OxTdlibBridgeApi {
   /// stale restored bot session) never fire, and playback hung waiting on a push that could never
   /// reach that bot's own inbox. Synchronous — an in-memory read on the Go side.
   Future<bool> isNativeSessionBot() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.isNativeSessionBot$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.isNativeSessionBot$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -459,10 +459,10 @@ class OxTdlibBridgeApi {
     }
   }
 
-  /// Current socket liveness; also pushed via OxTdlibBridgeEvents.onConnectionHealthChanged.
+  /// Current socket liveness; also pushed via SushiTdlibBridgeEvents.onConnectionHealthChanged.
   /// Synchronous — an in-memory read on the Go side, no round-trip.
-  Future<OxTdlibConnectionHealth> connectionHealth() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.connectionHealth$pigeonVar_messageChannelSuffix';
+  Future<SushiTdlibConnectionHealth> connectionHealth() async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.connectionHealth$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -485,7 +485,7 @@ class OxTdlibBridgeApi {
         message: 'Host platform returned null value for non-null return value.',
       );
     } else {
-      return (pigeonVar_replyList[0] as OxTdlibConnectionHealth?)!;
+      return (pigeonVar_replyList[0] as SushiTdlibConnectionHealth?)!;
     }
   }
 
@@ -495,7 +495,7 @@ class OxTdlibBridgeApi {
   /// waiting beats failing: app resume, and immediately before a playback download. Completes when
   /// the connection is usable, or fails if it could not be re-established.
   Future<void> reconnect() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.reconnect$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.reconnect$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -524,13 +524,13 @@ class OxTdlibBridgeApi {
   /// even one whose auth landed in `failed` — only a client object that never existed rebuilds
   /// cleanly from the on-disk session. Killing the process is the only way to guarantee that from
   /// here, since there is no "drop this client but keep the session file" call exposed yet (see
-  /// oxplayer_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
+  /// sushi_login_screen.dart's stuck-state UI). Session storage on disk is untouched, so the
   /// relaunched process resumes the same signed-in session — this is not a logout.
   ///
   /// Never returns (the process exits); the return type exists only so Dart can await the call
   /// being dispatched before the platform channel itself goes away.
   Future<void> restartApp() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.restartApp$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.restartApp$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -554,7 +554,7 @@ class OxTdlibBridgeApi {
 
   /// Phone/tablet flow, step 1. Async: waits on the real TdApi round-trip.
   Future<void> submitPhoneNumber(String phoneNumber) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitPhoneNumber$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.submitPhoneNumber$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -578,7 +578,7 @@ class OxTdlibBridgeApi {
 
   /// Phone/tablet flow, step 2.
   Future<void> submitCode(String code) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitCode$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.submitCode$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -602,7 +602,7 @@ class OxTdlibBridgeApi {
 
   /// Phone/tablet flow, step 3 — only valid when state is waitingForPassword.
   Future<void> submitTwoFactorPassword(String password) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitTwoFactorPassword$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.submitTwoFactorPassword$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -627,7 +627,7 @@ class OxTdlibBridgeApi {
   /// Android TV flow: request a QR login token; UI renders the URL pushed via
   /// onAuthStateChanged(waitingForQrConfirmation) as a QR code.
   Future<void> requestQrLogin() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.requestQrLogin$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.requestQrLogin$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -649,11 +649,11 @@ class OxTdlibBridgeApi {
     }
   }
 
-  /// Bot-token login: an alternative to phone/QR for users who don't want to give OXPlayer
+  /// Bot-token login: an alternative to phone/QR for users who don't want to give Sushi
   /// access to their personal Telegram account. Logs in as a bot (gotd/td
   /// auth.importBotAuthorization) instead — goes straight to ready, no code/2FA step.
   Future<void> submitBotToken(String token) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.submitBotToken$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.submitBotToken$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -677,7 +677,7 @@ class OxTdlibBridgeApi {
 
   /// Server-side session invalidation + local TDLib session wipe.
   Future<void> logOut() async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.logOut$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.logOut$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -705,8 +705,8 @@ class OxTdlibBridgeApi {
   /// TdlibHttpBridgeServer (mpv/mdk path — see that class for why).
   /// Throws if no MTProto/TDLib session is logged in yet — callers should
   /// check currentAuthState() first and prompt login if not ready.
-  Future<String> startPlaybackSession(OxTdlibPlaybackSource source) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.startPlaybackSession$pigeonVar_messageChannelSuffix';
+  Future<String> startPlaybackSession(SushiTdlibPlaybackSource source) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.startPlaybackSession$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -742,8 +742,8 @@ class OxTdlibBridgeApi {
   /// the receiving session ever sees the id that can be re-read later — and only it knows which
   /// sender the backend's round-robin actually settled on.
   /// Synchronous — reads an in-memory map, no MTProto round-trip.
-  Future<OxTdlibDeliveryRef?> deliveryRefForLocator(String locator) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.deliveryRefForLocator$pigeonVar_messageChannelSuffix';
+  Future<SushiTdlibDeliveryRef?> deliveryRefForLocator(String locator) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.deliveryRefForLocator$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -761,7 +761,7 @@ class OxTdlibBridgeApi {
         details: pigeonVar_replyList[2],
       );
     } else {
-      return (pigeonVar_replyList[0] as OxTdlibDeliveryRef?);
+      return (pigeonVar_replyList[0] as SushiTdlibDeliveryRef?);
     }
   }
 
@@ -769,7 +769,7 @@ class OxTdlibBridgeApi {
   /// delivery that lands while that HTTP request is still in flight is captured rather than raced
   /// for. Idempotent, synchronous, no MTProto round-trip.
   Future<void> armDeliveryWaiter(String locator) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.armDeliveryWaiter$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.armDeliveryWaiter$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -796,8 +796,8 @@ class OxTdlibBridgeApi {
   /// downloads for videos nobody pressed play on would spend the user's data on bytes that get
   /// thrown away. Resolving is enough: it makes the backend remember the message id, so the
   /// eventual play needs no Telegram call at all.
-  Future<void> warmDelivery(OxTdlibPlaybackSource source) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.warmDelivery$pigeonVar_messageChannelSuffix';
+  Future<void> warmDelivery(SushiTdlibPlaybackSource source) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.warmDelivery$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -825,8 +825,8 @@ class OxTdlibBridgeApi {
   ///
   /// No-op for a bot-token login: a bot is not a user account, has no dialog list to archive, and
   /// its B2B DM was already opened by main-bot's /connectbot.
-  Future<void> ensureProviderBotsReady(List<OxTdlibProviderBot> bots) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.ensureProviderBotsReady$pigeonVar_messageChannelSuffix';
+  Future<void> ensureProviderBotsReady(List<SushiTdlibProviderBot> bots) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.ensureProviderBotsReady$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -854,7 +854,7 @@ class OxTdlibBridgeApi {
   /// have no equivalent Activity-scoped teardown, so their wrapper must call this explicitly
   /// when a Telegram-sourced item finishes) — see TdlibBridgeObject.onTelegramPlaybackEnded.
   Future<void> stopPlaybackSession(String sessionUri) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.stopPlaybackSession$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.stopPlaybackSession$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -880,10 +880,10 @@ class OxTdlibBridgeApi {
   /// GetWebAppLinkUrl/GetWebAppUrl/GetMainWebApp — requires a Ready auth state (real Telegram
   /// login already completed) and a Mini App configured on that bot via @BotFather. Exchange the
   /// result with the backend's POST /auth/telegram to obtain OX session tokens; see
-  /// OxplayerTelegramAuthClient. [webAppShortName]/[hostedHttpsUrl] may be null/empty if unset —
+  /// SushiTelegramAuthClient. [webAppShortName]/[hostedHttpsUrl] may be null/empty if unset —
   /// at least one working WebApp path must be configured on the bot for this to succeed.
   Future<String> fetchWebAppInitData(String botUsername, String? webAppShortName, String? hostedHttpsUrl) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.fetchWebAppInitData$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.fetchWebAppInitData$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -913,7 +913,7 @@ class OxTdlibBridgeApi {
   /// DMs [username] with [text] and waits for the next private-chat reply starting with `!`
   /// (Sushi wire framing). Used for `/initbot <corr>` against init-bot. [timeoutMs] ≤ 0 → 30000.
   Future<String> sendTextAndWaitReply(String username, String text, int timeoutMs) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextAndWaitReply$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.sendTextAndWaitReply$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -946,7 +946,7 @@ class OxTdlibBridgeApi {
   /// [sendTextAndWaitReply] it never blocks on a server reply, so it cannot stall the caller
   /// waiting on one that is never coming.
   Future<void> sendTextFireAndForget(String username, String text) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.sendTextFireAndForget$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.sendTextFireAndForget$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -974,7 +974,7 @@ class OxTdlibBridgeApi {
   /// a bot-token login (no dialog list, no onboarding conversation to have). [timeoutMs] bounds
   /// the whole multi-step conversation, not one round trip; ≤ 0 → 90000.
   Future<void> ensureMainBotOnboarded(String username, int timeoutMs) async {
-    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeApi.ensureMainBotOnboarded$pigeonVar_messageChannelSuffix';
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.ensureMainBotOnboarded$pigeonVar_messageChannelSuffix';
     final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -997,31 +997,31 @@ class OxTdlibBridgeApi {
   }
 }
 
-abstract class OxTdlibBridgeEvents {
+abstract class SushiTdlibBridgeEvents {
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
-  void onAuthStateChanged(OxTdlibAuthState state);
+  void onAuthStateChanged(SushiTdlibAuthState state);
 
   /// Pushed whenever socket liveness changes. Independent of onAuthStateChanged — see
-  /// [OxTdlibConnectionHealth] for why the two must not be collapsed into one signal.
-  void onConnectionHealthChanged(OxTdlibConnectionHealth health);
+  /// [SushiTdlibConnectionHealth] for why the two must not be collapsed into one signal.
+  void onConnectionHealthChanged(SushiTdlibConnectionHealth health);
 
-  static void setUp(OxTdlibBridgeEvents? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
+  static void setUp(SushiTdlibBridgeEvents? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
     {
       final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onAuthStateChanged$messageChannelSuffix', pigeonChannelCodec,
+          'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onAuthStateChanged$messageChannelSuffix', pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onAuthStateChanged was null.');
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onAuthStateChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
-          final OxTdlibAuthState? arg_state = (args[0] as OxTdlibAuthState?);
+          final SushiTdlibAuthState? arg_state = (args[0] as SushiTdlibAuthState?);
           assert(arg_state != null,
-              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onAuthStateChanged was null, expected non-null OxTdlibAuthState.');
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onAuthStateChanged was null, expected non-null SushiTdlibAuthState.');
           try {
             api.onAuthStateChanged(arg_state!);
             return wrapResponse(empty: true);
@@ -1035,18 +1035,18 @@ abstract class OxTdlibBridgeEvents {
     }
     {
       final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged$messageChannelSuffix', pigeonChannelCodec,
+          'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onConnectionHealthChanged$messageChannelSuffix', pigeonChannelCodec,
           binaryMessenger: binaryMessenger);
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
         pigeonVar_channel.setMessageHandler((Object? message) async {
           assert(message != null,
-          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged was null.');
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onConnectionHealthChanged was null.');
           final List<Object?> args = (message as List<Object?>?)!;
-          final OxTdlibConnectionHealth? arg_health = (args[0] as OxTdlibConnectionHealth?);
+          final SushiTdlibConnectionHealth? arg_health = (args[0] as SushiTdlibConnectionHealth?);
           assert(arg_health != null,
-              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.OxTdlibBridgeEvents.onConnectionHealthChanged was null, expected non-null OxTdlibConnectionHealth.');
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeEvents.onConnectionHealthChanged was null, expected non-null SushiTdlibConnectionHealth.');
           try {
             api.onConnectionHealthChanged(arg_health!);
             return wrapResponse(empty: true);

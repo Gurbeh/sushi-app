@@ -5,10 +5,6 @@ import 'package:chopper/chopper.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart' as dto;
 import 'package:fladder/models/last_seen_notifications_model.dart';
-import 'package:fladder/models/seerr_credentials_model.dart';
-import 'package:fladder/seerr/seerr_chopper_service.dart';
-import 'package:fladder/seerr/seerr_json_converter.dart';
-import 'package:fladder/seerr/seerr_models.dart';
 
 import 'package:fladder/util/deep_link_helper.dart';
 
@@ -17,10 +13,7 @@ const String updateTaskNameDebug = 'nl.jknaapen.fladder.update_notifications_che
 
 class NotificationHelpers {
   static String buildDetailsDeepLink(String id) =>
-      '$kOxplayerDeepLinkScheme:///details?id=${Uri.encodeComponent(id)}';
-
-  static String buildSeerrDeepLink(String mediaType, int tmdbId) =>
-      '$kOxplayerDeepLinkScheme:///seerr/$mediaType/$tmdbId';
+      '$kSushiDeepLinkScheme:///details?id=${Uri.encodeComponent(id)}';
 
   static List<LastSeenModel> replaceOrAppendLastSeen(List<LastSeenModel> servers, LastSeenModel saved) {
     final exists = servers.any((s) => s.userId == saved.userId);
@@ -28,60 +21,7 @@ class NotificationHelpers {
     return [...servers, saved];
   }
 
-  static SeerrChopperService createSeerrClient(
-    SeerrCredentialsModel credentials, {
-    String? oxBearerToken,
-  }) {
-    final chopper = ChopperClient(
-      baseUrl: Uri.parse(credentials.serverUrl),
-      converter: const SeerrJsonConverter(),
-      interceptors: [
-        _WorkerSeerrAuthInterceptor(
-          apiKey: credentials.apiKey.trim(),
-          cookie: credentials.sessionCookie.trim(),
-          customHeaders: credentials.customHeaders,
-          oxBearerToken: credentials.useProxy ? oxBearerToken : null,
-        ),
-        HttpLoggingInterceptor(level: Level.basic),
-      ],
-    );
-
-    return SeerrChopperService.create(chopper);
-  }
-
-  static Future<List<SeerrMediaRequest>> fetchSeerrRequests(
-    SeerrChopperService seerrApi,
-    String seerrBase,
-    DateTime lastUpdateCheck,
-    bool debug,
-    int limit,
-    SeerrCredentialsModel seerrCredentials,
-  ) async {
-    try {
-      final meResp = await seerrApi.getMe();
-      if (!meResp.isSuccessful || meResp.body == null) return [];
-
-      final userId = meResp.body!.id;
-      final reqResp = await seerrApi.getRequests(take: limit, skip: 0);
-      final requests =
-          reqResp.isSuccessful && reqResp.body?.results != null ? reqResp.body!.results! : <SeerrMediaRequest>[];
-
-      final since = debug ? lastUpdateCheck.subtract(const Duration(days: 12)) : lastUpdateCheck;
-
-      final newRequests = requests.reversed.where((request) {
-        if (request.requestedBy?.id == userId) return false;
-        final dateStr = request.updatedAt ?? request.createdAt;
-        if (dateStr == null) return false;
-        return dateStr.isAfter(since.toLocal());
-      }).toList();
-      return newRequests;
-    } catch (e) {
-      log('Error fetching Seerr requests: $e');
-      return [];
-    }
-  }
-
-  static Future<List<dto.BaseItemDto>> fetchLatestItems(
+static Future<List<dto.BaseItemDto>> fetchLatestItems(
     String baseUrl,
     String userId,
     String token,
@@ -210,33 +150,3 @@ class _WorkerAuthInterceptor implements Interceptor {
   }
 }
 
-class _WorkerSeerrAuthInterceptor implements Interceptor {
-  _WorkerSeerrAuthInterceptor({
-    required this.apiKey,
-    required this.cookie,
-    required this.customHeaders,
-    this.oxBearerToken,
-  });
-
-  final String apiKey;
-  final String cookie;
-  final Map<String, String> customHeaders;
-  final String? oxBearerToken;
-
-  @override
-  FutureOr<Response<BodyType>> intercept<BodyType>(Chain<BodyType> chain) {
-    final headers = <String, String>{...chain.request.headers};
-    final proxyToken = oxBearerToken?.trim() ?? '';
-    if (proxyToken.isNotEmpty) {
-      headers['Authorization'] = 'MediaBrowser Token="$proxyToken"';
-    } else if (apiKey.isNotEmpty) {
-      headers['X-Api-Key'] = apiKey;
-    } else if (cookie.isNotEmpty) {
-      headers['Cookie'] = cookie;
-    }
-    headers.addAll(customHeaders);
-    headers.remove('ox-seerr-proxy');
-    final request = chain.request.copyWith(headers: headers);
-    return chain.proceed(request);
-  }
-}

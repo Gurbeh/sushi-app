@@ -42,7 +42,7 @@ void main() {
       },
       arm: (_) async {},
       ack: ({required fileId, required messageId}) async {},
-      poll: (_) async => OxTdlibDeliveryRef(providerBotId: 8, messageId: 77),
+      poll: (_) async => SushiTdlibDeliveryRef(providerBotId: 8, messageId: 77),
     );
 
     warmup.schedule(5);

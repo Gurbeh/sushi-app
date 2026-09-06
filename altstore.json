@@ -6,7 +6,7 @@
 	"apps": [
 	  {
 	    "name": "Sushi",
-	    "bundleIdentifier": "app.oxplayer",
+	    "bundleIdentifier": "app.sushi",
 	    "developerName": "DonutWare",
 	    "localizedDescription": "Telegram media library client built with Flutter.",
 	    "iconURL": "https://github.com/DonutWare/Fladder/raw/develop/icons/fladder_macos_icon.png?raw=true",

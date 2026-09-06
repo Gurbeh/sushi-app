@@ -11,8 +11,7 @@ import 'package:fladder/models/settings/client_settings_model.dart';
 import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
+import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/settings/book_viewer_settings_provider.dart';
@@ -172,7 +171,7 @@ class SharedHelper {
     }
   }
 
-  /// Most recently used saved account regardless of app-lock method (OXPlayer splash).
+  /// Most recently used saved account regardless of app-lock method (Sushi splash).
   AccountModel? getMostRecentAccount() {
     try {
       final accounts = getAccounts();
@@ -261,7 +260,7 @@ class SharedHelper {
       return SubtitleSettingsModel.fromJson(sharedPreferences.getString(SharedKeys._subtitleSettingsKey) ?? "");
     } catch (e) {
       log(e.toString());
-      return OxplayerConfig.isEnabled ? OxSubtitleFont.defaultSettings : const SubtitleSettingsModel();
+      return SushiSubtitleFont.defaultSettings;
     }
   }
 

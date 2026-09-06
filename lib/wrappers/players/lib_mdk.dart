@@ -13,8 +13,8 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
+import 'package:fladder/sushi/sushi_audio_log.dart';
+import 'package:fladder/sushi/sushi_playback_audio.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
@@ -149,8 +149,8 @@ class LibMDK extends BasePlayer {
   Future<int> setAudioTrack(AudioStreamModel? model, PlaybackModel playbackModel) async {
     final wantedAudioStream = model ?? playbackModel.defaultAudioStream;
     if (wantedAudioStream == null || wantedAudioStream.index == AudioStreamModel.no().index) {
-      if (oxplayerShouldSkipAudioTrackOff(playbackModel)) {
-        OxplayerAudioLog.event('audio_track_skip_off_muxed', fields: {
+      if (sushiShouldSkipAudioTrackOff(playbackModel)) {
+        SushiAudioLog.event('audio_track_skip_off_muxed', fields: {
           'backend': 'mdk',
           'defaultAudioIndex': playbackModel.mediaStreams?.defaultAudioStreamIndex,
         });

@@ -13,9 +13,7 @@ import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/library_filters_model.dart';
-import 'package:fladder/models/seerr_credentials_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -29,7 +27,7 @@ part 'user_provider.g.dart';
 
 @riverpod
 bool showSyncButtonProvider(Ref ref) {
-  if (SushiConfig.isEnabled) return true;
+  return true;
   final userCanSync = ref.watch(userProvider.select((value) => value?.canDownload ?? false));
   final hasSyncedItems = ref.watch(syncProvider.select((value) => value.items.isNotEmpty));
   return userCanSync || hasSyncedItems;
@@ -41,7 +39,7 @@ class User extends _$User {
 
   set userState(AccountModel? account) {
     // Policy is `includeFromJson: false` — re-attach on every write so download UI stays on.
-    if (SushiConfig.isEnabled && account != null && sushiIsLocalAccount(account)) {
+    if (account != null && sushiIsLocalAccount(account)) {
       account = sushiWithDownloadPolicy(account);
     }
     state = account?.copyWith(lastUsed: DateTime.now());
@@ -181,8 +179,8 @@ class User extends _$User {
     final response = await (favorite
         ? api.usersUserIdFavoriteItemsItemIdPost(itemId: itemId)
         : api.usersUserIdFavoriteItemsItemIdDelete(itemId: itemId));
-    if (OxplayerConfig.isEnabled && response.isSuccessful) {
-      ref.read(oxItemFlagsProvider.notifier).setFavorite(itemId, favorite);
+    if (response.isSuccessful) {
+      ref.read(sushiCatalogItemFlagsProvider.notifier).setFavorite(itemId, favorite);
     }
     return Response(response.base, UserData.fromDto(response.body));
   }
@@ -196,8 +194,8 @@ class User extends _$User {
         : api.usersUserIdPlayedItemsItemIdDelete(
             itemId: itemId,
           ));
-    if (OxplayerConfig.isEnabled && response.isSuccessful) {
-      final flags = ref.read(oxItemFlagsProvider.notifier);
+    if (response.isSuccessful) {
+      final flags = ref.read(sushiCatalogItemFlagsProvider.notifier);
       flags.setPlayed(itemId, enable);
       if (enable) {
         flags.setWatchlisted(itemId, false);
@@ -218,69 +216,6 @@ class User extends _$User {
     state = user.copyWith(
       credentials: user.credentials.copyWith(localUrl: value?.isEmpty == true ? null : value),
     );
-  }
-
-  void setSeerrServerUrl(String? value) {
-    final user = state;
-    if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      serverUrl: value?.trim() ?? "",
-    );
-    userState = user.copyWith(seerrCredentials: updated);
-  }
-
-  /// Atomic OX Seerr proxy credentials (server URL + proxy header) for VIP/admin users.
-  void setSeerrProxyCredentials({required String proxyBase}) {
-    final user = state;
-    if (user == null) return;
-    userState = user.copyWith(
-      seerrCredentials: SeerrCredentialsModel(
-        serverUrl: proxyBase.trim(),
-        customHeaders: const {'ox-seerr-proxy': '1'},
-      ),
-    );
-  }
-
-  void logoutSeerr() {
-    final user = state;
-    if (user == null) return;
-    userState = user.copyWith(seerrCredentials: const SeerrCredentialsModel());
-  }
-
-  void setSeerrApiKey(String? value) {
-    final user = state;
-    if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      apiKey: value?.trim() ?? "",
-    );
-    userState = user.copyWith(seerrCredentials: updated);
-  }
-
-  void setSeerrSessionCookie(String? value) {
-    final user = state;
-    if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      sessionCookie: value?.trim() ?? "",
-    );
-    userState = user.copyWith(seerrCredentials: updated);
-  }
-
-  void setSeerrCustomHeaders(Map<String, String> headers) {
-    final user = state;
-    if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      customHeaders: headers,
-    );
-    userState = user.copyWith(seerrCredentials: updated);
-  }
-
-  void clearSeerrCustomHeaders() {
-    final user = state;
-    if (user == null) return;
-    final updated = (user.seerrCredentials ?? const SeerrCredentialsModel()).copyWith(
-      customHeaders: {},
-    );
-    userState = user.copyWith(seerrCredentials: updated);
   }
 
   void addSearchQuery(String value) {

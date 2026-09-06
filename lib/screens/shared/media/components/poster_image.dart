@@ -13,11 +13,10 @@ import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
-import 'package:fladder/oxplayer/ox_detail_poster_badges.dart';
-import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
-import 'package:fladder/oxplayer/ox_boxset_availability_overlay.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/providers/ox_item_flags.dart';
+import 'package:fladder/sushi/sushi_detail_poster_badges.dart';
+import 'package:fladder/sushi/sushi_catalog_interest_status.dart';
+import 'package:fladder/sushi/sushi_boxset_availability_overlay.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/refresh_state.dart';
@@ -40,7 +39,7 @@ class PosterImage extends ConsumerWidget {
   final bool primaryPosters;
   final Function(bool focus)? onFocusChanged;
   final bool showSyncStatus;
-  final bool oxDetailBadges;
+  final bool sushiDetailBadges;
   final bool sushiContinueToggle;
 
   const PosterImage({
@@ -57,7 +56,7 @@ class PosterImage extends ConsumerWidget {
     this.primaryPosters = false,
     this.onFocusChanged,
     this.showSyncStatus = false,
-    this.oxDetailBadges = false,
+    this.sushiDetailBadges = false,
     this.sushiContinueToggle = false,
     super.key,
   });
@@ -67,9 +66,7 @@ class PosterImage extends ConsumerWidget {
     final radius = FladderTheme.smallShape.borderRadius;
     final padding = const EdgeInsets.all(5);
     final myKey = key ?? UniqueKey();
-    final showFavourite = OxplayerConfig.isEnabled
-        ? ref.watch(oxItemFlagsProvider.select((s) => s.isFavorite(poster.id)))
-        : poster.userData.isFavourite;
+    final showFavourite = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isFavorite(poster.id)));
 
     return Hero(
       tag: myKey,
@@ -106,10 +103,10 @@ class PosterImage extends ConsumerWidget {
           ),
         ),
         overlays: [
-          if (oxDetailPosterBadgesEnabled(oxDetailBadges)) ...[
-            if (oxRelatedMediaTypeBadge(context, poster) case final badge?) badge,
+          if (sushiDetailPosterBadgesEnabled(sushiDetailBadges)) ...[
+            if (sushiRelatedMediaTypeBadge(context, poster) case final badge?) badge,
           ],
-          if (oxCatalogAvailabilityOverlay(poster) case final overlay?) overlay,
+          if (sushiCatalogAvailabilityOverlay(poster) case final overlay?) overlay,
           if (showSyncStatus)
             Align(
               alignment: Alignment.topRight,
@@ -202,7 +199,7 @@ class PosterImage extends ConsumerWidget {
     showBottomSheetPill(
       context: context,
       item: poster,
-      content: (scrollContext, scrollController) => oxReactivePosterActionsList(
+      content: (scrollContext, scrollController) => sushiReactivePosterActionsList(
         context: scrollContext,
         ref: ref,
         poster: poster,

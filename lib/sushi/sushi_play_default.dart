@@ -19,7 +19,7 @@ import 'package:fladder/sushi/sushi_row_adapter.dart';
 /// (docs/05) — entirely separate from Jellyfin's PlaybackInfo, which Sushi has none of.
 ///
 /// Returns null when there's nothing to play (no file id picked yet, or the resolve failed) —
-/// callers show the same "unable to play" state they already show for a null OXPlayer/Jellyfin
+/// callers show the same "unable to play" state they already show for a null Sushi/Jellyfin
 /// model.
 ///
 /// Movies already carry `/files` on the model. Episodes fetch `/files` here if the pick-list is

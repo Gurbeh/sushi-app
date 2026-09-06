@@ -6,16 +6,10 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_prefetch.dart';
-import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/sushi/sushi_screen_telemetry.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
-import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 
@@ -56,12 +50,9 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
 
   final Ref ref;
 
-  late final JellyService api = ref.read(jellyApiProvider);
-
   Future<Response?> fetchDetails(ItemBaseModel item) async {
     Future<Response?> load() async {
       try {
-      if (SushiConfig.isEnabled) {
         if (item is! EpisodeModel) return null;
         final seriesId = item.parentId ?? '';
         final series = seriesId.isNotEmpty ? ref.read(seriesDetailsProvider(seriesId)) : null;
@@ -78,48 +69,17 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
         );
         sushiPlayWarmup.scheduleFromStreams(episode.mediaStreams);
         return null;
+      } catch (e) {
+        _tryToCreateOfflineState(item);
+        return null;
       }
-      final seriesResponse = await api.usersUserIdItemsItemIdGet(itemId: item.parentBaseModel.id);
-      if (seriesResponse.body == null) return null;
-      final episodes = await api.showsSeriesIdEpisodesGet(seriesId: item.parentBaseModel.id);
-
-      if (episodes.body == null) return null;
-
-      final episode = (await api.usersUserIdItemsItemIdGet(itemId: item.id)).bodyOrThrow as EpisodeModel;
-
-      state = state.copyWith(
-        series: seriesResponse.bodyOrThrow as SeriesModel,
-        episodes: EpisodeModel.episodesFromDto(episodes.bodyOrThrow.items, ref),
-        episode: episode,
-      );
-      if (OxplayerConfig.isEnabled) {
-        state = state.copyWith(episode: oxplayerPrepareEpisodeMediaStreams(state.episode, ref));
-        final ep = state.episode;
-        if (ep != null) {
-          OxplayerPlaybackPrefetch.scheduleForItem(
-            ref.read,
-            ep.id,
-            startPosition: ep.userData.playBackPosition,
-            mediaSourceId: ep.streamModel?.currentVersionStream?.id,
-          );
-        }
-      }
-
-      return seriesResponse;
-    } catch (e) {
-      _tryToCreateOfflineState(item);
-      return null;
-    }
     }
 
-    if (OxplayerConfig.isEnabled) {
-      return OxplayerScreenTelemetry.trackLoad(
-        screen: 'episode_detail',
-        phase: 'fetch',
-        load: load,
-      );
-    }
-    return load();
+    return SushiScreenTelemetry.trackLoad(
+      screen: 'episode_detail',
+      phase: 'fetch',
+      load: load,
+    );
   }
 
   Future<void> _tryToCreateOfflineState(ItemBaseModel item) async {
@@ -139,7 +99,6 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
       episode: episodes.firstWhereOrNull((element) => element.id == item.id),
       episodes: episodes,
     );
-    return;
   }
 
   void updateEpisode(EpisodeModel episode) {

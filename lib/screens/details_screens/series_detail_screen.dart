@@ -8,20 +8,13 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
-import 'package:fladder/oxplayer/ox_library_detail_labels.dart';
-import 'package:fladder/oxplayer/oxplayer_detail_loading.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/oxplayer_media_variant.dart';
-import 'package:fladder/oxplayer/ox_series_episode_actions.dart';
-import 'package:fladder/oxplayer/ox_series_selected_episode.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/widgets/ox_detail_action_layout.dart';
-import 'package:fladder/oxplayer/widgets/ox_series_detail_play_buttons.dart';
-import 'package:fladder/oxplayer/widgets/ox_series_episode_picker_button.dart';
-import 'package:fladder/oxplayer/widgets/ox_series_request_button.dart';
-import 'package:fladder/oxplayer/widgets/ox_seerr_people_row.dart';
-import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_detail_loading.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
+import 'package:fladder/sushi/sushi_media_variant.dart';
+import 'package:fladder/sushi/sushi_series_selected_episode.dart';
+import 'package:fladder/sushi/widgets/sushi_detail_action_layout.dart';
+import 'package:fladder/sushi/widgets/sushi_series_detail_play_buttons.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
@@ -30,9 +23,7 @@ import 'package:fladder/sushi/sushi_request_button.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
-import 'package:fladder/screens/seerr/widgets/seerr_poster_row.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
-import 'package:fladder/screens/shared/media/components/media_play_button.dart';
 import 'package:fladder/screens/shared/media/episode_posters.dart';
 import 'package:fladder/screens/shared/media/expanding_text.dart';
 import 'package:fladder/screens/shared/media/external_urls.dart';
@@ -69,23 +60,14 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
-    final selectedEpisode = oxSeriesSelectedEpisode(ref, details);
-    final needsEpisodePicker = !SushiConfig.isEnabled &&
-        OxplayerConfig.isEnabled &&
-        oxSeriesNeedsEpisodePick(details) &&
-        selectedEpisode == null;
-    final currentEpisode = SushiConfig.isEnabled
-        ? (selectedEpisode ?? details?.selectedEpisode ?? details?.nextUp)
-        : oxSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
+    final selectedEpisode = sushiSeriesSelectedEpisode(ref, details);
+    final currentEpisode = selectedEpisode ?? details?.selectedEpisode ?? details?.nextUp;
     final sushiHasPlayback = details != null && sushiItemHasPlaybackActions(details);
     // Only after /item has resolved (sushiTitleResolved) — the cached-page paint can populate
     // availableEpisodes before files land, so key off the network-refresh completion instead.
     // Until then, no Play and no Request (ADR 0014 §D2).
-    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: SushiConfig.isEnabled);
-    final sushiSeriesRequestTmdb = SushiConfig.isEnabled &&
-            details != null &&
-            sushiResolved &&
-            !sushiHasPlayback
+    final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: true);
+    final sushiSeriesRequestTmdb = details != null && sushiResolved && !sushiHasPlayback
         ? sushiTmdbIdFromItemId(details.id)
         : null;
 
@@ -118,48 +100,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   OverviewHeader(
                     name: details.name,
                     image: details.images,
-                    mainButton: needsEpisodePicker
-                        ? OxSeriesEpisodePickerButton(
+                    mainButton: currentEpisode != null && sushiHasPlayback
+                        ? SushiSeriesDetailPlayButtons(
                             series: details,
-                            onEpisodePlayed: () {
-                              if (!mounted) return;
-                              ref.read(providerId.notifier).fetchDetails(widget.item);
-                            },
-                          )
-                        : currentEpisode != null &&
-                                (!SushiConfig.isEnabled || sushiHasPlayback) &&
-                                (!OxplayerConfig.isEnabled || SushiConfig.isEnabled || currentEpisode.playAble)
-                            ? OxplayerConfig.isEnabled || SushiConfig.isEnabled
-                                ? OxSeriesDetailPlayButtons(
-                                    series: details,
-                                    episode: currentEpisode,
-                                    onPlay: (restart) async {
-                                      await currentEpisode.play(
-                                        detailsContext,
-                                        ref,
-                                        startPosition: restart ? Duration.zero : null,
-                                      );
-                                      if (!mounted) return;
-                                      ref.read(providerId.notifier).fetchDetails(widget.item);
-                                    },
-                                    onLongPlay: (restart) async {
-                                      await currentEpisode.play(
-                                        detailsContext,
-                                        ref,
-                                        showPlaybackOption: true,
-                                        startPosition: restart ? Duration.zero : null,
-                                      );
-                                      if (!mounted) return;
-                                      ref.read(providerId.notifier).fetchDetails(widget.item);
-                                    },
-                                    onEpisodePlayed: () {
-                                      if (!mounted) return;
-                                      ref.read(providerId.notifier).fetchDetails(widget.item);
-                                    },
-                                  )
-                                : MediaPlayButton(
-                            item: currentEpisode,
-                            onPressed: (restart) async {
+                            episode: currentEpisode,
+                            onPlay: (restart) async {
                               await currentEpisode.play(
                                 detailsContext,
                                 ref,
@@ -168,13 +113,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                               if (!mounted) return;
                               ref.read(providerId.notifier).fetchDetails(widget.item);
                             },
-                            onLongPressed: (restart) async {
+                            onLongPlay: (restart) async {
                               await currentEpisode.play(
                                 detailsContext,
                                 ref,
                                 showPlaybackOption: true,
                                 startPosition: restart ? Duration.zero : null,
                               );
+                              if (!mounted) return;
+                              ref.read(providerId.notifier).fetchDetails(widget.item);
+                            },
+                            onEpisodePlayed: () {
                               if (!mounted) return;
                               ref.read(providerId.notifier).fetchDetails(widget.item);
                             },
@@ -188,57 +137,45 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                     ref.read(providerId.notifier).fetchDetails(widget.item),
                               )
                             : null,
-                    centerButtons: OxDetailActionLayout(
+                    centerButtons: SushiDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
-                        if (SushiConfig.isEnabled) ...[
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                  const SushiItemFlags();
-                              return SelectableIconButton(
-                                onPressed: () async {
-                                  await ref
-                                      .read(sushiItemFlagsProvider.notifier)
-                                      .setWatchLater(details, !flags.watchLater);
-                                },
-                                selected: flags.watchLater,
-                                selectedIcon: IconsaxPlusBold.clock,
-                                icon: IconsaxPlusLinear.clock,
-                              );
-                            },
-                          ),
-                          // Follow the series for new-episode notifications (ADR 0014 §D3).
-                          Consumer(
-                            builder: (context, ref, _) {
-                              final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                  const SushiItemFlags();
-                              return SelectableIconButton(
-                                onPressed: () async {
-                                  await ref
-                                      .read(sushiItemFlagsProvider.notifier)
-                                      .setFollowing(details, !flags.following);
-                                },
-                                selected: flags.following,
-                                selectedIcon: IconsaxPlusBold.notification,
-                                icon: IconsaxPlusLinear.notification,
-                                label: flags.following
-                                    ? context.localized.sushiFollowing
-                                    : context.localized.sushiFollow,
-                              );
-                            },
-                          ),
-                        ] else
-                          SelectableIconButton(
-                            onPressed: () async {
-                              await ref
-                                  .read(userProvider.notifier)
-                                  .setAsFavorite(!details.userData.isFavourite, details.id);
-                            },
-                            selected: details.userData.isFavourite,
-                            selectedIcon: IconsaxPlusBold.heart,
-                            icon: IconsaxPlusLinear.heart,
-                          ),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                                const SushiItemFlags();
+                            return SelectableIconButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(sushiItemFlagsProvider.notifier)
+                                    .setWatchLater(details, !flags.watchLater);
+                              },
+                              selected: flags.watchLater,
+                              selectedIcon: IconsaxPlusBold.clock,
+                              icon: IconsaxPlusLinear.clock,
+                            );
+                          },
+                        ),
+                        // Follow the series for new-episode notifications (ADR 0014 §D3).
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                                const SushiItemFlags();
+                            return SelectableIconButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(sushiItemFlagsProvider.notifier)
+                                    .setFollowing(details, !flags.following);
+                              },
+                              selected: flags.following,
+                              selectedIcon: IconsaxPlusBold.notification,
+                              icon: IconsaxPlusLinear.notification,
+                              label: flags.following
+                                  ? context.localized.sushiFollowing
+                                  : context.localized.sushiFollow,
+                            );
+                          },
+                        ),
                         SelectableIconButton(
                           onPressed: () async {
                             await ref.read(userProvider.notifier).markAsPlayed(!details.userData.played, details.id);
@@ -247,10 +184,6 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                           selectedIcon: IconsaxPlusBold.tick_circle,
                           icon: IconsaxPlusLinear.tick_circle,
                         ),
-                        if (OxplayerEnv.isEnabled &&
-                            details.overview.seerrUrl?.isNotEmpty == true &&
-                            details.tmdbId != null)
-                          OxSeriesRequestButton(tmdbId: details.tmdbId!),
                         SelectableIconButton(
                           onPressed: () {
                             showBottomSheetPill(
@@ -286,18 +219,18 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     genres: details.overview.genreItems,
                     communityRating: details.overview.communityRating,
                     contentTags: details.overview.tags,
-                    additionalLabels: oxLibraryDetailLabels(
+                    additionalLabels: sushiLibraryDetailLabels(
                       context,
                       ref,
                       widget.item.id,
                       details.overview,
                     ),
                     mediaStreamHelper: currentEpisode != null &&
-                            oxplayerShowMediaStreamHelper(currentEpisode.mediaStreams)
+                            sushiShowMediaStreamHelper(currentEpisode.mediaStreams)
                         ? MediaStreamHelper(
                             mediaStream: currentEpisode.mediaStreams,
                             onItemChanged: (changed) {
-                              oxplayerOnUserMediaStreamsChanged(
+                              sushiOnUserMediaStreamsChanged(
                                 ref,
                                 changed,
                                 itemId: currentEpisode.id,
@@ -334,11 +267,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad ? null : VerticalDirection.down,
                         label: context.localized.episode(details.availableEpisodes?.length ?? 2),
                         onFocused: (episode) {
-                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
+                          sushiSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           context.ensureVisible(alignment: 0.8);
                         },
                         onEpisodeTap: (action, episode) async {
-                          oxSetSeriesSelectedEpisode(ref, widget.item.id, episode);
+                          sushiSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           action();
                         },
                         playEpisode: (episode) async {
@@ -358,16 +291,10 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       seasons: details.seasons,
                     ),
                   if (details.overview.people.isNotEmpty)
-                    (OxplayerConfig.isEnabled && !SushiConfig.isEnabled)
-                        ? OxSeerrPeopleRow(
-                            people: details.overview.people,
-                            contentPadding: padding,
-                            useLibraryPersonScreen: true,
-                          )
-                        : PeopleRow(
-                            people: details.overview.people,
-                            contentPadding: padding,
-                          ),
+                    PeopleRow(
+                      people: details.overview.people,
+                      contentPadding: padding,
+                    ),
                   if (details.specialFeatures?.isNotEmpty ?? false)
                     SpecialFeaturesRow(
                         contentPadding: padding,
@@ -378,10 +305,9 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       posters: details.related,
                       contentPadding: padding,
                       label: detailsContext.localized.related,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
+                      sushiDetailBadges: true,
                     ),
-                  if (SushiConfig.isEnabled &&
-                      (sushiCollectionFor(details.id)?.items.isNotEmpty ?? false))
+                  if (sushiCollectionFor(details.id)?.items.isNotEmpty ?? false)
                     PosterRow(
                       posters: sushiCollectionFor(details.id)!.items,
                       contentPadding: padding,
@@ -389,22 +315,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         final name = sushiCollectionFor(details.id)!.name;
                         return name.isEmpty ? 'Collection' : name;
                       }(),
-                      oxDetailBadges: false,
-                    ),
-                  if (details.seerrRecommended.isNotEmpty)
-                    SeerrPosterRow(
-                      posters: details.seerrRecommended,
-                      label:
-                          "${detailsContext.localized.discover} ${detailsContext.localized.recommended.toLowerCase()}",
-                      contentPadding: padding,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
-                    ),
-                  if (details.seerrRelated.isNotEmpty)
-                    SeerrPosterRow(
-                      posters: details.seerrRelated,
-                      label: "${detailsContext.localized.discover} ${detailsContext.localized.related.toLowerCase()}",
-                      contentPadding: padding,
-                      oxDetailBadges: OxplayerConfig.isEnabled,
+                      sushiDetailBadges: false,
                     ),
                   if (details.overview.externalUrls?.isNotEmpty == true)
                     Padding(
@@ -416,9 +327,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
             )
-          : OxplayerConfig.isEnabled
-              ? OxDetailLoadingContent(item: widget.item, padding: padding)
-              : Container(),
+          : SushiDetailLoadingContent(item: widget.item, padding: padding),
     );
   }
 }

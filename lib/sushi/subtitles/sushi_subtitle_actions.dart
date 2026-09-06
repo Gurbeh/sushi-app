@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fladder/models/items/episode_model.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_prefs_transport.dart';
@@ -17,7 +17,7 @@ import 'package:fladder/sushi/subtitles/sushi_subplus.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
 
 void _log(String phase, [Map<String, Object?> fields = const {}]) {
-  OxplayerStreamLog.event('sushi_sub_$phase', fields: fields);
+  SushiStreamLog.event('sushi_sub_$phase', fields: fields);
   developer.log('sushi_sub_$phase $fields', name: 'sushi.subs');
 }
 

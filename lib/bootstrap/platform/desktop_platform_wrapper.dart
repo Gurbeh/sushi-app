@@ -8,8 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/bootstrap/platform/base_app_wrapper.dart';
 import 'package:fladder/logic/application_menu.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_desktop_deep_link.dart';
+import 'package:fladder/sushi/sushi_desktop_deep_link.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -25,7 +24,7 @@ class DesktopAppWrapper extends BaseAppWrapper {
 }
 
 class _DesktopAppWrapperState extends BaseAppWrapperState<DesktopAppWrapper> with WindowListener {
-  OxplayerWindowsDeepLinkListener? _windowsDeepLinkListener;
+  SushiWindowsDeepLinkListener? _windowsDeepLinkListener;
 
   @override
   Future<void> platformInit() async {
@@ -51,8 +50,8 @@ class _DesktopAppWrapperState extends BaseAppWrapperState<DesktopAppWrapper> wit
       packageInfo,
     );
 
-    if (OxplayerConfig.isEnabled && defaultTargetPlatform == TargetPlatform.windows) {
-      _windowsDeepLinkListener = await oxplayerSetupWindowsDeepLinks(autoRouter: autoRouter);
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      _windowsDeepLinkListener = await sushiSetupWindowsDeepLinks(autoRouter: autoRouter);
     }
   }
 

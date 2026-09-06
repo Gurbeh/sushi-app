@@ -7,8 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
+import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/util/color_extensions.dart';
@@ -174,13 +173,12 @@ class SubtitleText extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fillScreen = ref.watch(videoPlayerSettingsProvider.select((value) => value.fillScreen));
     final fontSize = ref.read(subtitleSettingsProvider.select((value) => value.fontSize));
-    final usePersianFont = OxplayerConfig.isEnabled &&
-        OxSubtitleFont.shouldUsePersianFont(language: subtitleLanguage, text: text);
-    final textDirection = usePersianFont ? OxSubtitleFont.textDirectionFor(text) : TextDirection.ltr;
+    final usePersianFont = SushiSubtitleFont.shouldUsePersianFont(language: subtitleLanguage, text: text);
+    final textDirection = usePersianFont ? SushiSubtitleFont.textDirectionFor(text) : TextDirection.ltr;
     final fillStyle = usePersianFont
-        ? OxSubtitleFont.backgroundStyleFor(subModel, usePersianFont: true)
+        ? SushiSubtitleFont.backgroundStyleFor(subModel, usePersianFont: true)
         : subModel.backGroundStyle;
-    final textStyle = usePersianFont ? OxSubtitleFont.styleFor(subModel, usePersianFont: true) : subModel.style;
+    final textStyle = usePersianFont ? SushiSubtitleFont.styleFor(subModel, usePersianFont: true) : subModel.style;
 
     return Padding(
       padding: (fillScreen ? EdgeInsets.zero : EdgeInsets.only(left: padding.left, right: padding.right))

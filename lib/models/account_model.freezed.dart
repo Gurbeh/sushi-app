@@ -123,7 +123,6 @@ abstract mixin class $AccountModelCopyWith<$Res> {
       UserSettings? userSettings});
 
   $CredentialsModelCopyWith<$Res> get credentials;
-  $SeerrCredentialsModelCopyWith<$Res>? get seerrCredentials;
   $UserSettingsCopyWith<$Res>? get userSettings;
 }
 
@@ -261,21 +260,6 @@ class _$AccountModelCopyWithImpl<$Res> implements $AccountModelCopyWith<$Res> {
   $CredentialsModelCopyWith<$Res> get credentials {
     return $CredentialsModelCopyWith<$Res>(_self.credentials, (value) {
       return _then(_self.copyWith(credentials: value));
-    });
-  }
-
-  /// Create a copy of AccountModel
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SeerrCredentialsModelCopyWith<$Res>? get seerrCredentials {
-    if (_self.seerrCredentials == null) {
-      return null;
-    }
-
-    return $SeerrCredentialsModelCopyWith<$Res>(_self.seerrCredentials!,
-        (value) {
-      return _then(_self.copyWith(seerrCredentials: value));
     });
   }
 
@@ -807,8 +791,6 @@ abstract mixin class _$AccountModelCopyWith<$Res>
   @override
   $CredentialsModelCopyWith<$Res> get credentials;
   @override
-  $SeerrCredentialsModelCopyWith<$Res>? get seerrCredentials;
-  @override
   $UserSettingsCopyWith<$Res>? get userSettings;
 }
 
@@ -947,21 +929,6 @@ class __$AccountModelCopyWithImpl<$Res>
   $CredentialsModelCopyWith<$Res> get credentials {
     return $CredentialsModelCopyWith<$Res>(_self.credentials, (value) {
       return _then(_self.copyWith(credentials: value));
-    });
-  }
-
-  /// Create a copy of AccountModel
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @pragma('vm:prefer-inline')
-  $SeerrCredentialsModelCopyWith<$Res>? get seerrCredentials {
-    if (_self.seerrCredentials == null) {
-      return null;
-    }
-
-    return $SeerrCredentialsModelCopyWith<$Res>(_self.seerrCredentials!,
-        (value) {
-      return _then(_self.copyWith(seerrCredentials: value));
     });
   }
 

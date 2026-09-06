@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fladder/oxplayer/services/ox_update_service.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_app_update_transport.dart';
+import 'package:fladder/sushi/sushi_semver.dart';
 import 'package:fladder/sushi/sushi_wire.dart';
 
 Uint8List _tag(int field, int wire) => Uint8List.fromList(sushiUvarint((field << 3) | wire));
@@ -65,7 +65,7 @@ void main() {
     expect(sushiIsNewerApp('1.1.150', '1.2.0'), isTrue);
     expect(sushiIsNewerApp('1.2.0', '1.2.0'), isFalse);
     expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0'), isFalse);
-    expect(OxSemver.parse('1.1.150-nightly')?.patch, 150);
+    expect(SushiSemver.parse('1.1.150-nightly')?.patch, 150);
   });
 
   test('sushiNoteLatestApp ignores empty and keeps the last real one', () {

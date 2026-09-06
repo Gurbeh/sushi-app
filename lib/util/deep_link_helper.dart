@@ -4,20 +4,20 @@ import 'dart:developer';
 
 import 'package:auto_route/auto_route.dart' show DeepLink, PageRouteInfo;
 
-import 'package:fladder/oxplayer/oxplayer_share.dart';
-import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
+import 'package:fladder/sushi/sushi_share.dart';
+import 'package:fladder/sushi/sushi_share_deep_link.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 
-/// Custom URL scheme used by OXPlayer native deep links.
-const kOxplayerDeepLinkScheme = 'oxplayer';
+/// Custom URL scheme used by Sushi native deep links.
+const kSushiDeepLinkScheme = 'sushi';
 
 FutureOr<DeepLink> deepLinkBuilder(Uri? payload) {
   if (payload != null) {
-    log('OXPlayer deep link received: $payload');
+    log('Sushi deep link received: $payload');
   }
   final route = payloadToRoute(payload);
   if (route != null) {
-    return oxplayerDeepLinkForRoute(route);
+    return sushiDeepLinkForRoute(route);
   }
   return DeepLink.defaultPath;
 }
@@ -82,17 +82,17 @@ String encodeAuthLink(AuthLinkData data) {
 
 String buildAuthUrl(AuthLinkData data) {
   final payload = encodeAuthLink(data);
-  return '$kOxplayerDeepLinkScheme:///login?authLink=$payload';
+  return '$kSushiDeepLinkScheme:///login?authLink=$payload';
 }
 
 PageRouteInfo? payloadToRoute(Uri? payload) {
   if (payload == null) return null;
 
-  final shareId = oxplayerCatalogIdFromShareUri(payload);
+  final shareId = sushiCatalogIdFromShareUri(payload);
   if (shareId != null) {
-    oxplayerBufferShareMediaSource(
+    sushiBufferShareMediaSource(
       catalogId: shareId,
-      mediaSourceId: oxplayerMediaSourceIdFromShareUri(payload),
+      mediaSourceId: sushiMediaSourceIdFromShareUri(payload),
     );
     return DetailsRoute(id: shareId);
   }
@@ -106,21 +106,12 @@ PageRouteInfo? payloadToRoute(Uri? payload) {
     return LoginRoute(authLink: "sdflkj");
   }
 
-  if (payload.path.contains('/seerr')) {
-    final segments = payload.pathSegments;
-    if (segments.length >= 3) {
-      final mediaType = segments[1];
-      final tmdbId = int.tryParse(segments[2]);
-      if (tmdbId != null) return SeerrDetailsRoute(mediaType: mediaType, tmdbId: tmdbId);
-    }
-    return const SeerrRoute();
-  }
   if (payload.path.contains('/details')) {
     final id = payload.queryParameters['id'];
     if (id != null && id.isNotEmpty) {
-      oxplayerBufferShareMediaSource(
+      sushiBufferShareMediaSource(
         catalogId: id,
-        mediaSourceId: oxplayerMediaSourceIdFromShareUri(payload),
+        mediaSourceId: sushiMediaSourceIdFromShareUri(payload),
       );
       return DetailsRoute(id: id);
     }
@@ -134,14 +125,12 @@ String pageRouteInfoToPath(PageRouteInfo route) {
       DetailsRoute() => () {
           final id = route.queryParams.getString('id', '');
           final params = <String, String>{'id': id};
-          final msId = oxplayerPeekBufferedShareMediaSourceId(id);
+          final msId = sushiPeekBufferedShareMediaSourceId(id);
           if (msId != null && msId.isNotEmpty) {
             params['mediaSourceId'] = msId;
           }
           return Uri(path: '/details', queryParameters: params).toString();
         }(),
-      SeerrDetailsRoute() =>
-        '/seerr?mediaType=${route.queryParams.get('mediaType')}&tmdbId=${route.queryParams.get('tmdbId')}',
       LoginRoute() => '/login?authLink=${route.queryParams.get('authLink')}',
       _ => '/',
     };

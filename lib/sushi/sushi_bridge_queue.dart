@@ -3,7 +3,7 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:fladder/oxplayer/oxplayer_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 /// Serializes every Sushi-initiated call into the native TDLib bridge (home, initbot, item, files,
@@ -90,7 +90,7 @@ Future<String> sushiSendTextAndWaitReply({
   required int timeoutMs,
   bool priority = false,
 }) async {
-  final controller = OxplayerTdlibBridgeController.instance();
+  final controller = SushiTdlibBridgeController.instance();
   sushiRequestCount++;
   try {
     final reply = await _enqueue(
@@ -125,7 +125,7 @@ Future<String> sushiSendTextAndWaitReply({
 /// [sushiRequestCount] like every other wire call.
 Future<void> sushiSendTextFireAndForget(
     {required String username, required String text, bool priority = false}) {
-  final controller = OxplayerTdlibBridgeController.instance();
+  final controller = SushiTdlibBridgeController.instance();
   sushiRequestCount++;
   return _enqueue(
       () => controller.sendTextFireAndForget(username: username, text: text),
@@ -134,37 +134,37 @@ Future<void> sushiSendTextFireAndForget(
 
 Future<void> sushiEnsureMainBotOnboarded(
     {required String username, required int timeoutMs}) {
-  final controller = OxplayerTdlibBridgeController.instance();
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(
     () => controller.ensureMainBotOnboarded(
         username: username, timeoutMs: timeoutMs),
   );
 }
 
-Future<bool> sushiEnsureProviderBotsReady(List<OxTdlibProviderBot> bots) {
-  final controller = OxplayerTdlibBridgeController.instance();
+Future<bool> sushiEnsureProviderBotsReady(List<SushiTdlibProviderBot> bots) {
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.ensureProviderBotsReady(bots));
 }
 
 // The playback path runs in the fast lane (see [_enqueue] doc): a user waiting on a tap must not
 // queue behind background /home or /item traffic.
 Future<void> sushiArmDeliveryWaiter(String locator) {
-  final controller = OxplayerTdlibBridgeController.instance();
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.armDeliveryWaiter(locator), priority: true);
 }
 
-Future<String> sushiStartPlaybackSession(OxTdlibPlaybackSource source) {
-  final controller = OxplayerTdlibBridgeController.instance();
+Future<String> sushiStartPlaybackSession(SushiTdlibPlaybackSource source) {
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.startPlaybackSession(source), priority: true);
 }
 
 Future<void> sushiStopPlaybackSession(String sessionUri) {
   if (sessionUri.isEmpty) return Future.value();
-  final controller = OxplayerTdlibBridgeController.instance();
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.stopPlaybackSession(sessionUri));
 }
 
-Future<OxTdlibDeliveryRef?> sushiDeliveryRefForLocator(String locator) {
-  final controller = OxplayerTdlibBridgeController.instance();
+Future<SushiTdlibDeliveryRef?> sushiDeliveryRefForLocator(String locator) {
+  final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.deliveryRefForLocator(locator), priority: true);
 }

@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/items/media_streams_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_media_streams.dart';
-import 'package:fladder/oxplayer/widgets/ox_enum_box.dart';
+import 'package:fladder/sushi/sushi_media_streams.dart';
+import 'package:fladder/sushi/widgets/sushi_enum_box.dart';
 import 'package:fladder/screens/details_screens/components/label_title_item.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/enum_selection.dart';
@@ -39,22 +38,22 @@ class MediaStreamInformation extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (oxplayerShowVersionStreamPicker(mediaStream))
+        if (sushiShowVersionStreamPicker(mediaStream))
           _StreamOptionSelect(
             label: Text(context.localized.version),
             current: mediaStream.currentVersionStream != null
-                ? oxplayerVersionStreamLabel(
+                ? sushiVersionStreamLabel(
                     mediaStream.currentVersionStream!,
                     l10n: context.localized,
                   )
                 : '',
-            interactiveWithSingleItem: OxplayerConfig.isEnabled,
+            interactiveWithSingleItem: true,
             itemBuilder: (context) => mediaStream.versionStreams
                 .map((e) => ItemActionButton(
                       selected: mediaStream.currentVersionStream == e,
                       label: textWidget(
                         context,
-                        label: oxplayerVersionStreamLabel(e, l10n: context.localized),
+                        label: sushiVersionStreamLabel(e, l10n: context.localized),
                       ),
                       action: () => onVersionIndexChanged?.call(e.index),
                     ))
@@ -135,7 +134,7 @@ class _StreamOptionSelect<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final picker = interactiveWithSingleItem
-        ? OxEnumBox(
+        ? SushiEnumBox(
             current: current,
             itemBuilder: itemBuilder,
           )

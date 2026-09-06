@@ -6,13 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_brand.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_navigation.dart';
-import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
+import 'package:fladder/sushi/sushi_navigation.dart';
+import 'package:fladder/sushi/sushi_settings_visibility.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
 import 'package:fladder/providers/update_provider.dart';
@@ -123,7 +121,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final newRelease = ref.watch(updateProvider.select((value) => value.latestRelease));
 
     final hasNewUpdate = ref.watch(hasNewUpdateProvider);
-    final showReleaseBanner = !OxplayerConfig.isEnabled && !SushiConfig.isEnabled && hasNewUpdate && newRelease != null;
+    final showReleaseBanner = hasNewUpdate && newRelease != null;
     final applicationInfo = ref.watch(applicationInfoProvider);
 
     final isAdmin = ref.watch(userProvider.select((value) => value?.policy?.isAdministrator ?? false));
@@ -188,7 +186,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: deviceIcon,
               onTap: () => navigateTo(const ClientSettingsRoute()),
             ),
-            if (isAdmin && OxplayerSettingsVisibility.showControlPanel)
+            if (isAdmin && SushiSettingsVisibility.showControlPanel)
               SettingsListTile(
                 label: Text(context.localized.controlPanel),
                 subLabel: Text(context.localized.controlPanelDesc),
@@ -213,9 +211,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SettingsListTile(
               label: Text(context.localized.about),
               subLabel: Text(
-                OxplayerConfig.isEnabled
-                    ? '${OxplayerBrand.appName} v${applicationInfo.version}'
-                    : context.localized.aboutCreatedBy,
+                '${SushiBrand.appName} v${applicationInfo.version}',
               ),
               selected: containsRoute(const AboutSettingsRoute()),
               leading: Opacity(
@@ -264,7 +260,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   );
                 },
               ),
-            if (OxplayerSettingsVisibility.showSwitchUser)
+            if (SushiSettingsVisibility.showSwitchUser)
               SettingsListTile(
                 label: Text(context.localized.switchUser),
                 icon: IconsaxPlusLinear.arrow_swap_horizontal,
@@ -272,7 +268,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () async {
                   await ref.read(authProvider.notifier).switchUser();
                   if (context.mounted) {
-                    context.router.replaceAll(oxplayerSignOutRouteList());
+                    context.router.replaceAll(sushiSignOutRouteList());
                     await ref.read(authProvider.notifier).initModel();
                   }
                 },
@@ -284,12 +280,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onTap: () {
                 final user = ref.read(userProvider);
                 final userName = user?.name ?? "";
-                final title = OxplayerConfig.isEnabled
-                    ? context.localized.oxplayerLogoutUserPopupTitle(userName)
-                    : context.localized.logoutUserPopupTitle(userName);
-                final body = OxplayerConfig.isEnabled
-                    ? context.localized.oxplayerLogoutUserPopupContent(userName)
-                    : context.localized.logoutUserPopupContent(userName, user?.credentials.url ?? "");
+                final title = context.localized.sushiLogoutUserPopupTitle(userName);
+                final body = context.localized.sushiLogoutUserPopupContent(userName);
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -318,7 +310,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     await ref.read(authProvider.notifier).logOutUser();
                                     if (context.mounted) {
                                       Navigator.pop(context);
-                                      context.router.replaceAll(oxplayerSignOutRouteList());
+                                      context.router.replaceAll(sushiSignOutRouteList());
                                       await ref.read(authProvider.notifier).initModel();
                                     }
                                   },

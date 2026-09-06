@@ -1,5 +1,5 @@
 name: Feature request
-description: New OXPlayer capability or product improvement
+description: New Sushi capability or product improvement
 title: "FEAT: "
 labels:
   - feature
@@ -7,9 +7,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        **OXPlayer product features** belong here — not upstream Fladder.
+        **Sushi product features** belong here — not upstream Fladder.
 
-        If the API returns wrong data, file in [oxplayer-be](https://github.com/Aryan-mor/oxplayer-be/issues/new/choose) instead.
+        If the API returns wrong data, file in [Sushi-be](https://github.com/Aryan-mor/Sushi-be/issues/new/choose) instead.
         Rough notes in Farsi or English are fine.
 
   - type: dropdown
@@ -17,7 +17,7 @@ body:
     attributes:
       label: Area
       options:
-        - lib/oxplayer (OX-specific UI / flows)
+        - lib/Sushi (OX-specific UI / flows)
         - Home / library / catalog screens
         - Playback / player
         - Seerr / media requests UI
@@ -66,7 +66,7 @@ body:
     attributes:
       label: Scope notes (optional)
       options:
-        - label: "Likely needs oxplayer-be API changes too"
+        - label: "Likely needs Sushi-be API changes too"
           required: false
-        - label: "Should live under lib/oxplayer/ (not upstream Fladder files)"
+        - label: "Should live under lib/Sushi/ (not upstream Fladder files)"
           required: false

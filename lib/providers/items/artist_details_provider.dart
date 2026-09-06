@@ -124,7 +124,7 @@ class ArtistDetailsNotifier extends StateNotifier<ArtistModel?> {
           albums: albums
               .map(
                 (album) => album.copyWith(
-                  canDownload: album.canDownload == true || downloadableAlbumIds.contains(album.id),
+                  canDownload: album.canDownload == downloadableAlbumIds.contains(album.id),
                 ),
               )
               .toList(),

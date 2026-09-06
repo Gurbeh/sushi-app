@@ -56,7 +56,7 @@ int? sushiEpisodeIdFromItemId(String itemId) {
 }
 
 /// Builds the [MediaStreamsModel] Fladder's play button / quality picker read
-/// (`oxMovieHasPlayableMedia`/`oxplayerShowMediaStreamHelper` both just check
+/// (`sushiMovieHasPlayableMedia`/`sushiShowMediaStreamHelper` both just check
 /// `versionStreams.isNotEmpty`) from Sushi's compact [SushiFile] pick-list. Each file becomes one
 /// version/quality choice; `audio_langs`/`sub_langs` are comma-separated ISO 639-1 codes
 /// (catalog.NormalizeLangs, docs/12 §5.1) — there is no richer per-track metadata on the wire, so
@@ -157,7 +157,7 @@ ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) 
 
 /// Merges a fetched [SushiItemRes] (overview) and its files (mediaStreams) into an already-shown
 /// [MovieModel] — called after the home-rail placeholder is on screen, same "paint first, enrich
-/// after" shape `movies_details_provider.dart` already uses for OXPlayer.
+/// after" shape `movies_details_provider.dart` already uses for Sushi.
 MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiFile> files) {
   final genreNames = item.genres
       .split(',')

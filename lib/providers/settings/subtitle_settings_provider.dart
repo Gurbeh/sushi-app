@@ -6,8 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/playback/ox_subtitle_font.dart';
+import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/src/video_player_helper.g.dart' as pigeon;
 
@@ -17,7 +16,7 @@ final subtitleSettingsProvider = StateNotifierProvider<SubtitleSettingsNotifier,
 
 class SubtitleSettingsNotifier extends StateNotifier<SubtitleSettingsModel> {
   SubtitleSettingsNotifier(this.ref)
-      : super(OxplayerConfig.isEnabled ? OxSubtitleFont.defaultSettings : const SubtitleSettingsModel());
+      : super(SushiSubtitleFont.defaultSettings);
 
   final Ref ref;
 
@@ -52,7 +51,7 @@ class SubtitleSettingsNotifier extends StateNotifier<SubtitleSettingsModel> {
   SubtitleSettingsModel setOutlineThickness(double value) => state = state.copyWith(outlineSize: value);
 
   void resetSettings({SubtitleSettingsModel? value}) => state = value ??
-      (OxplayerConfig.isEnabled ? OxSubtitleFont.defaultSettings : const SubtitleSettingsModel());
+      (SushiSubtitleFont.defaultSettings);
 
   void setFontWeight(FontWeight? value) => state = state.copyWith(fontWeight: value);
 

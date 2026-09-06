@@ -13,7 +13,7 @@ Usage: release-client.sh [options] [summary]
 
 Semver bump (patch) in pubspec.yaml + fastlane changelog.
 Summary is prompted if omitted.
-Tag: vM.m.p → triggers Build OXPlayer (signed AAB + GitHub draft release).
+Tag: vM.m.p → triggers Build Sushi (signed AAB + GitHub draft release).
 
 Options:
   --dry-run      Show plan only
@@ -87,8 +87,8 @@ release_push "${TAG}"
 echo ""
 echo "=== released ${VERSION_NAME} (${TAG}) ==="
 echo "Watch build:"
-echo "  gh run list --repo Gurbeh/oxplayer-client --workflow='Build OXPlayer' --limit 3"
-echo "  gh run watch --repo Gurbeh/oxplayer-client"
+echo "  gh run list --repo Gurbeh/sushi-client --workflow='Build Sushi' --limit 3"
+echo "  gh run watch --repo Gurbeh/sushi-client"
 echo ""
 echo "When Create Release is green, publish draft:"
-echo "  gh release edit ${TAG} --repo Gurbeh/oxplayer-client --draft=false"
+echo "  gh release edit ${TAG} --repo Gurbeh/sushi-client --draft=false"

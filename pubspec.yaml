@@ -233,7 +233,7 @@ dev_dependencies:
 # Debug symbol upload: SENTRY_AUTH_TOKEN in CI/Infisical only (never commit). org/project/url are public.
 sentry:
   org: personal-z03
-  project: oxplayer-client
+  project: sushi-client
   url: https://de.sentry.io
   upload_debug_symbols: true
   upload_sources: true
@@ -258,10 +258,10 @@ flutter:
     - icons/
     - config/
     - assets/env/default.env
-    - assets/oxplayer/
+    - assets/sushi/
     # A directory entry is not recursive; the Iran-flag PNGs live one level down
     # and the subtitle picker (OxIranFlagIcon) 404s without this line.
-    - assets/oxplayer/flags/
+    - assets/sushi/flags/
     - assets/gradient.png
     - assets/Icon.svg
     - assets/mp-font.ttf

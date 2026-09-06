@@ -12,19 +12,15 @@ import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/settings/home_settings_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_dashboard_empty_help.dart';
-import 'package:fladder/oxplayer/oxplayer_dashboard_skeleton.dart';
-import 'package:fladder/oxplayer/oxplayer_dashboard_watchlist.dart';
-import 'package:fladder/oxplayer/oxplayer_home_detail_prefetch.dart';
-import 'package:fladder/oxplayer/oxplayer_home_refresh.dart';
-import 'package:fladder/oxplayer/oxplayer_tv_ui_limits.dart';
-import 'package:fladder/providers/arguments_provider.dart';
+import 'package:fladder/sushi/sushi_dashboard_empty_help.dart';
+import 'package:fladder/sushi/sushi_dashboard_skeleton.dart';
+import 'package:fladder/sushi/sushi_dashboard_watchlist.dart';
+import 'package:fladder/sushi/sushi_home_detail_prefetch.dart';
+import 'package:fladder/sushi/sushi_tv_ui_limits.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/home_settings_provider.dart';
-import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/dashboard/home_banner_widget.dart';
@@ -34,7 +30,6 @@ import 'package:fladder/screens/shared/media/poster_row.dart';
 import 'package:fladder/screens/shared/nested_scaffold.dart';
 import 'package:fladder/screens/shared/nested_sliver_appbar.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
@@ -67,37 +62,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    if (SushiConfig.isEnabled) {
-      // Cold-start half of bot rotation (docs/02 §7): re-syncs the Assignment's API/delivery bot
-      // lists in the background, in case they changed since this session last asked. No-op past
-      // the first call in a process (dashboard can rebuild/remount many times).
-      sushiRefreshInitbotOnColdStart(onReady: () {
-        if (!mounted) return;
-        unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
-      });
-    }
-    if (!OxplayerConfig.isEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final homeBanner = ref.read(homeSettingsProvider).homeBanner != HomeBanner.hide;
-        final dashboard = ref.read(dashboardProvider);
-        if (homeBanner && !dashboard.loaded && !dashboard.loading) {
-          unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume());
-        }
-      });
-    }
-    // OX leanback: skip 120s SWR refresh — keeps decoded posters warm and OOM-kills TV.
-    // Sushi: skip it too — unlike a Jellyfin GET, each refresh is a real Telegram bot round-trip,
-    // and DashboardScreen stays mounted under any pushed detail/player screen, so this timer would
-    // otherwise keep messaging the bot every 2 minutes for the entire session regardless of what's
-    // on screen.
-    final leanBack = SushiConfig.isEnabled ||
-        (OxplayerConfig.isEnabled && ref.read(argumentsStateProvider).leanBackMode);
-    if (!leanBack) {
-      _timer = Timer.periodic(const Duration(seconds: 120), (timer) {
-        _refreshIndicatorKey.currentState?.show();
-      });
-    }
+    // Cold-start half of bot rotation (docs/02 §7): re-syncs the Assignment's API/delivery bot
+    // lists in the background, in case they changed since this session last asked. No-op past
+    // the first call in a process (dashboard can rebuild/remount many times).
+    sushiRefreshInitbotOnColdStart(onReady: () {
+      if (!mounted) return;
+      unawaited(ref.read(dashboardProvider.notifier).fetchNextUpAndResume(force: true));
+    });
+    // Skip 120s SWR refresh: each refresh is a Telegram bot round-trip, and DashboardScreen
+    // stays mounted under pushed detail/player screens for the whole session.
   }
 
   @override
@@ -108,21 +81,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _refreshHome() async {
     if (!mounted) return;
-    // Sushi has no HTTP API — updateInformation()/OxplayerHomeRefresh both assume a Jellyfin-style
+    // Sushi has no HTTP API — updateInformation()/SushiHomeRefresh both assume a Jellyfin-style
     // server and would throw (no host to resolve). Its own home fetch is enough.
-    if (SushiConfig.isEnabled) {
-      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume(force: true);
-      return;
-    }
-    if (OxplayerConfig.isEnabled) {
-      await OxplayerHomeRefresh.refresh(ref);
-      return;
-    }
-    await ref.read(userProvider.notifier).updateInformation();
-    if (!mounted) return;
-    await ref.read(viewsProvider.notifier).fetchViews();
-    if (!mounted) return;
-    await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
+    await ref.read(dashboardProvider.notifier).fetchNextUpAndResume(force: true);
   }
 
   @override
@@ -141,7 +102,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final resumeAudio = dashboardData.resumeAudio;
     final resumeBooks = dashboardData.resumeBooks;
     final tvChannels = dashboardData.activePrograms;
-    final sushiRails = SushiConfig.isEnabled ? ref.watch(sushiHomeRailsProvider) : SushiHomeRailsData.empty;
+    final sushiRails = ref.watch(sushiHomeRailsProvider);
 
     final allResume = [...resumeVideo, ...resumeAudio, ...resumeBooks].toList();
 
@@ -150,29 +111,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       HomeCarouselSettings.combined => [...allResume, ...dashboardData.nextUp],
       HomeCarouselSettings.cont => allResume,
     };
-    final homeBannerPosters = OxplayerTvUiLimits.shouldCapHomeSlider(ref)
-        ? OxplayerTvUiLimits.capHomeSliderItems(homeCarouselItems)
-        : OxplayerConfig.isEnabled
-            ? OxplayerHomeDetailPrefetch.capSliderItems(homeCarouselItems)
-            : homeCarouselItems;
+    final homeBannerPosters = SushiTvUiLimits.shouldCapHomeSlider(ref)
+        ? SushiTvUiLimits.capHomeSliderItems(homeCarouselItems)
+        : SushiHomeDetailPrefetch.capSliderItems(homeCarouselItems);
 
     final viewSize = AdaptiveLayout.viewSizeOf(context);
 
     final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
-    final homeCached = oxHomeDashboardHasCachedContent(dashboardData, views);
-    final sliderCached = oxHomeHasCachedSliderData(dashboardData);
-    final sushiHasRails = SushiConfig.isEnabled && sushiRails.hasAny;
-    final homeFullyReady = SushiConfig.isEnabled
-        ? (dashboardData.loaded && !dashboardData.loading) || sushiHasRails
-        : !OxplayerConfig.isEnabled ||
-            oxHomeDashboardFullyReady(ref: ref, views: views, dashboard: dashboardData);
-    final homeShowContent = SushiConfig.isEnabled
-        ? homeFullyReady
-        : oxHomeDashboardShowContent(
-            homeFullyReady: homeFullyReady,
-            homeCached: homeCached,
-          );
-    final showBannerSkeleton = oxShowHomeBannerSkeleton(
+    final homeCached = sushiHomeDashboardHasCachedContent(dashboardData, views);
+    final sliderCached = sushiHomeHasCachedSliderData(dashboardData);
+    final sushiHasRails = sushiRails.hasAny;
+    final homeFullyReady = (dashboardData.loaded && !dashboardData.loading) || sushiHasRails;
+    final homeShowContent = homeFullyReady;
+    final showBannerSkeleton = sushiShowHomeBannerSkeleton(
       homeBanner: homeBanner,
       dashboardLoading: dashboardData.loading,
       dashboardLoaded: dashboardData.loaded,
@@ -185,12 +136,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         homeShowContent &&
         (sliderCached || (dashboardData.loaded && !dashboardData.loading)) &&
         homeCarouselItems.isNotEmpty;
-    final showListSkeleton = SushiConfig.isEnabled
-        ? !sushiHasRails && (!dashboardData.loaded || dashboardData.loading)
-        : oxShowHomeListSkeleton(
-            homeFullyReady: homeFullyReady,
-            homeCached: homeCached,
-          );
+    final showListSkeleton = !sushiHasRails && (!dashboardData.loaded || dashboardData.loading);
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(
@@ -213,11 +159,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: PullToRefresh(
         refreshKey: _refreshIndicatorKey,
         displacement: 80 + MediaQuery.of(context).viewPadding.top,
-        refreshOnStart: SushiConfig.isEnabled
-            ? false
-            : OxplayerConfig.isEnabled
-                ? (!homeCached || (homeBanner && !sliderCached))
-                : true,
+        refreshOnStart: false,
         onRefresh: () async => await _refreshHome(),
         child: (context) => PinchPosterZoom(
           scaleDifference: (difference) => ref.read(clientSettingsProvider.notifier).addPosterSize(difference),
@@ -244,7 +186,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       firstCurve: Curves.easeOut,
                       secondCurve: Curves.easeIn,
                       crossFadeState: showBanner ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                      firstChild: OxHomeBannerSkeleton(bannerType: bannerType),
+                      firstChild: SushiHomeBannerSkeleton(bannerType: bannerType),
                       secondChild: showBanner
                           ? HomeBannerWidget(
                               posters: homeBannerPosters,
@@ -263,16 +205,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ],
                   ),
                 ),
-              OxplayerDashboardEmptyHelpSliver(
+              SushiDashboardEmptyHelpSliver(
                 views: views,
                 dashboard: dashboardData,
               ),
               if (showListSkeleton) ...[
                 SliverToBoxAdapter(
-                  child: OxPosterRowSkeleton(contentPadding: padding),
+                  child: SushiPosterRowSkeleton(contentPadding: padding),
                 ),
                 SliverToBoxAdapter(
-                  child: OxPosterRowSkeleton(contentPadding: padding),
+                  child: SushiPosterRowSkeleton(contentPadding: padding),
                 ),
               ],
               if (homeShowContent)
@@ -294,7 +236,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: context.localized.dashboardContinueWatching,
-                      sushiContinueToggle: SushiConfig.isEnabled,
+                      sushiContinueToggle: true,
                       posters: resumeVideo,
                     ),
                   if (resumeAudio.isNotEmpty &&
@@ -312,24 +254,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       contentPadding: padding,
                       label: context.localized.dashboardContinueReading,
                       posters: resumeBooks,
-                    ),
-                  if (!SushiConfig.isEnabled &&
-                      dashboardData.nextUp.isNotEmpty &&
-                      (homeSettings.nextUp == HomeNextUp.nextUp || homeSettings.nextUp == HomeNextUp.separate))
-                    PosterRow(
-                      tvMode: useTVExpandedLayout,
-                      contentPadding: padding,
-                      label: context.localized.nextUp,
-                      posters: dashboardData.nextUp,
-                    ),
-                  if (!SushiConfig.isEnabled &&
-                      [...allResume, ...dashboardData.nextUp].isNotEmpty &&
-                      homeSettings.nextUp == HomeNextUp.combined)
-                    PosterRow(
-                      tvMode: useTVExpandedLayout,
-                      contentPadding: padding,
-                      label: context.localized.dashboardContinue,
-                      posters: [...allResume, ...dashboardData.nextUp],
                     ),
                   if (sushiRails.slider.isNotEmpty)
                     PosterRow(
@@ -371,7 +295,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       sushiContinueToggle: true,
                       posters: sushiRails.seriesTrending,
                     ),
-                  ...oxplayerDashboardRecentlyAddedRows(
+                  ...sushiDashboardRecentlyAddedRows(
                     context: context,
                     ref: ref,
                     views: views,

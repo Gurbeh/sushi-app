@@ -10,16 +10,16 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_audio.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_subtitle.dart';
-import 'package:fladder/oxplayer/oxplayer_audio_log.dart';
+import 'package:fladder/sushi/sushi_playback_audio.dart';
+import 'package:fladder/sushi/sushi_playback_subtitle.dart';
+import 'package:fladder/sushi/sushi_audio_log.dart';
 import 'package:collection/collection.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
-import 'package:fladder/oxplayer/oxplayer_memory_telemetry.dart';
-import 'package:fladder/oxplayer/oxplayer_native_playback.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_repair.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
-import 'package:fladder/oxplayer/oxplayer_playback_telemetry.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_memory_telemetry.dart';
+import 'package:fladder/sushi/sushi_native_playback.dart';
+import 'package:fladder/sushi/sushi_playback_repair.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
+import 'package:fladder/sushi/sushi_playback_telemetry.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
@@ -54,8 +54,8 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
   Future<void> init() {
     final inFlight = _initFuture;
     if (inFlight != null) {
-      if (OxplayerEnv.isEnabled) {
-        OxplayerStreamLog.event('video_player_init_join', fields: {
+      if (SushiEnv.isEnabled) {
+        SushiStreamLog.event('video_player_init_join', fields: {
           'hasPlayer': state.hasPlayer,
         });
       }
@@ -88,7 +88,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     // that never bound and the episode simply never started. See _activeBackend in
     // media_control_wrapper.dart. If this event ever starts firing per-play again, that comparison
     // is the first thing to check.
-    OxplayerStreamLog.event('video_player_reinit', fields: {
+    SushiStreamLog.event('video_player_reinit', fields: {
       'hasPlayer': state.hasPlayer,
       'stack': StackTrace.current.toString().split('\n').take(8).join(' <- '),
     });
@@ -163,7 +163,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final lastPosition = currentState.lastPosition;
     final diff = (position.inMilliseconds - lastPosition.inMilliseconds).abs();
 
-    final progressThreshold = OxplayerEnv.isEnabled
+    final progressThreshold = SushiEnv.isEnabled
         ? const Duration(seconds: 30)
         : const Duration(seconds: 10);
     if (diff > progressThreshold.inMilliseconds) {
@@ -180,8 +180,8 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
   }
 
   Future<bool> loadPlaybackItem(PlaybackModel model, Duration startPosition) async {
-    if (OxplayerEnv.isEnabled) {
-      OxplayerStreamLog.event('player_load_start', fields: {
+    if (SushiEnv.isEnabled) {
+      SushiStreamLog.event('player_load_start', fields: {
         'itemId': model.item.id,
         'hasMedia': model.media != null,
         'hasPlayer': state.hasPlayer,
@@ -191,7 +191,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     // Always await: joins provider warm-up init if still running (avoids double mpv create).
     await init();
 
-    if (OxplayerEnv.isEnabled) {
+    if (SushiEnv.isEnabled) {
       state.beginSushiSubtitleSession(model.item.id);
     }
 
@@ -199,8 +199,8 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     await state.stop();
     ref.read(playbackRateProvider.notifier).state = 1.0;
 
-    if (OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref)) {
-      OxplayerMemoryTelemetry.trimBeforeNativePlayback();
+    if (SushiEnv.isEnabled && sushiUsesNativePlayerRead(ref)) {
+      SushiMemoryTelemetry.trimBeforeNativePlayback();
     }
 
     final useMinimizedPlayer =
@@ -219,12 +219,12 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     final effectiveStartPosition = await model.resolvedStartPosition(startPosition);
 
     if (media != null) {
-      OxplayerStreamLog.event('player_load', fields: {
+      SushiStreamLog.event('player_load', fields: {
         'itemId': model.item.id,
-        'startPosition': OxplayerStreamLog.formatDuration(effectiveStartPosition),
+        'startPosition': SushiStreamLog.formatDuration(effectiveStartPosition),
         'startMs': effectiveStartPosition.inMilliseconds,
-        'streamUrl': OxplayerStreamLog.describeUrl(media.url),
-        'streamHost': OxplayerStreamLog.describeHost(media.url),
+        'streamUrl': SushiStreamLog.describeUrl(media.url),
+        'streamHost': SushiStreamLog.describeHost(media.url),
         // The queue drives the player's next/previous buttons (PlayableData.nextVideo /
         // previousVideo). A model that arrives here with queueLen=0 renders a player with no way
         // to reach the rest of the series, so it is worth seeing per load.
@@ -237,20 +237,20 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       await state.loadVideo(model, effectiveStartPosition, true);
       final settingsVolume = ref.read(videoPlayerSettingsProvider).volume;
       final backend = ref.read(videoPlayerSettingsProvider).wantedPlayer;
-      OxplayerAudioLog.event('playback_load_volume', fields: {
+      SushiAudioLog.event('playback_load_volume', fields: {
         'backend': backend.name,
         'settingsVolume': settingsVolume,
         'defaultAudioIndex': model.mediaStreams?.defaultAudioStreamIndex,
         'audioStreamCount': model.audioStreams?.length,
         'audioIndexes': model.audioStreams?.map((s) => s.index).join(','),
-        'resolvedAudioIndex': oxplayerResolvePlaybackAudioStream(model)?.index,
+        'resolvedAudioIndex': sushiResolvePlaybackAudioStream(model)?.index,
         'enablePlayPauseFade': ref.read(videoPlayerSettingsProvider).enablePlayPauseFade,
       });
       await state.setVolume(settingsVolume);
 
-      final resolvedAudio = oxplayerResolvePlaybackAudioStream(model);
+      final resolvedAudio = sushiResolvePlaybackAudioStream(model);
       await state.setAudioTrack(resolvedAudio, model);
-      final resolvedSubIndex = oxplayerResolveSubtitleStreamIndex(
+      final resolvedSubIndex = sushiResolveSubtitleStreamIndex(
         selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
         serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
         subStreams: model.subStreams,
@@ -269,7 +269,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       }
 
       final runtime = model.item.overview.runTime;
-      final deferCatalogDuration = OxplayerEnv.isEnabled && oxplayerUsesNativePlayerRead(ref);
+      final deferCatalogDuration = SushiEnv.isEnabled && sushiUsesNativePlayerRead(ref);
       ref.read(mediaPlaybackProvider.notifier).update((playback) {
         var next = playback.copyWith(
           state: useMinimizedPlayer ? VideoPlayerState.minimized : VideoPlayerState.fullScreen,
@@ -277,7 +277,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
           errorPlaying: false,
           skippedSegments: {},
         );
-        if (OxplayerEnv.isEnabled) {
+        if (SushiEnv.isEnabled) {
           next = next.copyWith(
             position: effectiveStartPosition,
             lastPosition: effectiveStartPosition,
@@ -291,9 +291,9 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       await state.play();
 
-      if (OxplayerEnv.isEnabled) {
+      if (SushiEnv.isEnabled) {
         unawaited(state.maybeSushiStartOnlineSubtitle(model));
-        OxplayerStreamRepairBridge.register(ref, newPlaybackModel);
+        SushiStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
         // Keep buffering=true until ExoPlayer reports STATE_READY — premature false
         // triggers stuck-repair loops during CDN resume seek (UI position already advanced).
@@ -313,7 +313,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     }
 
     mediaState.update((state) => state.copyWith(errorPlaying: true));
-    unawaited(OxplayerPlaybackTelemetry.reportFailure(
+    unawaited(SushiPlaybackTelemetry.reportFailure(
       stage: 'player_load',
       reason: 'missing_media_url',
       itemId: model.item.id,

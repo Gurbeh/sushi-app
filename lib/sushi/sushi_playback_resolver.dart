@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:fladder/oxplayer/oxplayer_tdlib_playback_resolver.dart'
-    show oxplayerIsTelegramDeliveryWaitTimeoutError, oxplayerIsTdlibFileMissingError;
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart'
+    show sushiIsTelegramDeliveryWaitTimeoutError, sushiIsTdlibFileMissingError;
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_play_pb.dart';
 import 'package:fladder/sushi/sushi_play_transport.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
-const _sushiPlayLogTag = 'OXPLAY_SUSHI';
+const _sushiPlayLogTag = 'SUSHI_SUSHI';
 void _log(String message) => debugPrint('$_sushiPlayLogTag: $message');
 
 /// Resolves one Sushi file id to a playable url, following docs/05-media-delivery.md §4:
@@ -20,7 +20,7 @@ void _log(String message) => debugPrint('$_sushiPlayLogTag: $message');
 /// 2. Send `/play`. A `Delivered` answer names a remembered message (no copy needed); a `Pending`
 ///    answer means deliveryd is copying it now — the native `startPlaybackSession(0/0, locator)`
 ///    already knows how to wait on the armed locator waiter for that copy to land (the same
-///    primitive `oxplayer_tdlib_playback_resolver.dart` uses for its own cold plays).
+///    primitive `sushi_tdlib_playback_resolver.dart` uses for its own cold plays).
 /// 3. A remembered message that turns out to be gone (deleted, wrong chat, cleared history) is a
 ///    "broken row" (docs/05 §4/§6): retry once with `force: true`, which makes the server delete
 ///    the row and re-deliver under the same locator — the waiter armed in step 1 is still good.
@@ -89,9 +89,9 @@ Future<String> _resolvePlaybackUrl({
 
 /// Polls [sushiDeliveryRefForLocator] (queued, so this never races the native side's own use of
 /// the bridge) until the push lands or [timeout] elapses. Mirrors
-/// `oxplayer_tdlib_playback_resolver.dart`'s `waitForTdlibDeliveryRef`, but through the Sushi
+/// `sushi_tdlib_playback_resolver.dart`'s `waitForTdlibDeliveryRef`, but through the Sushi
 /// queue rather than calling the controller directly.
-Future<OxTdlibDeliveryRef?> _pollDeliveryRef(
+Future<SushiTdlibDeliveryRef?> _pollDeliveryRef(
   String locator, {
   Duration timeout = const Duration(seconds: 15),
 }) async {
@@ -106,7 +106,7 @@ Future<OxTdlibDeliveryRef?> _pollDeliveryRef(
   return sushiDeliveryRefForLocator(locator);
 }
 
-SushiDelivered? _deliveredFromSessionRef(OxTdlibDeliveryRef? ref, String locator) {
+SushiDelivered? _deliveredFromSessionRef(SushiTdlibDeliveryRef? ref, String locator) {
   if (ref == null || ref.messageId <= 0 || ref.providerBotId <= 0) return null;
   return SushiDelivered(botId: ref.providerBotId, messageId: ref.messageId, locator: locator);
 }
@@ -141,7 +141,7 @@ Future<String> _startSession({
       ? sessionRef.botId
       : 0;
 
-  final source = OxTdlibPlaybackSource(
+  final source = SushiTdlibPlaybackSource(
     providerBotId: trustedBotId,
     messageId: delivered?.messageId ?? 0,
     preferHttpBridge: preferHttpBridge,
@@ -165,7 +165,7 @@ Future<String> _startSession({
   } catch (e) {
     _log('startPlaybackSession FAILED fileId=$fileId error=$e');
 
-    if (oxplayerIsTelegramDeliveryWaitTimeoutError(e)) {
+    if (sushiIsTelegramDeliveryWaitTimeoutError(e)) {
       final landed = await _pollDeliveryRef(locator);
       if (landed != null && landed.messageId > 0 && landed.providerBotId > 0) {
         _log('retry after 0/0 timeout using landed botId=${landed.providerBotId} messageId=${landed.messageId}');
@@ -183,7 +183,7 @@ Future<String> _startSession({
 
     if (isRetry) rethrow;
 
-    if (delivered != null && oxplayerIsTdlibFileMissingError(e)) {
+    if (delivered != null && sushiIsTdlibFileMissingError(e)) {
       final sessionRef = _deliveredFromSessionRef(await sushiDeliveryRefForLocator(locator), locator);
       if (sessionRef != null && sessionRef.messageId != delivered.messageId) {
         _log('stale server id ${delivered.messageId}; using session ref ${sessionRef.messageId}');

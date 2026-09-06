@@ -6,7 +6,7 @@
 set -e
 
 # The bundle Xcode wrote is named after PRODUCT_NAME, so read it instead of repeating it here:
-# hardcoding "OXPlayer" is what broke the first release after the rebrand (the app built fine and
+# hardcoding "Sushi" is what broke the first release after the rebrand (the app built fine and
 # only the DMG step failed, which fails the whole release).
 APP_NAME="$(sed -n 's/^PRODUCT_NAME *= *//p' macos/Runner/Configs/AppInfo.xcconfig | tr -d '\r')"
 if [ -z "$APP_NAME" ]; then

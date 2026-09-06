@@ -17,7 +17,7 @@ import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/fladder_image.dart';
 import 'package:fladder/util/focus_provider.dart';
-import 'package:fladder/oxplayer/oxplayer_catalog_interest_status.dart';
+import 'package:fladder/sushi/sushi_catalog_interest_status.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/animated_visibility.dart';
@@ -298,7 +298,7 @@ class _TVPosterItem extends ConsumerWidget {
     showBottomSheetPill(
       context: context,
       item: poster,
-      content: (scrollContext, scrollController) => oxReactivePosterActionsList(
+      content: (scrollContext, scrollController) => sushiReactivePosterActionsList(
         context: scrollContext,
         ref: ref,
         poster: poster,

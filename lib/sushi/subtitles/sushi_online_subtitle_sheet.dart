@@ -7,15 +7,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_stream_log.dart';
+import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/subtitles/sushi_subplus.dart';
 import 'package:fladder/sushi/subtitles/sushi_subtitle_actions.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
 
 void _log(String phase, [Map<String, Object?> fields = const {}]) =>
-    OxplayerStreamLog.event('sushi_sub_$phase', fields: fields);
+    SushiStreamLog.event('sushi_sub_$phase', fields: fields);
 
 const _kAutomatic = 'Automatic (online)';
 const _kOnline = 'Online subtitles…';
@@ -38,7 +37,7 @@ const _kRetry = 'Retry';
 /// Everything the async work needs is read from [ref] here, synchronously, because the calls
 /// below pop the dialog first — after which this [ref] is disposed and unusable.
 List<Widget> sushiSubtitleMenuRows(BuildContext context, WidgetRef ref) {
-  if (!OxplayerConfig.isEnabled) return const [];
+  
   final theme = Theme.of(context);
   final active = ref.watch(sushiActiveSubtitleProvider);
   final sel = theme.colorScheme.primary.withValues(alpha: 0.3);

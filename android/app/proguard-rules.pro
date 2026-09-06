@@ -1,4 +1,4 @@
-# Release shrinker rules for app.oxplayer (R8 / ProGuard).
+# Release shrinker rules for app.sushi (R8 / ProGuard).
 # Keep Sentry + Flutter JNI glue readable; mapping upload is via sentry_dart_plugin in CI.
 
 -keepattributes SourceFile,LineNumberTable
@@ -33,4 +33,4 @@
 # from native code (go/oxtelegram/cshared_android/jni_bridge.go, CallStaticVoidMethod) —  R8 has
 # no visibility into that call site and will strip/rename these as unreachable, which makes
 # GetStaticMethodID return null and the native side abort() on the next call. Must keep whole.
--keep class app.oxplayer.tdlibbridge.player.OxTelegramStreamBridge { *; }
+-keep class app.sushi.tdlibbridge.player.OxTelegramStreamBridge { *; }

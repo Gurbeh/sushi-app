@@ -11,9 +11,8 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/recommended_model.dart';
 import 'package:fladder/models/view_model.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_library_feed.dart';
-import 'package:fladder/oxplayer/oxplayer_screen_telemetry.dart';
+import 'package:fladder/sushi/sushi_library_feed.dart';
+import 'package:fladder/sushi/sushi_screen_telemetry.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/views_provider.dart';
@@ -23,7 +22,7 @@ part 'library_screen_provider.freezed.dart';
 part 'library_screen_provider.g.dart';
 
 Set<LibraryViewType> libraryLoadTypes(LibraryScreenModel state) {
-  if (OxplayerConfig.isEnabled && state.viewType.isEmpty) {
+  if (state.viewType.isEmpty) {
     return {LibraryViewType.recommended};
   }
   return state.viewType;
@@ -73,9 +72,7 @@ class LibraryScreen extends _$LibraryScreen {
 
   @override
   LibraryScreenModel build() => LibraryScreenModel(
-        viewType: OxplayerConfig.isEnabled
-            ? {}
-            : {LibraryViewType.recommended, LibraryViewType.favourites},
+        viewType: {},
       );
 
   Future<void> fetchAllLibraries() async {
@@ -102,10 +99,10 @@ class LibraryScreen extends _$LibraryScreen {
       await loadLibrary(viewModel);
     }
 
-    if (OxplayerConfig.isEnabled) {
-      await OxplayerScreenTelemetry.trackLoad(screen: 'library', phase: 'fetch', load: load);
+    
+      await SushiScreenTelemetry.trackLoad(screen: 'library', phase: 'fetch', load: load);
       return;
-    }
+    
     await load();
   }
 
@@ -147,12 +144,12 @@ class LibraryScreen extends _$LibraryScreen {
   }
 
   Future<List<RecommendedModel>> _fetchRecommendations(ViewModel viewModel) async {
-    if (OxplayerConfig.isEnabled) {
-      final feedShelves = await OxplayerLibraryFeed.fetchShelves(ref, viewModel);
+    
+      final feedShelves = await SushiLibraryFeed.fetchShelves(ref, viewModel);
       if (feedShelves != null) {
         return feedShelves;
       }
-    }
+    
 
     final collectionType = viewModel.collectionType;
     final fetchContinue = collectionType == CollectionType.movies ||
@@ -371,9 +368,7 @@ class LibraryScreen extends _$LibraryScreen {
 
   void clear() {
     state = LibraryScreenModel(
-      viewType: OxplayerConfig.isEnabled
-          ? {}
-          : {LibraryViewType.recommended, LibraryViewType.favourites},
+      viewType: {},
     );
   }
 }

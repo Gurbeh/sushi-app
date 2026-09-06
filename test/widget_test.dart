@@ -8,11 +8,11 @@ void main() {
       const ProviderScope(
         child: MaterialApp(
           home: Scaffold(
-            body: Text('oxplayer-test'),
+            body: Text('sushi-test'),
           ),
         ),
       ),
     );
-    expect(find.text('oxplayer-test'), findsOneWidget);
+    expect(find.text('sushi-test'), findsOneWidget);
   });
 }

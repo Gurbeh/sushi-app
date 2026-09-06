@@ -10,17 +10,14 @@ import 'package:fladder/models/account_model.dart';
 import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/credentials_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
-import 'package:fladder/oxplayer/oxplayer_api_disk_cache.dart';
-import 'package:fladder/oxplayer/oxplayer_config.dart';
-import 'package:fladder/oxplayer/oxplayer_image_auth.dart';
-import 'package:fladder/oxplayer/oxplayer_telegram_logout.dart';
+import 'package:fladder/sushi/sushi_api_disk_cache.dart';
+import 'package:fladder/sushi/sushi_image_auth.dart';
+import 'package:fladder/sushi/sushi_telegram_logout.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/favourites_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/library_screen_provider.dart';
-import 'package:fladder/providers/seerr_api_provider.dart';
-import 'package:fladder/providers/seerr_dashboard_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -90,9 +87,6 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
         ),
         loading: false,
       );
-
-      final seerrUrl = _findSeerrUrlForServer(serverId);
-      setTempSeerrUrl(seerrUrl);
     } catch (e) {
       state = state.copyWith(
         errorMessage: localContext?.localized.invalidUrl,
@@ -137,7 +131,7 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
     return _createAccountModel(response);
   }
 
-  /// OXPlayer: apply a Jellyfin-shaped auth payload (e.g. login-attempt long poll).
+  /// Sushi: apply a Jellyfin-shaped auth payload (e.g. login-attempt long poll).
   Future<Response<AccountModel>?> finishAuthenticationFromResult(
     Response<AuthenticationResult> response,
   ) async {
@@ -179,7 +173,7 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
       );
       ref.read(sharedUtilityProvider).addAccount(newUser);
       ref.read(userProvider.notifier).userState = newUser;
-      OxplayerImageAuth.syncFromAccount(newUser);
+      SushiImageAuth.syncFromAccount(newUser);
       final currentAccounts = ref.read(authProvider.notifier).getSavedAccounts();
 
       state = state.copyWith(
@@ -203,15 +197,9 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
         await ref.read(sharedUtilityProvider).saveAccounts(saved);
       }
     }
-
-    try {
-      await ref.read(seerrApiProvider).logout().timeout(const Duration(seconds: 5));
-    } catch (e) {
-      // Ignore logout errors for seerr
-    }
-    if (OxplayerConfig.isEnabled) {
-      unawaited(oxplayerLogoutTelegramSession());
-    }
+    
+      unawaited(sushiLogoutTelegramSession());
+    
     clearAllProviders();
     return null;
   }
@@ -226,10 +214,9 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
     ref.read(favouritesProvider.notifier).clear();
     ref.read(userProvider.notifier).clear();
     ref.read(libraryScreenProvider.notifier).clear();
-    ref.read(seerrDashboardProvider.notifier).clear();
-    if (OxplayerConfig.isEnabled) {
-      unawaited(OxplayerApiDiskCache.clearAll());
-    }
+    
+      unawaited(SushiApiDiskCache.clearAll());
+    
   }
 
   Future<void> setServer(String server) async {
@@ -268,28 +255,6 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
     );
   }
 
-  String? _findSeerrUrlForServer(String? serverId) {
-    if (FladderConfig.seerrBaseUrl?.isNotEmpty == true) {
-      return FladderConfig.seerrBaseUrl;
-    }
-    if (serverId == null || serverId.isEmpty) return null;
-    final matches = state.accounts.where(
-      (account) =>
-          account.credentials.serverId == serverId && (account.seerrCredentials?.serverUrl.isNotEmpty ?? false),
-    );
 
-    if (matches.isEmpty) return null;
 
-    final sorted = matches.toList()..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
-
-    return sorted.first.seerrCredentials?.serverUrl;
-  }
-
-  void setTempSeerrUrl(String? url) {
-    state = state.copyWith(tempSeerrUrl: url?.trim().isEmpty == true ? null : url?.trim());
-  }
-
-  void setTempSeerrSessionCookie(String? cookie) {
-    state = state.copyWith(tempSeerrSessionCookie: cookie?.trim().isEmpty == true ? null : cookie?.trim());
-  }
 }

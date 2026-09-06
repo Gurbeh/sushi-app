@@ -1,6 +1,6 @@
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/oxplayer/ox_library_item_ratings.dart';
-import 'package:fladder/oxplayer/oxplayer_env.dart';
+import 'package:fladder/sushi/sushi_library_item_ratings.dart';
+import 'package:fladder/sushi/sushi_env.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,13 +34,13 @@ class ItemDetailsNotifier extends StateNotifier<ItemBaseModel?> {
       return (item: null, trace: trace, attempts: 0, lastHttpStatus: null);
     }
 
-    final attempts = OxplayerEnv.isEnabled ? 3 : 1;
+    final attempts = SushiEnv.isEnabled ? 3 : 1;
     int? lastHttpStatus;
     for (var attempt = 0; attempt < attempts; attempt++) {
       trace.add('attempt_${attempt + 1}');
-      if (OxplayerEnv.isEnabled) {
+      if (SushiEnv.isEnabled) {
         if (attempt == 0) {
-          final cached = await oxLoadCachedLibraryItemDetails(ref, itemId);
+          final cached = await sushiLoadCachedLibraryItemDetails(ref, itemId);
           if (cached != null) {
             trace.add('disk_cache_hit');
             return (item: cached.model, trace: trace, attempts: attempt + 1, lastHttpStatus: lastHttpStatus);
@@ -48,7 +48,7 @@ class ItemDetailsNotifier extends StateNotifier<ItemBaseModel?> {
           trace.add('disk_cache_miss');
         }
 
-        final ox = await oxFetchLibraryItemDetails(ref, itemId);
+        final ox = await sushiFetchLibraryItemDetails(ref, itemId);
         if (ox != null) {
           trace.add('ox_fetch_hit');
           return (item: ox.model, trace: trace, attempts: attempt + 1, lastHttpStatus: lastHttpStatus);

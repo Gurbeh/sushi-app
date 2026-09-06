@@ -62,7 +62,7 @@ android {
             ]
         }
     }
-    namespace = "app.oxplayer"
+    namespace = "app.sushi"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -208,11 +208,11 @@ def stripFvpFromPluginRegistrant = tasks.register("stripFvpFromPluginRegistrant"
         }
         def patched = text.replaceAll(
                 /(?s)\s*try \{\s*flutterEngine\.getPlugins\(\)\.add\(new com\.mediadevkit\.fvp\.FvpPlugin\(\)\);\s*\} catch \(Exception e\) \{\s*Log\.e\(TAG, "Error registering plugin fvp[^"]*", e\);\s*\}/,
-                "\n    // OXPlayer: FvpPlugin omitted on Android (release MDK JNI crashes at JNI_OnLoad; use MPV)."
+                "\n    // Sushi: FvpPlugin omitted on Android (release MDK JNI crashes at JNI_OnLoad; use MPV)."
         )
         if (patched != text) {
             registrant.write(patched)
-            logger.lifecycle("OXPlayer: stripped FvpPlugin from GeneratedPluginRegistrant.java")
+            logger.lifecycle("Sushi: stripped FvpPlugin from GeneratedPluginRegistrant.java")
         }
     }
 }
@@ -231,5 +231,5 @@ def oxGoogleServicesFile = oxGoogleServicesCandidates.find { it.isFile() }
 if (oxGoogleServicesFile != null) {
     apply plugin: "com.google.gms.google-services"
     apply plugin: "com.google.firebase.crashlytics"
-    logger.lifecycle("OXPlayer: Firebase google-services from ${oxGoogleServicesFile.name}")
+    logger.lifecycle("Sushi: Firebase google-services from ${oxGoogleServicesFile.name}")
 }
