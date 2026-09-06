@@ -773,6 +773,8 @@ jobs:
   build-linux-flatpak:
     needs: [fetch-info, build-linux]
     if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    # Optional packaging — do not fail the whole release when Flatpak breaks.
+    continue-on-error: true
     runs-on: ubuntu-latest
     container:
       image: bilelmoussaoui/flatpak-github-actions:gnome-46
