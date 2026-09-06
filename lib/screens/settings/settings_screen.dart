@@ -13,7 +13,6 @@ import 'package:fladder/sushi/sushi_navigation.dart';
 import 'package:fladder/sushi/sushi_settings_visibility.dart';
 import 'package:fladder/providers/arguments_provider.dart';
 import 'package:fladder/providers/auth_provider.dart';
-import 'package:fladder/providers/update_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/settings/quick_connect_window.dart';
@@ -118,10 +117,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final quickConnectAvailable =
         ref.watch(userProvider.select((value) => value?.serverConfiguration?.quickConnectAvailable ?? false));
 
-    final newRelease = ref.watch(updateProvider.select((value) => value.latestRelease));
-
-    final hasNewUpdate = ref.watch(hasNewUpdateProvider);
-    final showReleaseBanner = hasNewUpdate && newRelease != null;
     final applicationInfo = ref.watch(applicationInfoProvider);
 
     final isAdmin = ref.watch(userProvider.select((value) => value?.policy?.isAdministrator ?? false));
@@ -166,18 +161,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 );
               },
             ),
-            if (showReleaseBanner) ...[
-              Card(
-                color: context.colors.secondaryContainer,
-                child: SettingsListTile(
-                  label: Text(context.localized.newReleaseFoundTitle(newRelease.version)),
-                  subLabel: Text(context.localized.newUpdateFoundOnGithub),
-                  icon: IconsaxPlusLinear.information,
-                  onTap: () => navigateTo(const AboutSettingsRoute()),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
             SettingsListTile(
               label: Text(context.localized.settingsClientTitle),
               subLabel: Text(context.localized.settingsClientDesc),

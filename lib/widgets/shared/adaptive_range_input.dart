@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:fladder/screens/shared/outlined_text_field.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/localization_helper.dart';
-import 'package:fladder/util/update_checker.dart';
+import 'package:fladder/util/string_extensions.dart';
 
 class AdaptiveRangeInput extends StatefulWidget {
   const AdaptiveRangeInput({

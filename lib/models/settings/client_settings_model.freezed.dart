@@ -41,11 +41,9 @@ mixin _$ClientSettingsModel implements DiagnosticableTreeMixin {
   DynamicSchemeVariant get schemeVariant;
   BackgroundType get backgroundImage;
   bool get enableBlurEffects;
-  bool get checkForUpdates;
   bool get usePosterForLibrary;
   bool get useSystemIME;
   bool get useTVExpandedLayout;
-  String? get lastViewedUpdate;
   int? get libraryPageSize;
   Map<GlobalHotKeys, KeyCombination> get shortcuts;
 
@@ -95,18 +93,16 @@ mixin _$ClientSettingsModel implements DiagnosticableTreeMixin {
       ..add(DiagnosticsProperty('schemeVariant', schemeVariant))
       ..add(DiagnosticsProperty('backgroundImage', backgroundImage))
       ..add(DiagnosticsProperty('enableBlurEffects', enableBlurEffects))
-      ..add(DiagnosticsProperty('checkForUpdates', checkForUpdates))
       ..add(DiagnosticsProperty('usePosterForLibrary', usePosterForLibrary))
       ..add(DiagnosticsProperty('useSystemIME', useSystemIME))
       ..add(DiagnosticsProperty('useTVExpandedLayout', useTVExpandedLayout))
-      ..add(DiagnosticsProperty('lastViewedUpdate', lastViewedUpdate))
       ..add(DiagnosticsProperty('libraryPageSize', libraryPageSize))
       ..add(DiagnosticsProperty('shortcuts', shortcuts));
   }
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'ClientSettingsModel(syncPath: $syncPath, transcodeDownloadModel: $transcodeDownloadModel, transcodeMusicDownloadModel: $transcodeMusicDownloadModel, position: $position, size: $size, timeOut: $timeOut, nextUpDateCutoff: $nextUpDateCutoff, updateNotificationsInterval: $updateNotificationsInterval, themeMode: $themeMode, themeColor: $themeColor, deriveColorsFromItem: $deriveColorsFromItem, amoledBlack: $amoledBlack, blurPlaceHolders: $blurPlaceHolders, blurUpcomingEpisodes: $blurUpcomingEpisodes, selectedLocale: $selectedLocale, enableMediaKeys: $enableMediaKeys, posterSize: $posterSize, pinchPosterZoom: $pinchPosterZoom, mouseDragSupport: $mouseDragSupport, requireWifi: $requireWifi, expandSideBar: $expandSideBar, showAllCollectionTypes: $showAllCollectionTypes, maxConcurrentDownloads: $maxConcurrentDownloads, schemeVariant: $schemeVariant, backgroundImage: $backgroundImage, enableBlurEffects: $enableBlurEffects, checkForUpdates: $checkForUpdates, usePosterForLibrary: $usePosterForLibrary, useSystemIME: $useSystemIME, useTVExpandedLayout: $useTVExpandedLayout, lastViewedUpdate: $lastViewedUpdate, libraryPageSize: $libraryPageSize, shortcuts: $shortcuts)';
+    return 'ClientSettingsModel(syncPath: $syncPath, transcodeDownloadModel: $transcodeDownloadModel, transcodeMusicDownloadModel: $transcodeMusicDownloadModel, position: $position, size: $size, timeOut: $timeOut, nextUpDateCutoff: $nextUpDateCutoff, updateNotificationsInterval: $updateNotificationsInterval, themeMode: $themeMode, themeColor: $themeColor, deriveColorsFromItem: $deriveColorsFromItem, amoledBlack: $amoledBlack, blurPlaceHolders: $blurPlaceHolders, blurUpcomingEpisodes: $blurUpcomingEpisodes, selectedLocale: $selectedLocale, enableMediaKeys: $enableMediaKeys, posterSize: $posterSize, pinchPosterZoom: $pinchPosterZoom, mouseDragSupport: $mouseDragSupport, requireWifi: $requireWifi, expandSideBar: $expandSideBar, showAllCollectionTypes: $showAllCollectionTypes, maxConcurrentDownloads: $maxConcurrentDownloads, schemeVariant: $schemeVariant, backgroundImage: $backgroundImage, enableBlurEffects: $enableBlurEffects, usePosterForLibrary: $usePosterForLibrary, useSystemIME: $useSystemIME, useTVExpandedLayout: $useTVExpandedLayout, libraryPageSize: $libraryPageSize, shortcuts: $shortcuts)';
   }
 }
 
@@ -143,11 +139,9 @@ abstract mixin class $ClientSettingsModelCopyWith<$Res> {
       DynamicSchemeVariant schemeVariant,
       BackgroundType backgroundImage,
       bool enableBlurEffects,
-      bool checkForUpdates,
       bool usePosterForLibrary,
       bool useSystemIME,
       bool useTVExpandedLayout,
-      String? lastViewedUpdate,
       int? libraryPageSize,
       Map<GlobalHotKeys, KeyCombination> shortcuts});
 
@@ -193,11 +187,9 @@ class _$ClientSettingsModelCopyWithImpl<$Res>
     Object? schemeVariant = null,
     Object? backgroundImage = null,
     Object? enableBlurEffects = null,
-    Object? checkForUpdates = null,
     Object? usePosterForLibrary = null,
     Object? useSystemIME = null,
     Object? useTVExpandedLayout = null,
-    Object? lastViewedUpdate = freezed,
     Object? libraryPageSize = freezed,
     Object? shortcuts = null,
   }) {
@@ -306,10 +298,6 @@ class _$ClientSettingsModelCopyWithImpl<$Res>
           ? _self.enableBlurEffects
           : enableBlurEffects // ignore: cast_nullable_to_non_nullable
               as bool,
-      checkForUpdates: null == checkForUpdates
-          ? _self.checkForUpdates
-          : checkForUpdates // ignore: cast_nullable_to_non_nullable
-              as bool,
       usePosterForLibrary: null == usePosterForLibrary
           ? _self.usePosterForLibrary
           : usePosterForLibrary // ignore: cast_nullable_to_non_nullable
@@ -322,10 +310,6 @@ class _$ClientSettingsModelCopyWithImpl<$Res>
           ? _self.useTVExpandedLayout
           : useTVExpandedLayout // ignore: cast_nullable_to_non_nullable
               as bool,
-      lastViewedUpdate: freezed == lastViewedUpdate
-          ? _self.lastViewedUpdate
-          : lastViewedUpdate // ignore: cast_nullable_to_non_nullable
-              as String?,
       libraryPageSize: freezed == libraryPageSize
           ? _self.libraryPageSize
           : libraryPageSize // ignore: cast_nullable_to_non_nullable
@@ -469,11 +453,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             DynamicSchemeVariant schemeVariant,
             BackgroundType backgroundImage,
             bool enableBlurEffects,
-            bool checkForUpdates,
             bool usePosterForLibrary,
             bool useSystemIME,
             bool useTVExpandedLayout,
-            String? lastViewedUpdate,
             int? libraryPageSize,
             Map<GlobalHotKeys, KeyCombination> shortcuts)?
         internal,
@@ -509,11 +491,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             _that.schemeVariant,
             _that.backgroundImage,
             _that.enableBlurEffects,
-            _that.checkForUpdates,
             _that.usePosterForLibrary,
             _that.useSystemIME,
             _that.useTVExpandedLayout,
-            _that.lastViewedUpdate,
             _that.libraryPageSize,
             _that.shortcuts);
       case _:
@@ -563,11 +543,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             DynamicSchemeVariant schemeVariant,
             BackgroundType backgroundImage,
             bool enableBlurEffects,
-            bool checkForUpdates,
             bool usePosterForLibrary,
             bool useSystemIME,
             bool useTVExpandedLayout,
-            String? lastViewedUpdate,
             int? libraryPageSize,
             Map<GlobalHotKeys, KeyCombination> shortcuts)
         internal,
@@ -602,11 +580,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             _that.schemeVariant,
             _that.backgroundImage,
             _that.enableBlurEffects,
-            _that.checkForUpdates,
             _that.usePosterForLibrary,
             _that.useSystemIME,
             _that.useTVExpandedLayout,
-            _that.lastViewedUpdate,
             _that.libraryPageSize,
             _that.shortcuts);
       case _:
@@ -655,11 +631,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             DynamicSchemeVariant schemeVariant,
             BackgroundType backgroundImage,
             bool enableBlurEffects,
-            bool checkForUpdates,
             bool usePosterForLibrary,
             bool useSystemIME,
             bool useTVExpandedLayout,
-            String? lastViewedUpdate,
             int? libraryPageSize,
             Map<GlobalHotKeys, KeyCombination> shortcuts)?
         internal,
@@ -694,11 +668,9 @@ extension ClientSettingsModelPatterns on ClientSettingsModel {
             _that.schemeVariant,
             _that.backgroundImage,
             _that.enableBlurEffects,
-            _that.checkForUpdates,
             _that.usePosterForLibrary,
             _that.useSystemIME,
             _that.useTVExpandedLayout,
-            _that.lastViewedUpdate,
             _that.libraryPageSize,
             _that.shortcuts);
       case _:
@@ -738,11 +710,9 @@ class _ClientSettingsModel extends ClientSettingsModel
       this.schemeVariant = DynamicSchemeVariant.rainbow,
       this.backgroundImage = BackgroundType.blurred,
       this.enableBlurEffects = false,
-      this.checkForUpdates = true,
       this.usePosterForLibrary = false,
       this.useSystemIME = false,
       this.useTVExpandedLayout = false,
-      this.lastViewedUpdate,
       this.libraryPageSize,
       final Map<GlobalHotKeys, KeyCombination> shortcuts = const {}})
       : _shortcuts = shortcuts,
@@ -826,9 +796,6 @@ class _ClientSettingsModel extends ClientSettingsModel
   final bool enableBlurEffects;
   @override
   @JsonKey()
-  final bool checkForUpdates;
-  @override
-  @JsonKey()
   final bool usePosterForLibrary;
   @override
   @JsonKey()
@@ -836,8 +803,6 @@ class _ClientSettingsModel extends ClientSettingsModel
   @override
   @JsonKey()
   final bool useTVExpandedLayout;
-  @override
-  final String? lastViewedUpdate;
   @override
   final int? libraryPageSize;
   final Map<GlobalHotKeys, KeyCombination> _shortcuts;
@@ -900,18 +865,16 @@ class _ClientSettingsModel extends ClientSettingsModel
       ..add(DiagnosticsProperty('schemeVariant', schemeVariant))
       ..add(DiagnosticsProperty('backgroundImage', backgroundImage))
       ..add(DiagnosticsProperty('enableBlurEffects', enableBlurEffects))
-      ..add(DiagnosticsProperty('checkForUpdates', checkForUpdates))
       ..add(DiagnosticsProperty('usePosterForLibrary', usePosterForLibrary))
       ..add(DiagnosticsProperty('useSystemIME', useSystemIME))
       ..add(DiagnosticsProperty('useTVExpandedLayout', useTVExpandedLayout))
-      ..add(DiagnosticsProperty('lastViewedUpdate', lastViewedUpdate))
       ..add(DiagnosticsProperty('libraryPageSize', libraryPageSize))
       ..add(DiagnosticsProperty('shortcuts', shortcuts));
   }
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'ClientSettingsModel.internal(syncPath: $syncPath, transcodeDownloadModel: $transcodeDownloadModel, transcodeMusicDownloadModel: $transcodeMusicDownloadModel, position: $position, size: $size, timeOut: $timeOut, nextUpDateCutoff: $nextUpDateCutoff, updateNotificationsInterval: $updateNotificationsInterval, themeMode: $themeMode, themeColor: $themeColor, deriveColorsFromItem: $deriveColorsFromItem, amoledBlack: $amoledBlack, blurPlaceHolders: $blurPlaceHolders, blurUpcomingEpisodes: $blurUpcomingEpisodes, selectedLocale: $selectedLocale, enableMediaKeys: $enableMediaKeys, posterSize: $posterSize, pinchPosterZoom: $pinchPosterZoom, mouseDragSupport: $mouseDragSupport, requireWifi: $requireWifi, expandSideBar: $expandSideBar, showAllCollectionTypes: $showAllCollectionTypes, maxConcurrentDownloads: $maxConcurrentDownloads, schemeVariant: $schemeVariant, backgroundImage: $backgroundImage, enableBlurEffects: $enableBlurEffects, checkForUpdates: $checkForUpdates, usePosterForLibrary: $usePosterForLibrary, useSystemIME: $useSystemIME, useTVExpandedLayout: $useTVExpandedLayout, lastViewedUpdate: $lastViewedUpdate, libraryPageSize: $libraryPageSize, shortcuts: $shortcuts)';
+    return 'ClientSettingsModel.internal(syncPath: $syncPath, transcodeDownloadModel: $transcodeDownloadModel, transcodeMusicDownloadModel: $transcodeMusicDownloadModel, position: $position, size: $size, timeOut: $timeOut, nextUpDateCutoff: $nextUpDateCutoff, updateNotificationsInterval: $updateNotificationsInterval, themeMode: $themeMode, themeColor: $themeColor, deriveColorsFromItem: $deriveColorsFromItem, amoledBlack: $amoledBlack, blurPlaceHolders: $blurPlaceHolders, blurUpcomingEpisodes: $blurUpcomingEpisodes, selectedLocale: $selectedLocale, enableMediaKeys: $enableMediaKeys, posterSize: $posterSize, pinchPosterZoom: $pinchPosterZoom, mouseDragSupport: $mouseDragSupport, requireWifi: $requireWifi, expandSideBar: $expandSideBar, showAllCollectionTypes: $showAllCollectionTypes, maxConcurrentDownloads: $maxConcurrentDownloads, schemeVariant: $schemeVariant, backgroundImage: $backgroundImage, enableBlurEffects: $enableBlurEffects, usePosterForLibrary: $usePosterForLibrary, useSystemIME: $useSystemIME, useTVExpandedLayout: $useTVExpandedLayout, libraryPageSize: $libraryPageSize, shortcuts: $shortcuts)';
   }
 }
 
@@ -950,11 +913,9 @@ abstract mixin class _$ClientSettingsModelCopyWith<$Res>
       DynamicSchemeVariant schemeVariant,
       BackgroundType backgroundImage,
       bool enableBlurEffects,
-      bool checkForUpdates,
       bool usePosterForLibrary,
       bool useSystemIME,
       bool useTVExpandedLayout,
-      String? lastViewedUpdate,
       int? libraryPageSize,
       Map<GlobalHotKeys, KeyCombination> shortcuts});
 
@@ -1001,11 +962,9 @@ class __$ClientSettingsModelCopyWithImpl<$Res>
     Object? schemeVariant = null,
     Object? backgroundImage = null,
     Object? enableBlurEffects = null,
-    Object? checkForUpdates = null,
     Object? usePosterForLibrary = null,
     Object? useSystemIME = null,
     Object? useTVExpandedLayout = null,
-    Object? lastViewedUpdate = freezed,
     Object? libraryPageSize = freezed,
     Object? shortcuts = null,
   }) {
@@ -1114,10 +1073,6 @@ class __$ClientSettingsModelCopyWithImpl<$Res>
           ? _self.enableBlurEffects
           : enableBlurEffects // ignore: cast_nullable_to_non_nullable
               as bool,
-      checkForUpdates: null == checkForUpdates
-          ? _self.checkForUpdates
-          : checkForUpdates // ignore: cast_nullable_to_non_nullable
-              as bool,
       usePosterForLibrary: null == usePosterForLibrary
           ? _self.usePosterForLibrary
           : usePosterForLibrary // ignore: cast_nullable_to_non_nullable
@@ -1130,10 +1085,6 @@ class __$ClientSettingsModelCopyWithImpl<$Res>
           ? _self.useTVExpandedLayout
           : useTVExpandedLayout // ignore: cast_nullable_to_non_nullable
               as bool,
-      lastViewedUpdate: freezed == lastViewedUpdate
-          ? _self.lastViewedUpdate
-          : lastViewedUpdate // ignore: cast_nullable_to_non_nullable
-              as String?,
       libraryPageSize: freezed == libraryPageSize
           ? _self.libraryPageSize
           : libraryPageSize // ignore: cast_nullable_to_non_nullable

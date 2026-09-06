@@ -89,11 +89,9 @@ abstract class ClientSettingsModel with _$ClientSettingsModel {
     @Default(DynamicSchemeVariant.rainbow) DynamicSchemeVariant schemeVariant,
     @Default(BackgroundType.blurred) BackgroundType backgroundImage,
     @Default(false) bool enableBlurEffects,
-    @Default(true) bool checkForUpdates,
     @Default(false) bool usePosterForLibrary,
     @Default(false) bool useSystemIME,
     @Default(false) bool useTVExpandedLayout,
-    String? lastViewedUpdate,
     int? libraryPageSize,
     @Default({}) Map<GlobalHotKeys, KeyCombination> shortcuts,
   }) = _ClientSettingsModel;

@@ -57,11 +57,9 @@ _ClientSettingsModel _$ClientSettingsModelFromJson(Map<String, dynamic> json) =>
               _$BackgroundTypeEnumMap, json['backgroundImage']) ??
           BackgroundType.blurred,
       enableBlurEffects: json['enableBlurEffects'] as bool? ?? false,
-      checkForUpdates: json['checkForUpdates'] as bool? ?? true,
       usePosterForLibrary: json['usePosterForLibrary'] as bool? ?? false,
       useSystemIME: json['useSystemIME'] as bool? ?? false,
       useTVExpandedLayout: json['useTVExpandedLayout'] as bool? ?? false,
-      lastViewedUpdate: json['lastViewedUpdate'] as String?,
       libraryPageSize: (json['libraryPageSize'] as num?)?.toInt(),
       shortcuts: (json['shortcuts'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry($enumDecode(_$GlobalHotKeysEnumMap, k),
@@ -100,11 +98,9 @@ Map<String, dynamic> _$ClientSettingsModelToJson(
       'schemeVariant': _$DynamicSchemeVariantEnumMap[instance.schemeVariant]!,
       'backgroundImage': _$BackgroundTypeEnumMap[instance.backgroundImage]!,
       'enableBlurEffects': instance.enableBlurEffects,
-      'checkForUpdates': instance.checkForUpdates,
       'usePosterForLibrary': instance.usePosterForLibrary,
       'useSystemIME': instance.useSystemIME,
       'useTVExpandedLayout': instance.useTVExpandedLayout,
-      'lastViewedUpdate': instance.lastViewedUpdate,
       'libraryPageSize': instance.libraryPageSize,
       'shortcuts': instance.shortcuts
           .map((k, e) => MapEntry(_$GlobalHotKeysEnumMap[k]!, e)),
