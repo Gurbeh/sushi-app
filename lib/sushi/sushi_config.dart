@@ -2,8 +2,10 @@
 ///
 /// Hardcoded on — this fork is always Sushi. Handles baked in per R-SEC-6 / ADR 0004.
 ///
-/// `production` flavor always uses the baked handle (`sushiMovieBot` unless `--dart-define`).
-/// `development` reads `assets/env/default.env` (`OXPLAYER_BOT_USERNAME` from `npm run env:pull`).
+/// Store flavors (`production`, `direct`) always use baked handles
+/// (`sushiMovieBot` / `sushiInit01Bot` unless `--dart-define`).
+/// `development` (and flavor-less local runs) read `assets/env/default.env`
+/// (`OXPLAYER_BOT_USERNAME` / `OXPLAYER_INIT_BOT_USERNAME` from `npm run env:pull`).
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 
 abstract final class SushiConfig {
@@ -15,14 +17,16 @@ abstract final class SushiConfig {
   );
   static const String _bakedInit = String.fromEnvironment(
     'SUSHI_INIT_BOT',
-    defaultValue: 'OXStreamer29bot',
+    defaultValue: 'sushiInit01Bot',
   );
   static const String _flavor = String.fromEnvironment('FLUTTER_APP_FLAVOR');
 
   static String _handle(String raw) => raw.trim().replaceFirst(RegExp(r'^@'), '');
 
-  /// Store / CI production APK must not follow a leftover local `default.env`.
-  static bool get _allowEnvHandles => _flavor != 'production';
+  /// Store / CI APKs (`production` Play, `direct` GitHub/website) must not follow a
+  /// leftover local `default.env` (dev handles like `@OXStreamer29bot`).
+  static bool get _allowEnvHandles =>
+      _flavor != 'production' && _flavor != 'direct';
 
   /// Public main-bot handle (no @).
   static String get mainBotUsername {

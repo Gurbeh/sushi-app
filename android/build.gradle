@@ -82,6 +82,16 @@ gradle.beforeProject { proj ->
     def envMap = parseEnvFile(new File(flutterProjectDir, "assets/env/default.env"))
     def ngrokMap = parseNgrokJson(new File(flutterProjectDir, "dart_defines.ngrok.json"))
 
+    // Store APKs must not inherit local default.env bot handles (dev @sushiMovieDevBot).
+    def taskBlob = (gradle.startParameter.taskNames ?: []).join(" ").toLowerCase()
+    def storeFlavor = taskBlob.contains("production") || taskBlob.contains("direct")
+    if (storeFlavor) {
+        ["OXPLAYER_BOT_USERNAME", "BOT_USERNAME"].each { k ->
+            envMap.remove(k)
+            ngrokMap.remove(k)
+        }
+    }
+
     def mergedMap = new LinkedHashMap()
     mergedMap.putAll(envMap)
     mergedMap.putAll(ngrokMap)

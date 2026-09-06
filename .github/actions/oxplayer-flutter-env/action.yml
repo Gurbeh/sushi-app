@@ -30,9 +30,15 @@ runs:
                     return value
             return ""
 
+        main_bot = env_first("SUSHI_MAIN_BOT", "OXPLAYER_BOT_USERNAME", "BOT_USERNAME") or "sushiMovieBot"
+        init_bot = env_first("SUSHI_INIT_BOT", "OXPLAYER_INIT_BOT_USERNAME", "INIT_BOT_USERNAME") or "sushiInit01Bot"
         keys = {
             "OXPLAYER": "true",
-            "BOT_USERNAME": env_first("BOT_USERNAME"),
+            "BOT_USERNAME": env_first("BOT_USERNAME") or main_bot,
+            "OXPLAYER_BOT_USERNAME": main_bot,
+            "OXPLAYER_INIT_BOT_USERNAME": init_bot,
+            "SUSHI_MAIN_BOT": main_bot,
+            "SUSHI_INIT_BOT": init_bot,
             "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
             # TDLib user-session (native playback + Telegram login) — baked at build time.
             "TELEGRAM_API_ID": env_first("TELEGRAM_API_ID"),

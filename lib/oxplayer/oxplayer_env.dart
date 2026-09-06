@@ -1,4 +1,5 @@
 import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 
 abstract final class OxplayerEnv {
   /// True when this build targets OXPlayer (API base URL configured).
@@ -46,6 +47,11 @@ abstract final class OxplayerEnv {
   static String? get effectiveMediaServerUrl => apiBaseUrl;
 
   static String? get botUsername {
+    // Store builds must not pick leftover `default.env` (`sushiMovieDevBot`).
+    if (SushiConfig.isEnabled) {
+      final h = SushiConfig.mainBotUsername;
+      return h.isEmpty ? null : h;
+    }
     final t = _pick(['OXPLAYER_BOT_USERNAME', 'BOT_USERNAME', 'TELEGRAM_MAIN_BOT_USERNAME'], _cBotUsername)
         .replaceFirst(RegExp(r'^@'), '');
     return t.isEmpty ? null : t;
