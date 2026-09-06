@@ -37,6 +37,7 @@ import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/providers/book_viewer_provider.dart';
 import 'package:fladder/providers/items/book_details_provider.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
@@ -649,6 +650,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
           catalog: read(sushiCatalogControllerProvider),
           preferHttpBridge: preferHttpBridge,
           sync: read(syncProvider.notifier),
+          playedIds: read(sushiCatalogItemFlagsProvider).playedIds,
         ),
       );
       _showLoadingIndicator(playContext, itemModel, op);

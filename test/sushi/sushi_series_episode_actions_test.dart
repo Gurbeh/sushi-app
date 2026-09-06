@@ -4,7 +4,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/sushi/ox_series_episode_actions.dart';
+import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:flutter_test/flutter_test.dart';
 EpisodeModel _episode({required String id, required int episode}) {
   return EpisodeModel(
@@ -66,6 +66,26 @@ void main() {
     final series = _series(episodes: [ep1, ep18]);
 
     expect(sushiSeriesDetailPlayTarget(series)?.id, 'ep-1');
+  });
+
+  test('sushiSeriesDetailPlayTarget skips fully watched selected episode', () {
+    final ep1 = _episode(id: 'ep-1', episode: 1).copyWith(
+      userData: const UserData(played: true),
+    );
+    final ep2 = _episode(id: 'ep-2', episode: 2);
+    final series = _series(selected: ep1, episodes: [ep1, ep2]);
+
+    expect(sushiSeriesDetailPlayTarget(series, selectedEpisode: ep1)?.id, 'ep-2');
+  });
+
+  test('sushiSeriesDetailPlayTarget keeps in-progress selected episode', () {
+    final ep1 = _episode(id: 'ep-1', episode: 1).copyWith(
+      userData: const UserData(progress: 40),
+    );
+    final ep2 = _episode(id: 'ep-2', episode: 2);
+    final series = _series(selected: ep1, episodes: [ep1, ep2]);
+
+    expect(sushiSeriesDetailPlayTarget(series, selectedEpisode: ep1)?.id, 'ep-1');
   });
 
   test('sushiSeriesDetailPlayTarget returns null until user picks on fresh series', () {

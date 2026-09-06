@@ -8,11 +8,14 @@ import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_playback_model.dart';
 import 'package:fladder/sushi/sushi_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/sushi_series_episode_actions.dart';
+import 'package:fladder/sushi/sushi_series_watch_state.dart';
 
 /// Resolves the item's selected quality (docs/12 §5's pick-list, applied in
 /// `sushi_item_adapter.dart`) to a playable [SushiPlaybackModel] via Sushi's own `/play` delivery
@@ -73,11 +76,23 @@ List<EpisodeModel> _playableEpisodes(Iterable<EpisodeModel>? episodes) => [
         if (e.playAble) e,
     ];
 
+Future<SeriesModel> _paintSeriesWatchState(
+  SeriesModel series, {
+  Set<String> playedIds = const {},
+}) async {
+  final tmdbId = sushiTmdbIdFromItemId(series.id);
+  final resume = tmdbId == null
+      ? null
+      : await sushiContinueFind(tmdbId: tmdbId, kind: SushiKind.series);
+  return sushiPaintSeriesWatchState(series, playedIds: playedIds, resume: resume);
+}
+
 Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   ItemBaseModel itemModel, {
   required SushiCatalogController catalog,
   bool preferHttpBridge = false,
   SyncNotifier? sync,
+  Set<String> playedIds = const {},
 }) async {
   var item = itemModel;
   if (item is SeriesModel ||
@@ -85,13 +100,16 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
           sushiFileIdFromVersionStreamId(item.streamModel?.currentVersionStream?.id) == null)) {
     item = await sushiHydrateForPlay(item, catalog);
   }
+  if (item is SeriesModel) {
+    item = await _paintSeriesWatchState(item, playedIds: playedIds);
+  }
 
   // Ordered sibling episodes for the queue. Captured here when we already hold the hydrated
   // series; the standalone-episode path fills it from the catalog further down.
   var episodeQueue = const <EpisodeModel>[];
   if (item is SeriesModel) {
     episodeQueue = _playableEpisodes(item.availableEpisodes);
-    final episode = item.nextUp ??
+    final episode = sushiSeriesDetailPlayTarget(item) ??
         (item.availableEpisodes == null || item.availableEpisodes!.isEmpty
             ? null
             : item.availableEpisodes!.first);

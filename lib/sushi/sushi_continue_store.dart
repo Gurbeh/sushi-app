@@ -24,6 +24,9 @@ class SushiContinueEntry {
     required this.positionMs,
     required this.durationMs,
     required this.atMs,
+    this.episodeItemId,
+    this.season,
+    this.episode,
   });
 
   final int tmdbId;
@@ -35,6 +38,9 @@ class SushiContinueEntry {
   final int positionMs;
   final int durationMs;
   final int atMs;
+  final String? episodeItemId;
+  final int? season;
+  final int? episode;
 
   double get progressPct {
     if (durationMs <= 0) return 0;
@@ -54,6 +60,9 @@ class SushiContinueEntry {
         'positionMs': positionMs,
         'durationMs': durationMs,
         'atMs': atMs,
+        if (episodeItemId != null && episodeItemId!.isNotEmpty) 'episodeItemId': episodeItemId,
+        if (season != null) 'season': season,
+        if (episode != null) 'episode': episode,
       };
 
   static SushiContinueEntry? fromJson(Map<String, dynamic> json) {
@@ -69,6 +78,9 @@ class SushiContinueEntry {
       positionMs: json['positionMs'] as int? ?? 0,
       durationMs: json['durationMs'] as int? ?? 0,
       atMs: json['atMs'] as int? ?? 0,
+      episodeItemId: json['episodeItemId'] as String?,
+      season: json['season'] as int?,
+      episode: json['episode'] as int?,
     );
   }
 
@@ -136,6 +148,9 @@ Future<void> sushiContinueRemember(ItemBaseModel item, Duration position, Durati
     positionMs: position.inMilliseconds,
     durationMs: duration.inMilliseconds,
     atMs: DateTime.now().millisecondsSinceEpoch,
+    episodeItemId: item is EpisodeModel ? item.id : null,
+    season: item is EpisodeModel ? item.season : null,
+    episode: item is EpisodeModel ? item.episode : null,
   );
   final existing = await _readAll();
   final next = [
@@ -184,6 +199,17 @@ Future<void> sushiContinueForget(ItemBaseModel item) async {
 Future<List<ItemBaseModel>> sushiContinueLoad() async {
   final entries = await _readAll();
   return [for (final e in entries) e.toItem()];
+}
+
+Future<SushiContinueEntry?> sushiContinueFind({
+  required int tmdbId,
+  required SushiKind kind,
+}) async {
+  final entries = await _readAll();
+  for (final entry in entries) {
+    if (entry.tmdbId == tmdbId && entry.kind == kind) return entry;
+  }
+  return null;
 }
 
 Future<List<SushiContinueEntry>> _readAll() async {

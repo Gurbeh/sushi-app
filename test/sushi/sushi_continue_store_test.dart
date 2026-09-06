@@ -6,6 +6,7 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
+import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 
@@ -68,6 +69,47 @@ void main() {
     expect(id?.tmdbId, 1396);
     expect(id?.kind, SushiKind.series);
     expect(id?.title, 'Breaking Bad');
+  });
+
+  test('continue json round-trips episode identity', () {
+    const e = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 12 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_12',
+      season: 1,
+      episode: 12,
+    );
+    final parsed = SushiContinueEntry.fromJson(e.toJson());
+    expect(parsed?.episodeItemId, 'sushi_ep_12');
+    expect(parsed?.season, 1);
+    expect(parsed?.episode, 12);
+  });
+
+  test('series continue toItem stays a series poster with progress', () {
+    const e = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 12 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_12',
+      season: 1,
+      episode: 12,
+    );
+    final item = e.toItem();
+    expect(item, isA<SeriesModel>());
+    expect(item.userData.progress, closeTo(25, 0.1));
   });
 
   test('finished entries (>=90%) are not continue-watching', () {

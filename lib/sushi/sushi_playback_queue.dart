@@ -10,6 +10,7 @@ import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
 
@@ -66,6 +67,7 @@ class SushiPlaybackModelHelper extends PlaybackModelHelper {
       catalog: ref.read(sushiCatalogControllerProvider),
       preferHttpBridge: preferHttpBridge,
       sync: ref.read(syncProvider.notifier),
+      playedIds: ref.read(sushiCatalogItemFlagsProvider).playedIds,
     );
     if (newModel == null) {
       ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(buffering: false));

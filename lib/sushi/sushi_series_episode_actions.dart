@@ -53,12 +53,23 @@ String _oxPickerSeasonName(SeasonModel? seasonMeta, int seasonNumber) {
   return seasonNumber.toString();
 }
 
-/// Play button / stream helper target on series detail — focused episode wins over Next Up.
+bool _sushiEpisodeIsFullyWatched(EpisodeModel episode) {
+  return episode.userData.played && episode.userData.progress == 0;
+}
+
+/// Play button / stream helper target on series detail.
+///
+/// Focused unwatched or in-progress episode wins. A fully watched selection
+/// (mark-as-watched) falls through to Next Up so the header advances.
 EpisodeModel? sushiSeriesDetailPlayTarget(
   SeriesModel? series, {
   EpisodeModel? selectedEpisode,
 }) {
   if (series == null) return null;
-  if (sushiSeriesNeedsEpisodePick(series) && selectedEpisode == null) return null;
-  return selectedEpisode ?? series.selectedEpisode ?? sushiSeriesPlayableNextUp(series);
+  final focused = selectedEpisode ?? series.selectedEpisode;
+  if (sushiSeriesNeedsEpisodePick(series) && focused == null) return null;
+  if (focused != null && !_sushiEpisodeIsFullyWatched(focused)) {
+    return focused;
+  }
+  return sushiSeriesPlayableNextUp(series);
 }
