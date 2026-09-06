@@ -311,25 +311,17 @@ release_client_version_name() {
 
 release_client_require_web_dispatch_token() {
   local has_gh=0
+  local repo="Gurbeh/sushi-app"
 
-  if gh secret list --repo Gurbeh/sushi-client --json name -q '.[].name' 2>/dev/null \
+  if gh secret list --repo "${repo}" --json name -q '.[].name' 2>/dev/null \
     | grep -qx 'OXPLAYER_BE_DISPATCH_TOKEN'; then
     has_gh=1
   fi
 
   if [[ "${has_gh}" -eq 0 ]]; then
-    echo "error: OXPLAYER_BE_DISPATCH_TOKEN is not set on Gurbeh/sushi-client." >&2
-    echo "Release builds will fail at Deploy Web · Hetzner without it." >&2
-    echo "" >&2
-    echo "Fix (pick one):" >&2
-    echo "  1. GitHub secret on Gurbeh/sushi-client:" >&2
-    echo "       gh secret set OXPLAYER_BE_DISPATCH_TOKEN --repo Gurbeh/sushi-client" >&2
-    echo "     (fine-grained PAT: Contents read + Actions read/write on Aryan-mor/oxplayer-be)" >&2
-    echo "  2. Infisical /core/client-ci (preferred with other CI secrets):" >&2
-    echo "       OXPLAYER_BE_DISPATCH_TOKEN=<same PAT>" >&2
-    echo "       pnpm infisical:bootstrap-client-ci   # from oxplayer-be" >&2
-    echo "" >&2
-    echo "See sushi-client/docs/RELEASE.md § Web (Hetzner)." >&2
-    exit 1
+    echo "warn: OXPLAYER_BE_DISPATCH_TOKEN is not set on ${repo}." >&2
+    echo "warn: Deploy Web · Hetzner may fail; Android/desktop tag builds still run." >&2
+    echo "warn: Set later: gh secret set OXPLAYER_BE_DISPATCH_TOKEN --repo ${repo}" >&2
+    return 0
   fi
 }
