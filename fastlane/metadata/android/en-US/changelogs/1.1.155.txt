@@ -1,0 +1,1 @@
+Fix assets/sushi path; allow release without Windows/Flatpak
