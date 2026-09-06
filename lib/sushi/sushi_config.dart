@@ -5,7 +5,7 @@
 /// Store flavors (`production`, `direct`) always use baked handles
 /// (`sushiMovieBot` / `sushiInit01Bot` unless `--dart-define`).
 /// `development` (and flavor-less local runs) read `assets/env/default.env`
-/// (`OXPLAYER_BOT_USERNAME` / `OXPLAYER_INIT_BOT_USERNAME` from `npm run env:pull`).
+/// (`SUSHI_MAIN_BOT` / `SUSHI_INIT_BOT` from `npm run env:pull`).
 import 'package:fladder/sushi/sushi_dotenv.dart';
 
 abstract final class SushiConfig {
@@ -24,14 +24,14 @@ abstract final class SushiConfig {
   static String _handle(String raw) => raw.trim().replaceFirst(RegExp(r'^@'), '');
 
   /// Store / CI APKs (`production` Play, `direct` GitHub/website) must not follow a
-  /// leftover local `default.env` (dev handles like `@OXStreamer29bot`).
+  /// leftover local `default.env` (dev handles).
   static bool get _allowEnvHandles =>
       _flavor != 'production' && _flavor != 'direct';
 
   /// Public main-bot handle (no @).
   static String get mainBotUsername {
     if (_allowEnvHandles) {
-      final fromEnv = _handle(SushiDotenv.get('OXPLAYER_BOT_USERNAME'));
+      final fromEnv = _handle(SushiDotenv.get('SUSHI_MAIN_BOT'));
       if (fromEnv.isNotEmpty) return fromEnv;
     }
     return _handle(_bakedMain);
@@ -40,7 +40,7 @@ abstract final class SushiConfig {
   /// Init-bot handle (no @). Machine handshake only (`/initbot`).
   static String get initBotUsername {
     if (_allowEnvHandles) {
-      final fromEnv = _handle(SushiDotenv.get('OXPLAYER_INIT_BOT_USERNAME'));
+      final fromEnv = _handle(SushiDotenv.get('SUSHI_INIT_BOT'));
       if (fromEnv.isNotEmpty) return fromEnv;
     }
     return _handle(_bakedInit);

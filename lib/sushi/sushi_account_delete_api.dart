@@ -21,7 +21,7 @@ class SushiAccountDeleteApi {
   Future<void> deleteAccount({required String accessToken}) async {
     final base = SushiEnv.apiBaseUrl;
     if (base == null) {
-      throw SushiAccountDeleteException('OXPLAYER_API_BASE_URL is not configured');
+      throw SushiAccountDeleteException('SUSHI_API_BASE_URL is not configured');
     }
     final uri = Uri.parse('$base/me/account/delete');
     final response = await _client.post(

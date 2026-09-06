@@ -2149,7 +2149,7 @@
             }
         }
     },
-    "sushiLoginBootstrapEnvError": "OXPLAYER_API_BASE_URL در assets/env/default.env تنظیم نشده.",
+    "sushiLoginBootstrapEnvError": "SUSHI_API_BASE_URL در assets/env/default.env تنظیم نشده.",
     "sushiLoginTelegramTitle": "ورود با تلگرام",
     "sushiLoginDeviceNotReady": "دستگاه آماده نیست. دوباره تلاش کنید.",
     "sushiLoginBotNotConfigured": "ربات تلگرام تنظیم نشده.",

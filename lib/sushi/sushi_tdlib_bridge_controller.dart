@@ -1009,7 +1009,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   }
 
   /// Fetches a Telegram-signed Mini App initData payload for TELEGRAM_WEBAPP_BOT_USERNAME (falls
-  /// back to OXPLAYER_BOT_USERNAME/main-bot when no dedicated auth bot is configured).
+  /// back to SUSHI_MAIN_BOT when no dedicated auth bot is configured).
   Future<String> fetchWebAppInitData() {
     final botUsername = SushiEnv.telegramWebAppBotUsername;
     if (botUsername == null) {

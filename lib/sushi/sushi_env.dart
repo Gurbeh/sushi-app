@@ -3,10 +3,10 @@ import 'package:fladder/sushi/sushi_config.dart';
 
 /// Build-time and runtime env for the Sushi client.
 abstract final class SushiEnv {
-  /// True when an HTTP API base URL is configured (legacy; usually unset for Sushi).
+  /// True when an HTTP API base URL is configured (optional for Telegram-native Sushi).
   static bool get isEnabled => apiBaseUrl != null;
 
-  static const String _cApiBaseUrl = String.fromEnvironment('OXPLAYER_API_BASE_URL', defaultValue: '');
+  static const String _cApiBaseUrl = String.fromEnvironment('SUSHI_API_BASE_URL', defaultValue: '');
   static const String _cTelegramApiId = String.fromEnvironment('TELEGRAM_API_ID', defaultValue: '');
   static const String _cTelegramApiHash = String.fromEnvironment('TELEGRAM_API_HASH', defaultValue: '');
   static const String _cTelegramWebAppShortName =
@@ -27,7 +27,7 @@ abstract final class SushiEnv {
   }
 
   static String? get apiBaseUrl {
-    final t = _pick(['OXPLAYER_API_BASE_URL', 'OXPLAYER_API_BASE'], _cApiBaseUrl);
+    final t = _pick(['SUSHI_API_BASE_URL', 'SUSHI_API_BASE'], _cApiBaseUrl);
     if (t.isEmpty) return null;
     return t.endsWith('/') ? t.substring(0, t.length - 1) : t;
   }

@@ -1,5 +1,5 @@
 name: Sushi dart-define env
-description: Validate OX secrets/variables and write JSON for flutter --dart-define-from-file
+description: Validate Sushi CI secrets and write JSON for flutter --dart-define-from-file
 runs:
   using: composite
   steps:
@@ -7,12 +7,12 @@ runs:
       shell: bash
       run: |
         missing=()
-        for var in BOT_USERNAME OXPLAYER_API_BASE_URL TELEGRAM_API_ID TELEGRAM_API_HASH; do
+        for var in TELEGRAM_API_ID TELEGRAM_API_HASH; do
           [ -z "${!var:-}" ] && missing+=("$var")
         done
         if [ ${#missing[@]} -gt 0 ]; then
           echo "Missing required secrets/variables: ${missing[*]}"
-          echo "Set TELEGRAM_API_ID/HASH in Infisical /core/client-ci (same my.telegram.org app as stream CLIENT_ID/HASH)."
+          echo "Set TELEGRAM_API_ID/HASH in Infisical sushi project /client-ci (or GitHub Actions secrets)."
           exit 1
         fi
 
@@ -30,24 +30,21 @@ runs:
                     return value
             return ""
 
-        main_bot = env_first("SUSHI_MAIN_BOT", "OXPLAYER_BOT_USERNAME", "BOT_USERNAME") or "sushiMovieBot"
-        init_bot = env_first("SUSHI_INIT_BOT", "OXPLAYER_INIT_BOT_USERNAME", "INIT_BOT_USERNAME") or "sushiInit01Bot"
+        # Never fall back to legacy BOT_USERNAME / OXPLAYER_* — those still hold Oxplayer values in CI.
+        main_bot = env_first("SUSHI_MAIN_BOT") or "sushiMovieBot"
+        init_bot = env_first("SUSHI_INIT_BOT") or "sushiInit01Bot"
+        main_bot = main_bot.lstrip("@")
+        init_bot = init_bot.lstrip("@")
+
         keys = {
-            "OXPLAYER": "true",
-            "BOT_USERNAME": env_first("BOT_USERNAME") or main_bot,
-            "OXPLAYER_BOT_USERNAME": main_bot,
-            "OXPLAYER_INIT_BOT_USERNAME": init_bot,
             "SUSHI_MAIN_BOT": main_bot,
             "SUSHI_INIT_BOT": init_bot,
-            "OXPLAYER_API_BASE_URL": env_first("OXPLAYER_API_BASE_URL"),
-            # TDLib user-session (native playback + Telegram login) — baked at build time.
+            "SUSHI_API_BASE_URL": env_first("SUSHI_API_BASE_URL"),
+            "SUSHI_API_BASE_IRAN": env_first("SUSHI_API_BASE_IRAN") or "https://api.sushi.ir",
             "TELEGRAM_API_ID": env_first("TELEGRAM_API_ID"),
             "TELEGRAM_API_HASH": env_first("TELEGRAM_API_HASH"),
         }
-        iran_api = env_first("OXPLAYER_API_BASE_IRAN", "OXPLAYER_API_BASE_ARVAN") or "https://api.oxplayer.ir"
-        iran_stream = env_first("OXPLAYER_STREAM_BASE_IRAN", "OXPLAYER_STREAM_BASE_ARVAN") or "https://oxstream.256251.ir.cdn.ir"
-        keys["OXPLAYER_API_BASE_IRAN"] = iran_api
-        keys["OXPLAYER_STREAM_BASE_IRAN"] = iran_stream
+
         sentry_env = env_first("SENTRY_ENVIRONMENT") or "production"
         keys["SENTRY_ENVIRONMENT"] = sentry_env
 
@@ -57,23 +54,22 @@ runs:
         hosted_webapp = env_first("TELEGRAM_HOSTED_WEBAPP_HTTPS_URL")
         if hosted_webapp:
             keys["TELEGRAM_HOSTED_WEBAPP_HTTPS_URL"] = hosted_webapp
-        # Dedicated Mini App auth bot — falls back to BOT_USERNAME/main-bot client-side when unset.
-        webapp_bot = env_first("TELEGRAM_WEBAPP_BOT_USERNAME")
-        if webapp_bot:
-            keys["TELEGRAM_WEBAPP_BOT_USERNAME"] = webapp_bot
+        webapp_bot = env_first("TELEGRAM_WEBAPP_BOT_USERNAME", "SUSHI_MAIN_BOT") or main_bot
+        keys["TELEGRAM_WEBAPP_BOT_USERNAME"] = webapp_bot.lstrip("@")
 
         sentry_dsn = env_first("SENTRY_DSN")
         require_sentry = env_first("REQUIRE_SENTRY_DSN").lower() in ("1", "true", "yes")
         if sentry_dsn:
             keys["SENTRY_DSN"] = sentry_dsn
         elif require_sentry:
-            print("Missing SENTRY_DSN — required for production client builds (Infisical /core/client-ci).")
+            print("Missing SENTRY_DSN — required for production client builds.")
             raise SystemExit(1)
 
         out = Path(os.environ["RUNNER_TEMP"]) / "flutter-build-env.json"
+        # Drop empty optional keys so dart/env stay clean
+        keys = {k: v for k, v in keys.items() if str(v).strip() != ""}
         out.write_text(json.dumps(keys), encoding="utf-8")
 
-        # pubspec.yaml bundles assets/env/default.env (gitignored locally; CI must materialize it).
         env_path = Path("assets/env/default.env")
         env_path.parent.mkdir(parents=True, exist_ok=True)
         env_path.write_text(
@@ -82,12 +78,12 @@ runs:
         )
         print(f"Wrote {env_path} ({env_path.stat().st_size} bytes)")
         print(
-            "TELEGRAM_API_ID set=",
-            bool(keys.get("TELEGRAM_API_ID")),
-            " TELEGRAM_API_HASH set=",
-            bool(keys.get("TELEGRAM_API_HASH")),
+            "SUSHI_MAIN_BOT=",
+            keys.get("SUSHI_MAIN_BOT"),
             " SUSHI_INIT_BOT=",
             keys.get("SUSHI_INIT_BOT"),
+            " TELEGRAM_API_ID set=",
+            bool(keys.get("TELEGRAM_API_ID")),
             sep="",
         )
         PY
