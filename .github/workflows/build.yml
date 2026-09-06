@@ -773,8 +773,8 @@ jobs:
   build-linux-flatpak:
     needs: [fetch-info, build-linux]
     if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
-    # Optional packaging — do not fail the whole release when Flatpak breaks.
-    continue-on-error: true
+    # Do NOT use continue-on-error here — that reports result=success and Create Release
+    # then tries to download a missing flatpak artifact. create_release already allows failure.
     runs-on: ubuntu-latest
     container:
       image: bilelmoussaoui/flatpak-github-actions:gnome-46
