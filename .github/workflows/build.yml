@@ -808,7 +808,14 @@ jobs:
       - build-linux
       - build-linux-flatpak
     runs-on: ubuntu-latest
-    if: needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly'
+    # Ship when core platforms succeed; Windows/Flatpak may fail without blocking Android shelf.
+    if: |
+      always() &&
+      (needs.fetch-info.outputs.build_type == 'release' || needs.fetch-info.outputs.build_type == 'nightly') &&
+      needs.build-android.result == 'success' &&
+      needs.build-linux.result == 'success' &&
+      needs.build-ios.result == 'success' &&
+      needs.build-macos.result == 'success'
     permissions:
       contents: write
     steps:
@@ -884,11 +891,13 @@ jobs:
           mv "Sushi-android/${SUF}-x86_64.apk" "Sushi-Android-${V}-x86_64.apk" || true
 
       - uses: actions/download-artifact@v5
+        if: needs.build-windows.result == 'success'
         with:
           name: Sushi-windows-portable
           path: Sushi-windows-portable
 
       - name: Stage Windows portable
+        if: needs.build-windows.result == 'success'
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
@@ -896,11 +905,13 @@ jobs:
           zip -r "../Sushi-Windows-${V}.zip" .
 
       - uses: actions/download-artifact@v5
+        if: needs.build-windows.result == 'success'
         with:
           name: Sushi-windows-installer
           path: Sushi-windows-installer
 
       - name: Stage Windows installer
+        if: needs.build-windows.result == 'success'
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
@@ -941,13 +952,13 @@ jobs:
           zip -r "../Sushi-Linux-${V}.zip" .
 
       - uses: actions/download-artifact@v5
-        if: needs.fetch-info.outputs.build_type == 'release'
+        if: needs.fetch-info.outputs.build_type == 'release' && needs.build-linux-flatpak.result == 'success'
         with:
           name: Sushi-linux-flatpak
           path: Sushi-linux-flatpak
 
       - name: Stage Linux Flatpak
-        if: needs.fetch-info.outputs.build_type == 'release'
+        if: needs.fetch-info.outputs.build_type == 'release' && needs.build-linux-flatpak.result == 'success'
         shell: bash
         run: |
           V="${{ steps.version.outputs.version }}"
@@ -999,21 +1010,27 @@ jobs:
             "Sushi-Android-${V}-arm64-v8a.apk"
             "Sushi-Android-${V}-armeabi-v7a.apk"
             "Sushi-Android-${V}-x86_64.apk"
-            "Sushi-Windows-${V}-Setup.exe"
-            "Sushi-Windows-${V}.zip"
             "Sushi-iOS-${V}.ipa"
             "Sushi-macOS-${V}.dmg"
             "Sushi-Linux-${V}.zip"
             "Sushi-Linux-${V}.AppImage"
             "Sushi-Linux-${V}.AppImage.zsync"
           )
-          if [[ "${{ needs.fetch-info.outputs.build_type }}" == "release" ]]; then
-            FILES+=("Sushi-Linux-${V}.flatpak")
-          fi
+          # Optional platforms — omit when that job failed.
+          for opt in \
+            "Sushi-Windows-${V}-Setup.exe" \
+            "Sushi-Windows-${V}.zip" \
+            "Sushi-Linux-${V}.flatpak"; do
+            if [[ -f "$opt" ]]; then
+              FILES+=("$opt")
+            else
+              echo "::warning::skipping missing optional asset: $opt"
+            fi
+          done
 
           for f in "${FILES[@]}"; do
             if [[ ! -f "$f" ]]; then
-              echo "::error::missing release asset: $f"
+              echo "::error::missing required release asset: $f"
               exit 1
             fi
           done
@@ -1053,7 +1070,7 @@ jobs:
           prerelease: ${{ needs.fetch-info.outputs.build_type == 'nightly' }}
           make_latest: ${{ needs.fetch-info.outputs.build_type == 'release' }}
           generate_release_notes: ${{ needs.fetch-info.outputs.build_type == 'release' }}
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           files: |
             Sushi-Android-${{ steps.version.outputs.version }}-arm64-v8a.apk
             Sushi-Android-${{ steps.version.outputs.version }}-armeabi-v7a.apk
