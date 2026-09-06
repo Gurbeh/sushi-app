@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bump pubspec.yaml + Play changelog, commit, tag vM.m.p, push main + tag.
+# Bump pubspec.yaml + changelog, commit, tag vM.m.p, push main + tag.
 # Usage: bash scripts/release-client.sh [options] ["One-line release summary"]
 set -euo pipefail
 
@@ -13,7 +13,7 @@ Usage: release-client.sh [options] [summary]
 
 Semver bump (patch) in pubspec.yaml + fastlane changelog.
 Summary is prompted if omitted.
-Tag: vM.m.p → triggers Build Sushi (signed AAB + GitHub draft release).
+Tag: vM.m.p → triggers Build Sushi (signed APKs + GitHub release + Telegram).
 
 Options:
   --dry-run      Show plan only
@@ -23,8 +23,8 @@ Options:
   --verify       Run verify-all locally before push
 
 Example:
-  bash scripts/release-client.sh -y "Iran web API routing fixes"
-  # Both repos: from oxplayer-be → pnpm release:all -y "…"
+  bash scripts/release-client.sh -y "Android login retry"
+  # Both repos: from sushi → npm run release:all -- -y "…"
 EOF
 }
 
@@ -41,7 +41,6 @@ cd "${ROOT}"
 release_require_gh_auth
 release_commit_pending_changes
 release_preflight
-release_client_require_web_dispatch_token
 release_run_verify
 
 NEW_VERSION="$(release_client_next_version)"
@@ -90,5 +89,4 @@ echo "Watch build:"
 echo "  gh run list --repo Gurbeh/sushi-app --workflow='Build Sushi' --limit 3"
 echo "  gh run watch --repo Gurbeh/sushi-app"
 echo ""
-echo "When Create Release is green, publish draft:"
-echo "  gh release edit ${TAG} --repo Gurbeh/sushi-app --draft=false"
+echo "CI publishes the GitHub release and posts binaries to @sushiMovieNews."

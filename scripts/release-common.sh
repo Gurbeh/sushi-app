@@ -308,20 +308,3 @@ release_client_version_name() {
   local full="$1"
   echo "${full%%+*}"
 }
-
-release_client_require_web_dispatch_token() {
-  local has_gh=0
-  local repo="Gurbeh/sushi-app"
-
-  if gh secret list --repo "${repo}" --json name -q '.[].name' 2>/dev/null \
-    | grep -qx 'OXPLAYER_BE_DISPATCH_TOKEN'; then
-    has_gh=1
-  fi
-
-  if [[ "${has_gh}" -eq 0 ]]; then
-    echo "warn: OXPLAYER_BE_DISPATCH_TOKEN is not set on ${repo}." >&2
-    echo "warn: Deploy Web · Hetzner may fail; Android/desktop tag builds still run." >&2
-    echo "warn: Set later: gh secret set OXPLAYER_BE_DISPATCH_TOKEN --repo ${repo}" >&2
-    return 0
-  fi
-}
