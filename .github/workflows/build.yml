@@ -43,9 +43,10 @@ concurrency:
 env:
   NIGHTLY_TAG: nightly
   BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
-  Sushi_API_BASE_URL: ${{ secrets.Sushi_API_BASE_URL }}
-  Sushi_API_BASE_IRAN: ${{ secrets.Sushi_API_BASE_IRAN }}
-  Sushi_STREAM_BASE_IRAN: ${{ secrets.Sushi_STREAM_BASE_IRAN }}
+  # Keep OXPLAYER_* secret names — Infisical / GitHub still ship those keys; Dart reads them too.
+  OXPLAYER_API_BASE_URL: ${{ secrets.OXPLAYER_API_BASE_URL }}
+  OXPLAYER_API_BASE_IRAN: ${{ secrets.OXPLAYER_API_BASE_IRAN }}
+  OXPLAYER_STREAM_BASE_IRAN: ${{ secrets.OXPLAYER_STREAM_BASE_IRAN }}
   TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
   TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
   TELEGRAM_HOSTED_WEBAPP_HTTPS_URL: ${{ secrets.TELEGRAM_HOSTED_WEBAPP_HTTPS_URL }}
