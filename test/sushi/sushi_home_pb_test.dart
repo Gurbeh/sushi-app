@@ -65,6 +65,13 @@ void main() {
     expect(bytes, [0x08, sushiHomeTabSeries, 0x10, 42]);
   });
 
+  test('sushiEncodeHomeReq appends platform as a length-delimited field', () {
+    final bytes = sushiEncodeHomeReq(tab: sushiHomeTabMovies, platform: 'windows');
+    expect(bytes.first, 0x08);
+    expect(bytes[1], sushiHomeTabMovies);
+    expect(bytes[2], 0x1a); // field 3, wire 2
+  });
+
   test('sushiEncodeHomeReq omits zero-value fields', () {
     expect(sushiEncodeHomeReq(tab: 0, sinceSeq: 0), isEmpty);
   });
@@ -113,6 +120,20 @@ void main() {
     expect(watched.map((r) => r.title), ['Watched One', 'Watched Two']);
 
     expect(res.rowsFor(SushiRailKind.trending), isEmpty);
+    expect(res.latestApp, isNull);
+  });
+
+  test('SushiHomeRes decodes latest_app', () {
+    final latest = BytesBuilder()
+      ..add(_lenDelim(1, utf8.encode('android_new')))
+      ..add(_lenDelim(2, utf8.encode('1.2.0')));
+    final out = BytesBuilder()
+      ..add(_varintField(2, 9))
+      ..add(_lenDelim(4, latest.toBytes()));
+    final res = SushiHomeRes.decode(out.toBytes());
+    expect(res.seq, 9);
+    expect(res.latestApp?.platform, 'android_new');
+    expect(res.latestApp?.version, '1.2.0');
   });
 
   test('sushiEncodeRequestText matches docs/02 §3 grammar for a bare command', () {

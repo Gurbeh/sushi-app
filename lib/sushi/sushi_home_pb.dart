@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_wire.dart';
 
 /// Hand-decode/encode of `sushi.v1.HomeReq`/`HomeRes`/`Rail`/`Row`
@@ -165,16 +166,23 @@ class SushiRail {
 
 /// Decoded `sushi.v1.HomeRes`.
 class SushiHomeRes {
-  const SushiHomeRes({required this.rails, required this.seq, required this.ttlSeconds});
+  const SushiHomeRes({
+    required this.rails,
+    required this.seq,
+    required this.ttlSeconds,
+    this.latestApp,
+  });
 
   final List<SushiRail> rails;
   final int seq;
   final int ttlSeconds;
+  final SushiLatestApp? latestApp;
 
   static SushiHomeRes decode(Uint8List bytes) {
     final rails = <SushiRail>[];
     var seq = 0;
     var ttlSeconds = 0;
+    SushiLatestApp? latestApp;
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -195,11 +203,21 @@ class SushiHomeRes {
           final v = sushiReadVarint(bytes, i);
           i = v.next;
           ttlSeconds = v.value;
+        case 4:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          latestApp = SushiLatestApp.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiHomeRes(rails: List.unmodifiable(rails), seq: seq, ttlSeconds: ttlSeconds);
+    return SushiHomeRes(
+      rails: List.unmodifiable(rails),
+      seq: seq,
+      ttlSeconds: ttlSeconds,
+      latestApp: latestApp,
+    );
   }
 
   /// The rows of the first rail matching [kind], or an empty list if the server didn't send one.
@@ -213,7 +231,7 @@ class SushiHomeRes {
 
 /// Encodes a `sushi.v1.HomeReq`: field 1 `tab` (varint enum, [sushiHomeTabMovies]/
 /// [sushiHomeTabSeries]), field 2 `since_seq` (varint).
-Uint8List sushiEncodeHomeReq({required int tab, int sinceSeq = 0}) {
+Uint8List sushiEncodeHomeReq({required int tab, int sinceSeq = 0, String platform = ''}) {
   final out = BytesBuilder();
   void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
   if (tab != 0) {
@@ -223,6 +241,12 @@ Uint8List sushiEncodeHomeReq({required int tab, int sinceSeq = 0}) {
   if (sinceSeq != 0) {
     writeTag(2, 0);
     out.add(sushiUvarint(sinceSeq));
+  }
+  if (platform.isNotEmpty) {
+    writeTag(3, 2);
+    final bytes = utf8.encode(platform);
+    out.add(sushiUvarint(bytes.length));
+    out.add(bytes);
   }
   return out.toBytes();
 }

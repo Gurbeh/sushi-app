@@ -7,6 +7,9 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/oxplayer/oxplayer_brand.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
+import 'package:fladder/sushi/sushi_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fladder/oxplayer/oxplayer_config.dart';
 import 'package:fladder/oxplayer/oxplayer_navigation.dart';
 import 'package:fladder/oxplayer/oxplayer_settings_visibility.dart';
@@ -120,7 +123,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final newRelease = ref.watch(updateProvider.select((value) => value.latestRelease));
 
     final hasNewUpdate = ref.watch(hasNewUpdateProvider);
-    final showReleaseBanner = !OxplayerConfig.isEnabled && hasNewUpdate && newRelease != null;
+    final showReleaseBanner = !OxplayerConfig.isEnabled && !SushiConfig.isEnabled && hasNewUpdate && newRelease != null;
     final applicationInfo = ref.watch(applicationInfoProvider);
 
     final isAdmin = ref.watch(userProvider.select((value) => value?.policy?.isAdministrator ?? false));
@@ -135,6 +138,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           showBackButtonNested: AdaptiveLayout.inputDeviceOf(context) != InputDevice.dPad,
           showUserIcon: true,
           items: [
+            ValueListenableBuilder<SushiLatestApp?>(
+              valueListenable: sushiLatestApp,
+              builder: (context, latest, _) {
+                if (latest == null ||
+                    !sushiIsNewerApp(applicationInfo.version, latest.version)) {
+                  return const SizedBox.shrink();
+                }
+                final copy = SushiUpdateCopy.of(context);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Card(
+                    color: context.colors.secondaryContainer,
+                    child: SettingsListTile(
+                      label: Text(copy.bannerTitle),
+                      subLabel: Text(copy.bannerSub(latest.version)),
+                      icon: IconsaxPlusLinear.document_download,
+                      onTap: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        if (!context.mounted) return;
+                        await sushiShowUpdateDialog(
+                          context: context,
+                          currentVersion: applicationInfo.version,
+                          prefs: prefs,
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
             if (showReleaseBanner) ...[
               Card(
                 color: context.colors.secondaryContainer,

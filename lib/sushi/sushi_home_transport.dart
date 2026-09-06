@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:fladder/sushi/sushi_app_platform.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
@@ -20,8 +22,12 @@ Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
   }
 
   final corr = sushiNewCorrBase36();
-  final requestText =
-      sushiEncodeRequestText('home', corr, sushiEncodeHomeReq(tab: tab));
+  final platform = await sushiAppPlatform();
+  final requestText = sushiEncodeRequestText(
+    'home',
+    corr,
+    sushiEncodeHomeReq(tab: tab, platform: platform),
+  );
 
   try {
     final reply = await sushiSendTextAndWaitReply(
@@ -39,7 +45,9 @@ Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
           '[sushi] home: unexpected msgType=${env.type} (corr=${env.corr})');
       return null;
     }
-    return SushiHomeRes.decode(env.payload);
+    final home = SushiHomeRes.decode(env.payload);
+    sushiNoteLatestApp(home.latestApp);
+    return home;
   } catch (e, st) {
     debugPrint('[sushi] home fetch failed: $e\n$st');
     return null;

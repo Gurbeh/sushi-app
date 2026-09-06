@@ -11,6 +11,8 @@ import 'package:fladder/oxplayer/oxplayer_dotenv.dart';
 import 'package:fladder/oxplayer/oxplayer_sentry_user_sync.dart';
 import 'package:fladder/oxplayer/services/ox_github_update_service.dart';
 import 'package:fladder/oxplayer/services/ox_update_service.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/oxplayer/oxplayer_playback_details_refresh.dart';
 import 'package:fladder/oxplayer/oxplayer_share_deep_link.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
@@ -41,6 +43,12 @@ abstract final class OxplayerBootstrap {
     if (!OxplayerConfig.isEnabled) return;
     if (kIsWeb) return;
 
+    if (SushiConfig.isEnabled) {
+      // ADR 0019: version arrives on HomeRes. GitHub / Play checks are invisibility violations.
+      sushiBindUpdatePrompt(result.sharedPreferences, result.applicationInfo.version);
+      return;
+    }
+
     if (Platform.isAndroid) {
       // Play installs → Play in-app update API.
       // Sideloaded APKs → GitHub Releases download/install (OxUpdateService no-ops).
@@ -70,7 +78,9 @@ abstract final class OxplayerBootstrap {
     if (kIsWeb) return child;
 
     var wrapped = child;
-    if (Platform.isAndroid ||
+    if (SushiConfig.isEnabled) {
+      wrapped = SushiUpdatePromptHost(child: wrapped);
+    } else if (Platform.isAndroid ||
         Platform.isWindows ||
         Platform.isMacOS ||
         Platform.isLinux) {
