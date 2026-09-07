@@ -1,0 +1,1 @@
+Fix Flatpak missing sushi_icon.svg
