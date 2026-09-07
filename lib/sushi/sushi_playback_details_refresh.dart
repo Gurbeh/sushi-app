@@ -4,10 +4,12 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_patch_playback_progress.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/providers/video_player_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/util/refresh_after_watch_state.dart';
 
 /// After playback ends, patch detail UserData immediately and refresh series/home.
@@ -48,6 +50,19 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
           position: position,
           runTime: duration,
         );
+
+        final runTime = duration > Duration.zero
+            ? duration
+            : (item.overview.runTime ?? Duration.zero);
+        final derived = sushiDerivePlaybackUserData(
+          current: item.userData,
+          position: position,
+          runTime: runTime,
+        );
+        if (derived.played) {
+          ref.read(sushiCatalogItemFlagsProvider.notifier).setPlayed(item.id, true);
+          unawaited(ref.read(userProvider.notifier).markAsPlayed(true, item.id));
+        }
 
         
           unawaited(sushiContinueRemember(item, position, duration));

@@ -14,7 +14,6 @@ import 'package:fladder/sushi/sushi_media_streams.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
-import 'package:fladder/sushi/sushi_series_selected_episode.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
 import 'package:fladder/sushi/widgets/sushi_detail_action_layout.dart';
 import 'package:fladder/sushi/widgets/sushi_series_detail_play_buttons.dart';
@@ -67,8 +66,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
-    final selectedEpisode = sushiSeriesSelectedEpisode(ref, details);
-    final currentEpisode = sushiSeriesDetailPlayTarget(details, selectedEpisode: selectedEpisode);
+    final currentEpisode = sushiSeriesDetailPlayTarget(details);
     final sushiHasPlayback = details != null && sushiItemHasPlaybackActions(details);
     // Only after /item has resolved (sushiTitleResolved) — the cached-page paint can populate
     // availableEpisodes before files land, so key off the network-refresh completion instead.
@@ -274,11 +272,9 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad ? null : VerticalDirection.down,
                         label: context.localized.episode(details.availableEpisodes?.length ?? 2),
                         onFocused: (episode) {
-                          sushiSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           context.ensureVisible(alignment: 0.8);
                         },
                         onEpisodeTap: (action, episode) async {
-                          sushiSetSeriesSelectedEpisode(ref, widget.item.id, episode);
                           action();
                         },
                         playEpisode: (episode) async {
