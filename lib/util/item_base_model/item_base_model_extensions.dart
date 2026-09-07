@@ -25,6 +25,7 @@ import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
+import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/screens/collections/add_to_collection.dart';
@@ -147,7 +148,8 @@ extension ItemBaseModelExtensions on ItemBaseModel {
       _ => true,
     };
     final sushiEnabled = true;
-    final sushiPlayed = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(id)));
+    final sushiMarkId = sushiMarkPlayedItemId(this);
+    final sushiPlayed = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(sushiMarkId)));
     final sushiShowBothMarkActions = sushiEnabled &&
         (sushiIsActivePlaybackItem(ref, id) || (userData.progress > 0 && !userData.played));
     void applyMarkUserData(UserData? newData) {
@@ -282,8 +284,8 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             icon: const Icon(IconsaxPlusLinear.eye),
             action: () async {
               try {
-                final userData = await ref.read(userProvider.notifier).markAsPlayed(true, id);
-                applyMarkUserData(userData?.bodyOrThrow);
+                await ref.read(userProvider.notifier).markAsPlayed(true, sushiMarkPlayedItemId(this));
+                applyMarkUserData(const UserData(played: true, progress: 0, playbackPositionTicks: 0));
               } finally {
                 context.refreshData();
               }
@@ -297,8 +299,8 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             label: Text(context.localized.markAsUnwatched),
             action: () async {
               try {
-                final userData = await ref.read(userProvider.notifier).markAsPlayed(false, id);
-                applyMarkUserData(userData?.bodyOrThrow);
+                await ref.read(userProvider.notifier).markAsPlayed(false, sushiMarkPlayedItemId(this));
+                applyMarkUserData(const UserData(played: false, progress: 0, playbackPositionTicks: 0));
               } finally {
                 context.refreshData();
               }

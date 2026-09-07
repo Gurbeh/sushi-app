@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fladder/sushi/sushi_catalog_http.dart';
 import 'package:fladder/sushi/sushi_env.dart';
@@ -58,39 +60,88 @@ Set<String> _idsFromJson(dynamic raw) {
   };
 }
 
+const _playedPrefsKey = 'sushi_played_ids_v1';
+
+Future<Set<String>> _readLocalPlayed() async {
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_playedPrefsKey);
+  if (raw == null || raw.isEmpty) return {};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return {};
+    return {
+      for (final e in decoded)
+        if (e is String && e.isNotEmpty) e,
+    };
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _writeLocalPlayed(Set<String> ids) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(_playedPrefsKey, jsonEncode(ids.toList()));
+}
+
 @Riverpod(keepAlive: true)
 class SushiCatalogItemFlags extends _$SushiCatalogItemFlags {
   @override
-  SushiCatalogItemFlagsState build() => SushiCatalogItemFlagsState.empty;
+  SushiCatalogItemFlagsState build() {
+    Future.microtask(_mergeLocalPlayed);
+    return SushiCatalogItemFlagsState.empty;
+  }
+
+  Future<void> _mergeLocalPlayed() async {
+    final local = await _readLocalPlayed();
+    if (local.isEmpty) return;
+    state = state.copyWith(playedIds: {...state.playedIds, ...local});
+  }
 
   Future<void> load() async {
-    if (!SushiEnv.isEnabled) return;
+    if (!SushiEnv.isEnabled) {
+      await _mergeLocalPlayed();
+      return;
+    }
     final baseUrl = ref.read(serverUrlProvider);
-    if (baseUrl == null || baseUrl.isEmpty) return;
+    if (baseUrl == null || baseUrl.isEmpty) {
+      await _mergeLocalPlayed();
+      return;
+    }
     final headers = sushiCatalogApiHeaders(ref);
-    if (headers.isEmpty) return;
+    if (headers.isEmpty) {
+      await _mergeLocalPlayed();
+      return;
+    }
 
     final uri = Uri.parse('$baseUrl/me/item-flags');
     try {
       final response = await http.get(uri, headers: headers);
+      final local = await _readLocalPlayed();
       if (response.statusCode != 200) {
         developer.log(
           'GET ${uri.path} failed status=${response.statusCode}',
           name: 'SushiCatalogItemFlags',
         );
+        if (local.isNotEmpty) {
+          state = state.copyWith(playedIds: {...state.playedIds, ...local});
+        }
         return;
       }
       final body = jsonDecode(response.body);
       if (body is! Map<String, dynamic>) return;
+      final serverPlayed = _idsFromJson(body['playedIds']);
+      // Client-owned episode ids live in memory/prefs. GET must not wipe them.
+      final playedIds = {...serverPlayed, ...state.playedIds, ...local};
       state = SushiCatalogItemFlagsState(
         favoriteIds: _idsFromJson(body['favoriteIds']),
-        playedIds: _idsFromJson(body['playedIds']),
+        playedIds: playedIds,
         watchlistIds: _idsFromJson(body['watchlistIds']),
         followingIds: _idsFromJson(body['followingIds']),
         loaded: true,
       );
     } catch (e, st) {
       developer.log('GET /me/item-flags failed', name: 'SushiCatalogItemFlags', error: e, stackTrace: st);
+      await _mergeLocalPlayed();
     }
   }
 
@@ -105,7 +156,7 @@ class SushiCatalogItemFlags extends _$SushiCatalogItemFlags {
     state = state.copyWith(favoriteIds: next);
   }
 
-  void setPlayed(String id, bool value) {
+  Future<void> setPlayed(String id, bool value) async {
     if (id.isEmpty) return;
     final next = {...state.playedIds};
     if (value) {
@@ -114,6 +165,7 @@ class SushiCatalogItemFlags extends _$SushiCatalogItemFlags {
       next.remove(id);
     }
     state = state.copyWith(playedIds: next);
+    await _writeLocalPlayed(next);
   }
 
   void setWatchlisted(String id, bool value) {

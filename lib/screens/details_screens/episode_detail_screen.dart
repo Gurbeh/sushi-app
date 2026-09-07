@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_library_detail_labels.dart';
 import 'package:fladder/sushi/sushi_media_streams.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
@@ -50,6 +51,9 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
     final details = ref.watch(providerInstance);
     final seasonDetails = details.series;
     final episodeDetails = details.episode;
+    final playedIds = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.playedIds));
+    final episodePlayed =
+        episodeDetails != null && (episodeDetails.userData.played || playedIds.contains(episodeDetails.id));
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
 
@@ -128,9 +132,9 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                           onPressed: () async {
                             await ref
                                 .read(userProvider.notifier)
-                                .markAsPlayed(!(episodeDetails.userData.played), episodeDetails.id);
+                                .markAsPlayed(!episodePlayed, episodeDetails.id);
                           },
-                          selected: episodeDetails.userData.played,
+                          selected: episodePlayed,
                           selectedIcon: IconsaxPlusBold.tick_circle,
                           icon: IconsaxPlusLinear.tick_circle,
                         ),

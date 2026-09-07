@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 
+import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
@@ -58,4 +59,14 @@ String _oxPickerSeasonName(SeasonModel? seasonMeta, int seasonNumber) {
 EpisodeModel? sushiSeriesDetailPlayTarget(SeriesModel? series) {
   if (series == null) return null;
   return sushiSeriesPlayableNextUp(series);
+}
+
+/// Id to send to [markAsPlayed]. Series posters use the catalog TMDB id;
+/// next-up reads episode ids (`sushi_ep_*`), so the series page must mark
+/// the current play-target episode.
+String sushiMarkPlayedItemId(ItemBaseModel item) {
+  if (item is SeriesModel) {
+    return sushiSeriesDetailPlayTarget(item)?.id ?? item.id;
+  }
+  return item.id;
 }

@@ -60,7 +60,7 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
           runTime: runTime,
         );
         if (derived.played) {
-          ref.read(sushiCatalogItemFlagsProvider.notifier).setPlayed(item.id, true);
+          unawaited(ref.read(sushiCatalogItemFlagsProvider.notifier).setPlayed(item.id, true));
           unawaited(ref.read(userProvider.notifier).markAsPlayed(true, item.id));
         }
 

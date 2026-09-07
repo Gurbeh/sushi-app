@@ -89,6 +89,25 @@ void main() {
     expect(sushiSeriesDetailPlayTarget(series)?.id, 'ep-1');
   });
 
+  test('sushiMarkPlayedItemId on a series is the play-target episode, not the series', () {
+    final ep1 = _episode(id: 'sushi_ep_1', episode: 1);
+    final ep2 = _episode(id: 'sushi_ep_2', episode: 2);
+    final series = _series(episodes: [ep1, ep2]);
+
+    expect(sushiMarkPlayedItemId(series), 'sushi_ep_1');
+    expect(sushiMarkPlayedItemId(ep1), 'sushi_ep_1');
+  });
+
+  test('sushiMarkPlayedItemId advances after the current episode is watched', () {
+    final ep1 = _episode(id: 'sushi_ep_1', episode: 1).copyWith(
+      userData: const UserData(played: true),
+    );
+    final ep2 = _episode(id: 'sushi_ep_2', episode: 2);
+    final series = _series(episodes: [ep1, ep2]);
+
+    expect(sushiMarkPlayedItemId(series), 'sushi_ep_2');
+  });
+
   test('sushiSeriesPickerSeasons groups episodes by season', () {
     final ep1 = _episode(id: 'ep-1', episode: 1);
     final ep2 = _episode(id: 'ep-2', episode: 1).copyWith(season: 2);

@@ -183,9 +183,12 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         ),
                         SelectableIconButton(
                           onPressed: () async {
-                            await ref.read(userProvider.notifier).markAsPlayed(!details.userData.played, details.id);
+                            final target = currentEpisode;
+                            final markId = target?.id ?? details.id;
+                            final played = target?.userData.played ?? details.userData.played;
+                            await ref.read(userProvider.notifier).markAsPlayed(!played, markId);
                           },
-                          selected: details.userData.played,
+                          selected: currentEpisode?.userData.played ?? details.userData.played,
                           selectedIcon: IconsaxPlusBold.tick_circle,
                           icon: IconsaxPlusLinear.tick_circle,
                         ),

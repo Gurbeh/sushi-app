@@ -196,6 +196,15 @@ Future<void> sushiContinueForget(ItemBaseModel item) async {
   await _writeAll(next);
 }
 
+/// Drop a continue row whose resume target is this episode (mark-as-watched).
+Future<void> sushiContinueForgetEpisode(String episodeItemId) async {
+  if (episodeItemId.isEmpty) return;
+  final existing = await _readAll();
+  final next = existing.where((e) => e.episodeItemId != episodeItemId).toList();
+  if (next.length == existing.length) return;
+  await _writeAll(next);
+}
+
 Future<List<ItemBaseModel>> sushiContinueLoad() async {
   final entries = await _readAll();
   return [for (final e in entries) e.toItem()];

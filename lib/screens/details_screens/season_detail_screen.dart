@@ -4,12 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_library_detail_labels.dart';
 import 'package:fladder/sushi/sushi_season_playable.dart';
+import 'package:fladder/sushi/sushi_season_user_data.dart';
 import 'package:fladder/sushi/sushi_season_watch_actions.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
 import 'package:fladder/screens/shared/media/episode_details_list.dart';
@@ -42,7 +45,28 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final details = ref.watch(providerId);
+    final detailsRaw = ref.watch(providerId);
+    final playedIds = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.playedIds));
+    final paintedEpisodes = detailsRaw == null
+        ? const <EpisodeModel>[]
+        : [
+            for (final episode in detailsRaw.episodes)
+              playedIds.contains(episode.id)
+                  ? episode.copyWith(
+                      userData: episode.userData.copyWith(
+                        played: true,
+                        progress: 0,
+                        playbackPositionTicks: 0,
+                      ),
+                    )
+                  : episode,
+          ];
+    final details = detailsRaw == null
+        ? null
+        : detailsRaw.copyWith(
+            episodes: paintedEpisodes,
+            userData: sushiSeasonUserDataFromEpisodes(paintedEpisodes),
+          );
 
     return DetailScaffold(
       label: details?.localizedName(context.localized) ?? "",

@@ -14,6 +14,7 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/library_filters_model.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
@@ -186,24 +187,29 @@ class User extends _$User {
   }
 
   Future<Response<UserData>?> markAsPlayed(bool enable, String itemId) async {
-    final response = await (enable
-        ? api.usersUserIdPlayedItemsItemIdPost(
-            itemId: itemId,
-            datePlayed: DateTime.now(),
-          )
-        : api.usersUserIdPlayedItemsItemIdDelete(
-            itemId: itemId,
-          ));
-    if (response.isSuccessful) {
-      final flags = ref.read(sushiCatalogItemFlagsProvider.notifier);
-      flags.setPlayed(itemId, enable);
-      if (enable) {
-        flags.setWatchlisted(itemId, false);
-      }
-      // Series/season mark cascades to episodes — refresh full membership sets.
-      unawaited(flags.load());
+    final flags = ref.read(sushiCatalogItemFlagsProvider.notifier);
+    await flags.setPlayed(itemId, enable);
+    if (enable) {
+      flags.setWatchlisted(itemId, false);
+      unawaited(sushiContinueForgetEpisode(itemId));
     }
-    return Response(response.base, UserData.fromDto(response.body));
+    try {
+      final response = await (enable
+          ? api.usersUserIdPlayedItemsItemIdPost(
+              itemId: itemId,
+              datePlayed: DateTime.now(),
+            )
+          : api.usersUserIdPlayedItemsItemIdDelete(
+              itemId: itemId,
+            ));
+      if (response.isSuccessful) {
+        // Merge, do not replace — GET /me/item-flags may omit sushi_ep_* ids.
+        unawaited(flags.load());
+      }
+      return Response(response.base, UserData.fromDto(response.body));
+    } catch (_) {
+      return null;
+    }
   }
 
   void clear() => userState = null;
