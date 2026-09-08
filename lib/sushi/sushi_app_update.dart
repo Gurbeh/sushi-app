@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
@@ -16,6 +17,7 @@ export 'package:fladder/sushi/sushi_app_update_pb.dart' show SushiLatestApp;
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_semver.dart';
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart' show sushiIsTdlibFileMissingError;
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 const _kSkippedVersionKey = 'sushi_skipped_app_version';
@@ -30,6 +32,16 @@ String _updateCurrentVersion = '';
 void sushiBindUpdatePrompt(SharedPreferences prefs, String currentVersion) {
   _updatePrefs = prefs;
   _updateCurrentVersion = currentVersion;
+}
+
+GlobalKey<NavigatorState>? _updateNavigatorKey;
+
+/// Registered from `MaterialApp.router` (the route Navigator's own key) so the automatic
+/// prompt can show over a context that actually sits below a Navigator. [SushiUpdatePromptHost]
+/// wraps `MaterialApp.router` from the outside, so its own `State.context` has no Navigator
+/// ancestor — `showDialog` with that context silently fails to find one and throws.
+void sushiRegisterUpdateNavigatorKey(GlobalKey<NavigatorState> key) {
+  _updateNavigatorKey = key;
 }
 
 /// Called from the home transport whenever a HomeRes includes latest_app (ADR 0019).
@@ -61,17 +73,28 @@ Future<void> sushiSkipAppVersion(SharedPreferences prefs, String version) {
 Future<void> sushiInstallLatestApp({
   required void Function(double? progress) onProgress,
 }) async {
-  final res = await sushiFetchAppUpdate();
+  var res = await sushiFetchAppUpdate();
   if (res == null || res.messageId == 0) {
     throw StateError('appupdate: no file');
   }
   await sushiArmDeliveryWaiter(res.locator);
-  final url = await sushiStartPlaybackSession(SushiTdlibPlaybackSource(
-    providerBotId: res.botId,
-    messageId: res.messageId,
-    preferHttpBridge: true,
-    locator: res.locator,
-  ));
+
+  String url;
+  try {
+    url = await _startAppUpdateSession(res);
+  } catch (e) {
+    // /appupdate always does a fresh copyMessage server-side (appupdate.go), so a freshly copied
+    // message occasionally isn't visible yet on the client's own TDLib read (OX_DM_STALE) — the
+    // same race sushi_playback_resolver.dart absorbs by forcing a re-copy and retrying once.
+    if (!sushiIsTdlibFileMissingError(e)) rethrow;
+    debugPrint('[sushi] appupdate stale copy, retrying: $e');
+    final retry = await sushiFetchAppUpdate();
+    if (retry == null || retry.messageId == 0) rethrow;
+    res = retry;
+    await sushiArmDeliveryWaiter(res.locator);
+    url = await _startAppUpdateSession(res);
+  }
+
   try {
     final file = await _downloadLocalhost(url, res.fileName, onProgress);
     onProgress(1);
@@ -79,6 +102,15 @@ Future<void> sushiInstallLatestApp({
   } finally {
     await sushiStopPlaybackSession(url);
   }
+}
+
+Future<String> _startAppUpdateSession(SushiAppUpdateRes res) {
+  return sushiStartPlaybackSession(SushiTdlibPlaybackSource(
+    providerBotId: res.botId,
+    messageId: res.messageId,
+    preferHttpBridge: true,
+    locator: res.locator,
+  ));
 }
 
 Future<File> _downloadLocalhost(
@@ -330,12 +362,25 @@ class _SushiUpdatePromptHostState extends State<SushiUpdatePromptHost> {
       return;
     }
     _shown = true;
+    _tryShow(prefs);
+  }
+
+  // This widget wraps `MaterialApp.router` from the outside, so `this.context` has no Navigator
+  // ancestor and can't host a dialog — use the route Navigator's own key instead (registered from
+  // `_FladderApp.build`). That key's context may not be mounted yet on the very first frame(s), so
+  // retry post-frame rather than dropping the prompt.
+  void _tryShow(SharedPreferences prefs) {
     if (!mounted) return;
-    await sushiShowUpdateDialog(
-      context: context,
+    final navContext = _updateNavigatorKey?.currentContext;
+    if (navContext == null || !navContext.mounted || Navigator.maybeOf(navContext) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryShow(prefs));
+      return;
+    }
+    unawaited(sushiShowUpdateDialog(
+      context: navContext,
       currentVersion: _updateCurrentVersion,
       prefs: prefs,
-    );
+    ));
   }
 
   @override

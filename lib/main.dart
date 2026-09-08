@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/bootstrap/app_bootstrap.dart';
 import 'package:fladder/models/playback/playback_model.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_bootstrap.dart';
 import 'package:fladder/sushi/sushi_image_notifier.dart';
 import 'package:fladder/sushi/sushi_playback_queue.dart';
@@ -87,6 +88,9 @@ class _FladderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // ADR 0019: the automatic update prompt needs a context below this Navigator, not
+    // SushiUpdatePromptHost's own (which wraps MaterialApp.router from the outside).
+    if (!kIsWeb) sushiRegisterUpdateNavigatorKey(autoRouter.navigatorKey);
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
     final themeMode = ref.watch(clientSettingsProvider.select((value) => value.themeMode));
     final themeColor = ref.watch(clientSettingsProvider.select((value) => value.themeColor));

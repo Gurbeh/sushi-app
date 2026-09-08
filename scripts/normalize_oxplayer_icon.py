@@ -8,8 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "logo (2).svg"
-OUT_ICON = ROOT / "icons" / "oxplayer_icon.svg"
-OUT_OUTLINE = ROOT / "icons" / "oxplayer_icon_outline.svg"
+OUT_ICON = ROOT / "icons" / "sushi_icon.svg"
+OUT_OUTLINE = ROOT / "icons" / "sushi_icon_outline.svg"
 CANVAS = 1024
 PADDING = 256
 SAFE = CANVAS - 2 * PADDING  # 624
