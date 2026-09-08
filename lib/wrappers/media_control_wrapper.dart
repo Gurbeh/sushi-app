@@ -800,13 +800,15 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     sushiBeginPlaybackSubtitleSession(ref, itemId);
   }
 
-  /// Playable Farsi already on → keep it. Hardsub → Off. Else Automatic (online).
-  /// Catalog-only `sub_langs=fa` stubs are not playable; those still auto-load.
+  /// Playable Farsi already on → keep it. Hardsub → Off, unless the audio is English (an
+  /// English hardsub print has no Persian burned in, so Automatic still runs). Else Automatic
+  /// (online). Catalog-only `sub_langs=fa` stubs are not playable; those still auto-load.
   /// AI translate never starts on its own.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
     final hardSub = sushiMediaSourceLooksHardSub(sourceName);
     final hasPersianSoft = sushiHasPersianSoftSub(model.subStreams);
+    final isEnglishAudio = sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language);
     final resolved = sushiResolveSubtitleStreamIndex(
       selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
       serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
@@ -818,10 +820,11 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       hardSub: hardSub,
       hasPersianSoft: hasPersianSoft,
       subtitleOff: subtitleOff,
+      isEnglishAudio: isEnglishAudio,
     );
     log(
       'sushi_sub_start_choice choice=${choice.name} hardSub=$hardSub '
-      'hasPersianSoft=$hasPersianSoft resolved=$resolved',
+      'hasPersianSoft=$hasPersianSoft isEnglishAudio=$isEnglishAudio resolved=$resolved',
       name: 'sushi.subs',
     );
     if (choice != SushiStartSubtitle.automaticOnline) return;

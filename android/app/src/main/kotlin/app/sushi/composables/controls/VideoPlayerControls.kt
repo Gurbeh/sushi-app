@@ -675,7 +675,6 @@ internal fun RowScope.RightButtons(
     showAudioDialog: MutableState<Boolean>,
     showSubDialog: MutableState<Boolean>
 ) {
-    val hasSubtitles by VideoPlayerObject.hasSubtracks.collectAsState(false)
     val hasAudioTracks by VideoPlayerObject.hasAudioTracks.collectAsState(false)
 
     val isTVMode by VideoPlayerObject.implementation.isTVMode.collectAsState(false)
@@ -708,7 +707,9 @@ internal fun RowScope.RightButtons(
                 )
             }
             CustomButton(
-                enabled = hasSubtitles,
+                // Always tappable, even with no embedded track — SubtitlePicker still offers
+                // Automatic / Online / Translate with AI.
+                enabled = true,
                 onClick = {
                     showSubDialog.value = true
                 },

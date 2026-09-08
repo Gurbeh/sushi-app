@@ -70,12 +70,23 @@ bool sushiHasPersianSoftSub(List<SubStreamModel>? subStreams) {
 /// What to apply at playback start. Previous title's AI / Automatic pick must not carry over.
 enum SushiStartSubtitle { persianSoft, automaticOnline, off }
 
+/// True when a track's language/title codes read as English ('en', 'eng', 'en-*', or a title
+/// that says so). Same rule [sushiPreferredSubtitleStreamIndex] uses to spot an English track.
+bool sushiIsEnglishLanguage(String? language) {
+  final lang = (language ?? '').trim().toLowerCase();
+  return lang == 'en' || lang == 'eng' || lang.startsWith('en-');
+}
+
+/// Hardsub sources default to Off (stacking soft Persian on top of burn-in duplicates the
+/// subtitle on Android ExoPlayer) — except an English hardsub print, which still has no Persian
+/// on screen, so Automatic (online) still runs.
 SushiStartSubtitle sushiStartSubtitleChoice({
   required bool hardSub,
   required bool hasPersianSoft,
   bool subtitleOff = false,
+  bool isEnglishAudio = false,
 }) {
-  if (hardSub) return SushiStartSubtitle.off;
+  if (hardSub) return isEnglishAudio ? SushiStartSubtitle.automaticOnline : SushiStartSubtitle.off;
   if (hasPersianSoft && !subtitleOff) return SushiStartSubtitle.persianSoft;
   return SushiStartSubtitle.automaticOnline;
 }
@@ -94,13 +105,8 @@ int? sushiPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
   if (persian != null) return persian.index;
 
   final english = real.firstWhereOrNull((s) {
-    final lang = s.language.trim().toLowerCase();
     final title = s.displayTitle.trim().toLowerCase();
-    return lang == 'en' ||
-        lang == 'eng' ||
-        lang.startsWith('en-') ||
-        title.contains('english') ||
-        title == 'en';
+    return sushiIsEnglishLanguage(s.language) || title.contains('english') || title == 'en';
   });
   if (english != null) return english.index;
 

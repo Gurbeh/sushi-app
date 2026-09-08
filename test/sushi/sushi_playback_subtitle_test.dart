@@ -149,4 +149,23 @@ void main() {
       SushiStartSubtitle.off,
     );
   });
+
+  test('English hardsub still runs Automatic; non-English hardsub stays Off', () {
+    expect(
+      sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: true),
+      SushiStartSubtitle.automaticOnline,
+    );
+    expect(
+      sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: false),
+      SushiStartSubtitle.off,
+    );
+  });
+
+  test('sushiIsEnglishLanguage matches en/eng/en-* only', () {
+    expect(sushiIsEnglishLanguage('en'), isTrue);
+    expect(sushiIsEnglishLanguage('eng'), isTrue);
+    expect(sushiIsEnglishLanguage('en-US'), isTrue);
+    expect(sushiIsEnglishLanguage('fa'), isFalse);
+    expect(sushiIsEnglishLanguage(null), isFalse);
+  });
 }
