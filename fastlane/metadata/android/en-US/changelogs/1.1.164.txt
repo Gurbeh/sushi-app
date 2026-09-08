@@ -1,0 +1,1 @@
+Fix in-app update: wait for Telegram copy instead of sender message id
