@@ -37,9 +37,15 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="tg" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
         <package android:name="org.telegram.messenger" />
         <package android:name="org.telegram.messenger.web" />
         <package android:name="org.thunderdog.challegram" />
+        <package android:name="com.google.android.packageinstaller" />
+        <package android:name="com.android.packageinstaller" />
     </queries>
 
     <application

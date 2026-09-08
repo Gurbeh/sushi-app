@@ -12,6 +12,9 @@ const sushiPlatLinux = 'linux';
 const sushiPlatMacOS = 'macos';
 const sushiPlatIOS = 'ios';
 
+/// Caption stamped on the protocol-chat copy. Mirror of `api.AppUpdateLocator`.
+String sushiAppUpdateLocator(String platform) => 'app_$platform';
+
 /// Client's `app_releases` platform. Empty on web / unknown.
 Future<String> sushiAppPlatform() async {
   if (kIsWeb) return '';

@@ -77,4 +77,17 @@ void main() {
     sushiNoteLatestApp(const SushiLatestApp(platform: 'windows', version: ''));
     expect(sushiLatestApp.value?.version, '2.0.0');
   });
+
+  test('sushiAppUpdateLocator matches server caption', () {
+    expect(sushiAppUpdateLocator('android_new'), 'app_android_new');
+    expect(sushiAppUpdateLocator('android_tv'), 'app_android_tv');
+  });
+
+  test('sushiAppUpdateColdSource ignores sender-side copyMessage id', () {
+    final src = sushiAppUpdateColdSource('app_android_new');
+    expect(src.providerBotId, 0);
+    expect(src.messageId, 0);
+    expect(src.locator, 'app_android_new');
+    expect(src.preferHttpBridge, isTrue);
+  });
 }

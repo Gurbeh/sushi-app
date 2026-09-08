@@ -5,20 +5,24 @@ import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:fladder/sushi/widgets/sushi_dialog_focus_trap.dart';
+import 'package:fladder/sushi/sushi_app_platform.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_app_update_transport.dart';
-
-export 'package:fladder/sushi/sushi_app_update_pb.dart' show SushiLatestApp;
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_semver.dart';
-import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart' show sushiIsTdlibFileMissingError;
+import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart'
+    show sushiIsTdlibFileMissingError, sushiIsTelegramDeliveryWaitTimeoutError;
 import 'package:fladder/src/tdlib_bridge.g.dart';
+
+export 'package:fladder/sushi/sushi_app_platform.dart' show sushiAppUpdateLocator;
+export 'package:fladder/sushi/sushi_app_update_pb.dart' show SushiLatestApp;
 
 const _kSkippedVersionKey = 'sushi_skipped_app_version';
 
@@ -69,30 +73,59 @@ Future<void> sushiSkipAppVersion(SharedPreferences prefs, String version) {
   return prefs.setString(_kSkippedVersionKey, version);
 }
 
+/// Cold /appupdate session: never pass copyMessage's id. That id is the *sender's* numbering;
+/// native `getMessages` uses the receiver's, so a protocol-chat text message sits at that number
+/// (`OX_DM_STALE: dm message N has no document`). 0/0 waits on the locator push instead — same
+/// as a cold `/play`. Arm [sushiArmDeliveryWaiter] *before* `/appupdate`.
+SushiTdlibPlaybackSource sushiAppUpdateColdSource(String locator) {
+  return SushiTdlibPlaybackSource(
+    providerBotId: 0,
+    messageId: 0,
+    preferHttpBridge: true,
+    locator: locator,
+  );
+}
+
 /// Copies the shelf file into the protocol chat, pulls it over MTProto, installs.
 Future<void> sushiInstallLatestApp({
   required void Function(double? progress) onProgress,
 }) async {
-  var res = await sushiFetchAppUpdate();
+  final platform = await sushiAppPlatform();
+  if (platform.isEmpty) {
+    throw StateError('appupdate: unknown platform');
+  }
+  final locator = sushiAppUpdateLocator(platform);
+  await sushiArmDeliveryWaiter(locator);
+
+  var res = await sushiFetchAppUpdate(platform: platform);
   if (res == null || res.messageId == 0) {
     throw StateError('appupdate: no file');
   }
-  await sushiArmDeliveryWaiter(res.locator);
+  final loc = res.locator.isNotEmpty ? res.locator : locator;
 
   String url;
   try {
-    url = await _startAppUpdateSession(res);
+    url = await sushiStartPlaybackSession(sushiAppUpdateColdSource(loc));
   } catch (e) {
-    // /appupdate always does a fresh copyMessage server-side (appupdate.go), so a freshly copied
-    // message occasionally isn't visible yet on the client's own TDLib read (OX_DM_STALE) — the
-    // same race sushi_playback_resolver.dart absorbs by forcing a re-copy and retrying once.
-    if (!sushiIsTdlibFileMissingError(e)) rethrow;
-    debugPrint('[sushi] appupdate stale copy, retrying: $e');
-    final retry = await sushiFetchAppUpdate();
-    if (retry == null || retry.messageId == 0) rethrow;
-    res = retry;
-    await sushiArmDeliveryWaiter(res.locator);
-    url = await _startAppUpdateSession(res);
+    if (!sushiIsTdlibFileMissingError(e) && !sushiIsTelegramDeliveryWaitTimeoutError(e)) {
+      rethrow;
+    }
+    debugPrint('[sushi] appupdate waiting for landed copy: $e');
+    final landed = await _pollAppUpdateDeliveryRef(loc);
+    if (landed != null && landed.messageId > 0 && landed.providerBotId > 0) {
+      url = await sushiStartPlaybackSession(SushiTdlibPlaybackSource(
+        providerBotId: landed.providerBotId,
+        messageId: landed.messageId,
+        preferHttpBridge: true,
+        locator: loc,
+      ));
+    } else {
+      await sushiArmDeliveryWaiter(loc);
+      final retry = await sushiFetchAppUpdate(platform: platform);
+      if (retry == null || retry.messageId == 0) rethrow;
+      res = retry;
+      url = await sushiStartPlaybackSession(sushiAppUpdateColdSource(loc));
+    }
   }
 
   try {
@@ -104,13 +137,19 @@ Future<void> sushiInstallLatestApp({
   }
 }
 
-Future<String> _startAppUpdateSession(SushiAppUpdateRes res) {
-  return sushiStartPlaybackSession(SushiTdlibPlaybackSource(
-    providerBotId: res.botId,
-    messageId: res.messageId,
-    preferHttpBridge: true,
-    locator: res.locator,
-  ));
+Future<SushiTdlibDeliveryRef?> _pollAppUpdateDeliveryRef(
+  String locator, {
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final ref = await sushiDeliveryRefForLocator(locator);
+    if (ref != null && ref.messageId > 0 && ref.providerBotId > 0) {
+      return ref;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+  }
+  return sushiDeliveryRefForLocator(locator);
 }
 
 Future<File> _downloadLocalhost(
@@ -123,7 +162,8 @@ Future<File> _downloadLocalhost(
     throw StateError('appupdate: expected localhost bridge, got ${uri.host}');
   }
   final dir = await getTemporaryDirectory();
-  final safe = fileName.isEmpty ? 'sushi_update' : fileName.replaceAll(RegExp(r'[/\\]'), '_');
+  var safe = fileName.isEmpty ? 'sushi_update.apk' : fileName.replaceAll(RegExp(r'[/\\]'), '_');
+  if (!safe.contains('.')) safe = '$safe.apk';
   final out = File('${dir.path}/$safe');
   final client = HttpClient();
   try {
@@ -149,6 +189,13 @@ Future<File> _downloadLocalhost(
 
 Future<void> _installFile(File file) async {
   if (Platform.isAndroid) {
+    final status = await Permission.requestInstallPackages.status;
+    if (!status.isGranted) {
+      final next = await Permission.requestInstallPackages.request();
+      if (!next.isGranted) {
+        throw StateError('Could not launch the Android package installer');
+      }
+    }
     final opened = await FileDownloader().openFile(
       filePath: file.path,
       mimeType: 'application/vnd.android.package-archive',
