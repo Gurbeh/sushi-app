@@ -64,18 +64,16 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
           unawaited(ref.read(userProvider.notifier).markAsPlayed(true, item.id));
         }
 
-        
-          unawaited(sushiContinueRemember(item, position, duration));
-        
-
-        unawaited(
-          Future<void>.delayed(const Duration(milliseconds: 200), () async {
-            if (!mounted) return;
-            await refreshAfterWatchStateChange(ref, item);
-            if (!mounted) return;
-            await sushiRefreshHomeAfterPlayback(ref);
-          }),
-        );
+        unawaited((() async {
+          // Prefs must land before fetchDetails paints from the continue store.
+          await sushiContinueRemember(item, position, duration);
+          if (!mounted) return;
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+          if (!mounted) return;
+          await refreshAfterWatchStateChange(ref, item);
+          if (!mounted) return;
+          await sushiRefreshHomeAfterPlayback(ref);
+        })());
       },
     );
   }

@@ -14,7 +14,9 @@ import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -47,16 +49,22 @@ class MovieDetails extends _$MovieDetails {
         final tmdbId = sushiTmdbIdFromItemId(item.id);
         if (tmdbId == null) return null;
 
+        // Catalog `/item` has no UserData. Enrich from the already-patched
+        // provider state when present so a post-play refetch cannot wipe resume
+        // with the original 0% route item. Then overlay continue-watching.
+        final enrichBase = state ?? item;
         final catalog = ref.read(sushiCatalogControllerProvider);
         final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.movie);
         if (cached?.page != null) {
-          final painted = sushiEnrichMovieModel(item, cached!.page!, cached.files);
+          var painted = sushiEnrichMovieModel(enrichBase, cached!.page!, cached.files);
+          painted = await _paintWatchState(painted);
+          if (loadGen != _loadGeneration) return null;
           apply(painted);
           sushiPlayWarmup.scheduleFromStreams(painted.mediaStreams);
-          unawaited(_sushiRefreshMovie(item, tmdbId, loadGen));
+          unawaited(_sushiRefreshMovie(enrichBase, tmdbId, loadGen));
           return null;
         }
-        await _sushiRefreshMovie(item, tmdbId, loadGen);
+        await _sushiRefreshMovie(enrichBase, tmdbId, loadGen);
         return null;
       } catch (e) {
         return null;
@@ -81,7 +89,11 @@ class MovieDetails extends _$MovieDetails {
         log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
         return;
       }
-      state = sushiEnrichMovieModel(item, snap.page!, snap.files);
+      final enrichBase = state ?? item;
+      var next = sushiEnrichMovieModel(enrichBase, snap.page!, snap.files);
+      next = await _paintWatchState(next);
+      if (loadGen != _loadGeneration) return;
+      state = next;
       sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
     } finally {
       if (loadGen == _loadGeneration) {
@@ -100,5 +112,12 @@ class MovieDetails extends _$MovieDetails {
     if (current == null) return;
     _loadGeneration++;
     state = current.copyWith(userData: userData);
+  }
+
+  Future<MovieModel> _paintWatchState(MovieModel movie) {
+    return sushiLoadAndPaintMovieWatchState(
+      movie,
+      playedIds: ref.read(sushiCatalogItemFlagsProvider).playedIds,
+    );
   }
 }

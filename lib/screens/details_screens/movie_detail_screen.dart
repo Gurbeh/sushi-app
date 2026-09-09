@@ -7,7 +7,9 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:fladder/sushi/sushi_detail_loading.dart';
 import 'package:fladder/sushi/sushi_media_streams.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
@@ -53,7 +55,11 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final details = ref.watch(providerInstance);
+    final detailsRaw = ref.watch(providerInstance);
+    final playedIds = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.playedIds));
+    final details = detailsRaw == null
+        ? null
+        : sushiPaintMovieWatchState(detailsRaw, playedIds: playedIds);
     final wrapAlignment = AdaptiveLayout.viewSizeOf(context) != ViewSize.phone
         ? WrapAlignment.start
         : WrapAlignment.center;

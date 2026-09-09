@@ -15,6 +15,7 @@ import 'package:fladder/sushi/sushi_playback_model.dart';
 import 'package:fladder/sushi/sushi_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
+import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
 
 /// Resolves the item's selected quality (docs/12 §5's pick-list, applied in
@@ -102,6 +103,9 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   }
   if (item is SeriesModel) {
     item = await _paintSeriesWatchState(item, playedIds: playedIds);
+  }
+  if (item is MovieModel) {
+    item = await sushiLoadAndPaintMovieWatchState(item, playedIds: playedIds);
   }
 
   // Ordered sibling episodes for the queue. Captured here when we already hold the hydrated
