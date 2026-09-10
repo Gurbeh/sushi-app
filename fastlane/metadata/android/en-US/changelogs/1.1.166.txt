@@ -1,0 +1,1 @@
+Fix TV d-pad down stuck on series and movie details
