@@ -110,6 +110,7 @@ class _FocusRowState extends State<FocusRow> {
           ),
       child: Focus(
         focusNode: _groupNode,
+        skipTraversal: true,
         onFocusChange: (value) {
           widget.onFocusChange?.call(value);
           if (value && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad) {
@@ -134,8 +135,54 @@ int _readingOrderCompare(FocusNode a, FocusNode b) {
   return a.rect.left.compareTo(b.rect.left);
 }
 
-List<FocusNode> _childNodes(FocusNode node) =>
-    node.descendants.where((n) => n.canRequestFocus && n.context != null).toList()..sort(_readingOrderCompare);
+List<FocusNode> _childNodes(FocusNode node) {
+  final all = node.descendants.where((n) => n.canRequestFocus && n.context != null && !n.skipTraversal).toList();
+  return all.where((n) => !all.any((other) => other != n && n.descendants.contains(other))).toList()
+    ..sort(_readingOrderCompare);
+}
+
+List<List<FocusNode>> _visualRows(List<FocusNode> nodes) {
+  final rows = <List<FocusNode>>[];
+  for (final node in nodes) {
+    if (rows.isEmpty || (node.rect.top - rows.last.first.rect.top).abs() > _rowTolerance) {
+      rows.add([node]);
+    } else {
+      rows.last.add(node);
+    }
+  }
+  return rows;
+}
+
+FocusNode? _nodeOnAdjacentRow(FocusNode groupNode, FocusNode current, TraversalDirection direction) {
+  if (direction != TraversalDirection.up && direction != TraversalDirection.down) return null;
+  final leaves = _childNodes(groupNode);
+  FocusNode? resolved = leaves.contains(current) ? current : null;
+  if (resolved == null) {
+    for (final leaf in leaves) {
+      if (leaf.ancestors.contains(current) || current.ancestors.contains(leaf)) {
+        resolved = leaf;
+        break;
+      }
+    }
+  }
+  if (resolved == null) return null;
+  final rows = _visualRows(leaves);
+  var rowIndex = -1;
+  var colIndex = -1;
+  for (var r = 0; r < rows.length; r++) {
+    final c = rows[r].indexOf(resolved);
+    if (c != -1) {
+      rowIndex = r;
+      colIndex = c;
+      break;
+    }
+  }
+  if (rowIndex == -1) return null;
+  final nextRowIndex = direction == TraversalDirection.down ? rowIndex + 1 : rowIndex - 1;
+  if (nextRowIndex < 0 || nextRowIndex >= rows.length) return null;
+  final row = rows[nextRowIndex];
+  return row[colIndex.clamp(0, row.length - 1)];
+}
 
 class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
   final VoidCallback? onVertical;
@@ -151,7 +198,9 @@ class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
     final parent = currentNode.parent;
     final nodes = parent == null
         ? <FocusNode>[]
-        : parent.descendants.where((n) => n.canRequestFocus && n.context != null).toList()
+        : parent.descendants
+            .where((n) => n.canRequestFocus && n.context != null && !n.skipTraversal)
+            .toList()
       ..sort(_readingOrderCompare);
 
     if (nodes.isEmpty) return super.inDirection(currentNode, direction);
@@ -182,18 +231,17 @@ class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
         }
         return true;
       case TraversalDirection.up:
-        onVertical?.call();
-        return super.inDirection(groupNode, direction);
       case TraversalDirection.down:
         onVertical?.call();
-        final groupParent = groupNode.parent;
-        if (groupParent != null) {
-          if (groupParent.canRequestFocus) {
-            groupParent.requestFocus();
-          }
-          return groupParent.focusInDirection(direction);
+        // Stay inside a Wrap's next/previous visual row first. Escape via
+        // [super.inDirection] from the *current* button rect — never by
+        // focusing the parent FocusScope (full-screen rect has nothing below).
+        final inGroup = _nodeOnAdjacentRow(groupNode, currentNode, direction);
+        if (inGroup != null) {
+          inGroup.requestFocus();
+          return true;
         }
-        return super.inDirection(groupNode, direction);
+        return super.inDirection(currentNode, direction);
     }
   }
 }

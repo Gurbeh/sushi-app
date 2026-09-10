@@ -297,38 +297,44 @@ class OverviewHeader extends ConsumerWidget {
                   )
                 ],
               ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: crossAlignment,
-              children: [
-                if (subTitle != null && name.toLowerCase() != subTitle!.toLowerCase())
-                  Flexible(
-                    child: SelectableText(
-                      subTitle ?? "",
-                      textAlign: TextAlign.center,
-                      style: mainStyle,
-                      maxLines: 1,
+            ExcludeFocus(
+              excluding: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: crossAlignment,
+                children: [
+                  if (subTitle != null && name.toLowerCase() != subTitle!.toLowerCase())
+                    Flexible(
+                      child: SelectableText(
+                        subTitle ?? "",
+                        textAlign: TextAlign.center,
+                        style: mainStyle,
+                        maxLines: 1,
+                      ),
                     ),
-                  ),
-                if (name.toLowerCase() != originalTitle?.toLowerCase() && originalTitle != null)
-                  SelectableText(
-                    originalTitle.toString(),
-                    textAlign: TextAlign.center,
-                    style: subStyle,
-                  ),
-              ].addInBetween(const SizedBox(height: 4)),
+                  if (name.toLowerCase() != originalTitle?.toLowerCase() && originalTitle != null)
+                    SelectableText(
+                      originalTitle.toString(),
+                      textAlign: TextAlign.center,
+                      style: subStyle,
+                    ),
+                ].addInBetween(const SizedBox(height: 4)),
+              ),
             ),
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: crossAlignment,
               spacing: 10,
               children: [
-                MetadataLabels(
-                  officialRating: officialRating,
-                  productionYear: productionYear,
-                  runTime: runTime,
-                  communityRating: communityRating,
-                  showIranFlag: showIranFlag,
+                ExcludeFocus(
+                  excluding: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
+                  child: MetadataLabels(
+                    officialRating: officialRating,
+                    productionYear: productionYear,
+                    runTime: runTime,
+                    communityRating: communityRating,
+                    showIranFlag: showIranFlag,
+                  ),
                 ),
                 _OxGenresWithAdultChip(
                   genres: genres,
