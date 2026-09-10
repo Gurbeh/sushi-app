@@ -50,7 +50,7 @@ file_label() {
 file_tags() {
   case "$1" in
     *arm64-v8a*.apk) echo "#android #arm64" ;;
-    *armeabi-v7a*.apk) echo "#android_old #armeabi" ;;
+    *armeabi-v7a*.apk) echo "#android_old #armeabi #android_tv" ;;
     *-Setup.exe) echo "#windows" ;;
     *.ipa) echo "#ios" ;;
     *.dmg) echo "#macos" ;;
