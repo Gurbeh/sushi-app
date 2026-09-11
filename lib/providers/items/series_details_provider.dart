@@ -99,11 +99,11 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       sushiPlayWarmup.scheduleFromStreams(
         (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
       );
-    } finally {
-      // Play/Request are only decidable once this has run (ADR 0014). Not on a superseded load.
       if (loadGen == _loadGeneration) {
         ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
       }
+    } catch (e, s) {
+      log('[sushi] series details: refresh failed tmdbId=$tmdbId: $e', stackTrace: s);
     }
   }
 

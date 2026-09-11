@@ -68,11 +68,12 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
 
     final currentEpisode = sushiSeriesDetailPlayTarget(details);
     final sushiHasPlayback = details != null && sushiItemHasPlaybackActions(details);
+    final sushiCarried = details != null && sushiSeriesCarried(details);
     // Only after /item has resolved (sushiTitleResolved) — the cached-page paint can populate
     // availableEpisodes before files land, so key off the network-refresh completion instead.
     // Until then, no Play and no Request (ADR 0014 §D2).
     final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: true);
-    final sushiSeriesRequestTmdb = details != null && sushiResolved && !sushiHasPlayback
+    final sushiSeriesRequestTmdb = details != null && sushiResolved && !sushiHasPlayback && !sushiCarried
         ? sushiTmdbIdFromItemId(details.id)
         : null;
 
@@ -105,7 +106,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   OverviewHeader(
                     name: details.name,
                     image: details.images,
-                    mainButton: currentEpisode != null && sushiHasPlayback
+                    mainButton: currentEpisode != null && (sushiHasPlayback || sushiCarried)
                         ? SushiSeriesDetailPlayButtons(
                             series: details,
                             episode: currentEpisode,

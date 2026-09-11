@@ -132,10 +132,9 @@ modules:
   - name: zenity
     buildsystem: meson
     sources:
-      - type: git
-        url: https://gitlab.gnome.org/GNOME/zenity.git
-        tag: 4.0.3
-        commit: 7f7ac1840cfd914dfac69d947f0849dc50b0f695
+      - type: archive
+        url: https://download.gnome.org/sources/zenity/4.0/zenity-4.0.3.tar.xz
+        sha256:  b429d97b87bd9ce7fb72ac0b78df534725d8ad39817ddca6a4ca2ee5381b08de
 
   - name: fladder
     buildsystem: simple

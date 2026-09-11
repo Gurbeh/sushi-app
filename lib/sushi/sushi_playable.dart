@@ -9,8 +9,7 @@ bool _hasReadyStreams(EpisodeModel episode) => episode.mediaStreams.versionStrea
 /// Whether Play / Sync belong on this item's overflow menu.
 ///
 /// Compact [sushiRowToItemBaseModel] cards have no `/files` yet — hide Play/Sync until the
-/// detail enrich attaches at least one ready version stream. A series with an episode tree
-/// but no ready file is still unplayable (ADR 0014: Request replaces Play).
+/// detail enrich attaches at least one ready version stream.
 bool sushiItemHasPlaybackActions(ItemBaseModel item) {
   switch (item) {
     case MovieModel movie:
@@ -24,4 +23,11 @@ bool sushiItemHasPlaybackActions(ItemBaseModel item) {
     default:
       return false;
   }
+}
+
+/// We carry this series (season index or catalog episode ids). Request is for TMDB-only titles
+/// (ADR 0014), not for a catalog show whose header play-target has no file yet.
+bool sushiSeriesCarried(SeriesModel series) {
+  if (series.seasons?.any((s) => s.episodeCount > 0) == true) return true;
+  return series.availableEpisodes?.any((e) => e.playAble) == true;
 }

@@ -201,6 +201,40 @@ void main() {
     expect(sushiItemHasPlaybackActions(ready), isTrue);
   });
 
+  test('season index means the series is carried, even without ready files', () {
+    final base = sushiRowToItemBaseModel(
+      const SushiRow(
+        tmdbId: 37854,
+        kind: SushiKind.series,
+        title: 'One Piece',
+        year: 1999,
+        rating: 90,
+        poster: 'op',
+      ),
+    ) as SeriesModel;
+    final enriched = sushiEnrichSeriesModel(
+      base,
+      const SushiItemRes(
+        row: SushiRow(
+          tmdbId: 37854,
+          kind: SushiKind.series,
+          title: 'One Piece',
+          year: 1999,
+          rating: 90,
+          poster: 'op',
+        ),
+        overview: '',
+        releasedOn: 0,
+        episodes: [
+          SushiEpisode(episodeId: 50, seasonNo: 1, episodeNo: 50, title: 'Ready'),
+        ],
+        seasons: [SushiSeason(seasonNo: 1, episodeCount: 1000)],
+      ),
+    );
+    expect(sushiSeriesCarried(enriched), isTrue);
+    expect(sushiItemHasPlaybackActions(enriched), isFalse);
+  });
+
   test('empty audioLangs still exposes a playable default audio index', () {
     final streams = sushiBuildMediaStreams(const [
       SushiFile(
