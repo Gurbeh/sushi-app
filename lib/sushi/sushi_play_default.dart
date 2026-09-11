@@ -11,8 +11,10 @@ import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_playback_model.dart';
 import 'package:fladder/sushi/sushi_playback_resolver.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:fladder/sushi/sushi_movie_watch_state.dart';
@@ -38,7 +40,7 @@ Future<ItemBaseModel> sushiHydrateForPlay(ItemBaseModel item, SushiCatalogContro
     if (tmdbId == null) return item;
     final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.movie);
     if (snap.page == null) return item;
-    return sushiEnrichMovieModel(item, snap.page!, snap.files);
+    return sushiEnrichMovieModel(item, snap.page!, snap.files, preferredFileId: snap.lastFileId);
   }
   if (item is SeriesModel) {
     if (item.availableEpisodes?.isNotEmpty == true) return item;
@@ -108,8 +110,17 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   if (item is SeriesModel) {
     item = await _paintSeriesWatchState(item, playedIds: playedIds);
   }
+  int? movieEpisodeId;
   if (item is MovieModel) {
-    item = await sushiLoadAndPaintMovieWatchState(item, playedIds: playedIds);
+    SushiFilesRes? files;
+    final tmdbId = sushiTmdbIdFromItemId(item.id);
+    if (tmdbId != null) {
+      final snap = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.movie);
+      files = snap?.filesRes;
+      final eps = snap?.page?.episodes ?? const [];
+      if (eps.isNotEmpty) movieEpisodeId = eps.first.episodeId;
+    }
+    item = await sushiLoadAndPaintMovieWatchState(item, playedIds: playedIds, files: files);
   }
 
   // Ordered sibling episodes for the queue. Captured here when we already hold the hydrated
@@ -132,8 +143,12 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
     final episodeId = sushiEpisodeIdFromItemId(item.id);
     if (episodeId == null) return null;
     final files = await catalog.openFiles(episodeId: episodeId);
-    streams = sushiBuildMediaStreams(files);
+    streams = sushiBuildMediaStreams(files.files, preferredFileId: files.lastFileId);
     fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
+    final overlay = sushiUserDataFromFiles(files);
+    if (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played) {
+      item = item.copyWith(userData: overlay);
+    }
   }
 
   if (item is! MovieModel && item is! EpisodeModel) return null;
@@ -156,11 +171,14 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
         media: Media(url: local.videoFile.path),
         mediaStreams: streams ?? item.streamModel,
         queue: queue,
+        episodeId: sushiEpisodeIdFromItemId(playing.id) ?? movieEpisodeId,
       );
     }
   }
 
   if (fileId == null) return null;
+
+  final episodeId = sushiEpisodeIdFromItemId(playing.id) ?? movieEpisodeId;
 
   // Never let this reject: the caller awaits it through CancelableOperation.valueOrCancellation,
   // which — unlike every sushiFetch*/sushiPlay call this resolver is built on — rethrows instead
@@ -175,6 +193,7 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
       media: Media(url: url),
       mediaStreams: streams ?? item.streamModel,
       queue: queue,
+      episodeId: episodeId,
     );
   } catch (e, st) {
     debugPrint('[sushi] play resolve failed: $e\n$st');

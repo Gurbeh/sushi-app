@@ -516,28 +516,71 @@ class SushiItemRes {
 
 /// Decoded `sushi.v1.FilesRes`.
 class SushiFilesRes {
-  const SushiFilesRes({required this.files});
+  const SushiFilesRes({
+    required this.files,
+    this.positionS = 0,
+    this.done = false,
+    this.lastFileId = 0,
+  });
 
   final List<SushiFile> files;
+  final int positionS;
+  final bool done;
+  final int lastFileId;
+
+  bool get hasProgress => done || positionS > 0;
+
+  int get resumeDurationS {
+    if (lastFileId != 0) {
+      for (final f in files) {
+        if (f.fileId == lastFileId && f.durationS > 0) return f.durationS;
+      }
+    }
+    for (final f in files) {
+      if (f.durationS > 0) return f.durationS;
+    }
+    return 0;
+  }
 
   static SushiFilesRes decode(Uint8List bytes) {
     final files = <SushiFile>[];
+    var positionS = 0;
+    var done = false;
+    var lastFileId = 0;
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
       i = tagR.next;
       final field = tagR.value >> 3;
       final wire = tagR.value & 0x7;
-      if (field == 1) {
-        final lenR = sushiReadVarint(bytes, i);
-        i = lenR.next;
-        files.add(SushiFile.decode(bytes.sublist(i, i + lenR.value)));
-        i += lenR.value;
-      } else {
-        i = sushiSkipField(bytes, i, wire);
+      switch (field) {
+        case 1:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          files.add(SushiFile.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        case 2:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          positionS = v.value;
+        case 3:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          done = v.value != 0;
+        case 4:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          lastFileId = v.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
       }
     }
-    return SushiFilesRes(files: List.unmodifiable(files));
+    return SushiFilesRes(
+      files: List.unmodifiable(files),
+      positionS: positionS,
+      done: done,
+      lastFileId: lastFileId,
+    );
   }
 }
 

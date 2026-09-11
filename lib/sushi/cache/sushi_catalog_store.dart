@@ -36,12 +36,25 @@ class SushiTitleSnapshot {
     required this.files,
     required this.fromCache,
     required this.lite,
+    this.positionS = 0,
+    this.done = false,
+    this.lastFileId = 0,
   });
 
   final SushiItemRes? page;
   final List<SushiFile> files;
   final bool fromCache;
   final bool lite;
+  final int positionS;
+  final bool done;
+  final int lastFileId;
+
+  SushiFilesRes get filesRes => SushiFilesRes(
+        files: files,
+        positionS: positionS,
+        done: done,
+        lastFileId: lastFileId,
+      );
 }
 
 /// Persistence for the catalog cache. Drift is the production impl; tests use a fake.

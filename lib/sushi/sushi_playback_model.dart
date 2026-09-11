@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +13,13 @@ import 'package:fladder/models/items/trick_play_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/util/bitrate_helper.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
 
 /// [PlaybackModel] for a file resolved through Sushi's own `/play` delivery (docs/05).
-/// Continue-watching is stored locally (docs/12 §2); `/ev` progress sync is still deferred.
+/// Continue-watching is stored locally first (R-WRITE-1); `/ev` prog is fire-and-forget.
 class SushiPlaybackModel extends PlaybackModel {
   SushiPlaybackModel({
     required super.item,
@@ -28,7 +32,15 @@ class SushiPlaybackModel extends PlaybackModel {
     super.playbackQueue,
     super.queueSource,
     super.bitRateOptions,
+    this.episodeId,
   }) : super(playbackInfo: null);
+
+  /// Catalog episode id. Movies use S00E00; episodes parse from `sushi_ep_*`.
+  final int? episodeId;
+
+  DateTime? _lastProgAt;
+
+  int? get resolvedEpisodeId => episodeId ?? sushiEpisodeIdFromItemId(item.id);
 
   @override
   List<SubStreamModel> get subStreams => [SubStreamModel.no(), ...mediaStreams?.subStreams ?? []];
@@ -54,17 +66,40 @@ class SushiPlaybackModel extends PlaybackModel {
   }
 
   @override
-  Future<PlaybackModel?> playbackStarted(Duration position, Ref ref) async => null;
-
-  @override
-  Future<PlaybackModel?> playbackStopped(Duration position, Duration? totalDuration, Ref ref) async {
-    final duration = totalDuration ?? Duration.zero;
-    await sushiContinueRemember(item, position, duration);
+  Future<PlaybackModel?> playbackStarted(Duration position, Ref ref) async {
+    _sendProg(position, item.overview.runTime ?? Duration.zero);
     return null;
   }
 
   @override
-  Future<PlaybackModel?> updatePlaybackPosition(Duration position, bool isPlaying, Ref ref) async => null;
+  Future<PlaybackModel?> playbackStopped(Duration position, Duration? totalDuration, Ref ref) async {
+    final duration = totalDuration ?? item.overview.runTime ?? Duration.zero;
+    await sushiContinueRemember(item, position, duration);
+    _sendProg(position, duration, force: true);
+    return null;
+  }
+
+  @override
+  Future<PlaybackModel?> updatePlaybackPosition(Duration position, bool isPlaying, Ref ref) async {
+    _sendProg(position, item.overview.runTime ?? Duration.zero);
+    return null;
+  }
+
+  void _sendProg(Duration position, Duration duration, {bool force = false}) {
+    final ep = resolvedEpisodeId;
+    if (ep == null) return;
+    final now = DateTime.now();
+    if (!force && _lastProgAt != null && now.difference(_lastProgAt!) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastProgAt = now;
+    unawaited(sushiSendProgEvent(
+      episodeId: ep,
+      positionS: position.inSeconds,
+      fileId: sushiFileIdFromVersionStreamId(mediaStreams?.currentVersionStream?.id) ?? 0,
+      durationS: duration.inSeconds,
+    ));
+  }
 
   @override
   SushiPlaybackModel? updateUserData(UserData userData) {
@@ -80,6 +115,7 @@ class SushiPlaybackModel extends PlaybackModel {
   String toString() => 'SushiPlaybackModel(item: $item, media: $media)';
 
   @override
+  @override
   SushiPlaybackModel copyWith({
     ItemBaseModel? item,
     ValueGetter<Media?>? media,
@@ -91,6 +127,7 @@ class SushiPlaybackModel extends PlaybackModel {
     PlaybackQueueState? playbackQueue,
     PlaybackQueueSource? queueSource,
     Map<Bitrate, bool>? bitRateOptions,
+    int? episodeId,
   }) {
     return SushiPlaybackModel(
       item: item ?? this.item,
@@ -103,6 +140,7 @@ class SushiPlaybackModel extends PlaybackModel {
       playbackQueue: playbackQueue ?? this.playbackQueue,
       queueSource: queueSource ?? this.queueSource,
       bitRateOptions: bitRateOptions ?? this.bitRateOptions,
+      episodeId: episodeId ?? this.episodeId,
     );
   }
 }

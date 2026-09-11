@@ -1,6 +1,8 @@
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 /// Overlay client watch state onto a catalog movie.
@@ -12,6 +14,7 @@ MovieModel sushiPaintMovieWatchState(
   MovieModel movie, {
   Set<String> playedIds = const {},
   SushiContinueEntry? resume,
+  SushiFilesRes? files,
 }) {
   if (playedIds.contains(movie.id)) {
     return movie.copyWith(
@@ -32,6 +35,10 @@ MovieModel sushiPaintMovieWatchState(
       ),
     );
   }
+  final fromServer = sushiUserDataFromFiles(files);
+  if (fromServer != null) {
+    return movie.copyWith(userData: fromServer);
+  }
   return movie;
 }
 
@@ -39,10 +46,11 @@ MovieModel sushiPaintMovieWatchState(
 Future<MovieModel> sushiLoadAndPaintMovieWatchState(
   MovieModel movie, {
   Set<String> playedIds = const {},
+  SushiFilesRes? files,
 }) async {
   final tmdbId = sushiTmdbIdFromItemId(movie.id);
   final resume = tmdbId == null
       ? null
       : await sushiContinueFind(tmdbId: tmdbId, kind: SushiKind.movie);
-  return sushiPaintMovieWatchState(movie, playedIds: playedIds, resume: resume);
+  return sushiPaintMovieWatchState(movie, playedIds: playedIds, resume: resume, files: files);
 }

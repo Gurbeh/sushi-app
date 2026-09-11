@@ -241,6 +241,29 @@ void main() {
     expect(res.files[1].state, SushiFileState.unavailable);
   });
 
+  test('SushiFilesRes decodes episode progress', () {
+    final f1 = _encodeFile(
+      fileId: 5,
+      qualityLabel: '1080p',
+      height: 1080,
+      audioLangs: 'en',
+      subLangs: '',
+      sizeBytes: 1,
+      durationS: 7200,
+      state: 1,
+    );
+    final out = BytesBuilder()
+      ..add(_lenDelim(1, f1))
+      ..add(_varintField(2, 1200))
+      ..add(_varintField(3, 1))
+      ..add(_varintField(4, 5));
+    final res = SushiFilesRes.decode(out.toBytes());
+    expect(res.positionS, 1200);
+    expect(res.done, isTrue);
+    expect(res.lastFileId, 5);
+    expect(res.resumeDurationS, 7200);
+  });
+
   test('SushiFilesRes decodes empty list', () {
     final res = SushiFilesRes.decode(Uint8List(0));
     expect(res.files, isEmpty);

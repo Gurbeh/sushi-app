@@ -111,6 +111,32 @@ Future<void> sushiSendFollowEvent({required int tmdbId, required bool on}) async
   await _sendEvent(eventField: 3, inner: inner.toBytes());
 }
 
+/// ProgEvent { episode_id = 1; position_s = 2; file_id = 3; duration_s = 4; } — fire-and-forget.
+Future<void> sushiSendProgEvent({
+  required int episodeId,
+  required int positionS,
+  int fileId = 0,
+  int durationS = 0,
+}) async {
+  if (episodeId <= 0) return;
+  final inner = BytesBuilder();
+  _writeTag(inner, 1, 0);
+  inner.add(sushiUvarint(episodeId));
+  if (positionS != 0) {
+    _writeTag(inner, 2, 0);
+    inner.add(sushiUvarint(positionS < 0 ? 0 : positionS));
+  }
+  if (fileId != 0) {
+    _writeTag(inner, 3, 0);
+    inner.add(sushiUvarint(fileId));
+  }
+  if (durationS != 0) {
+    _writeTag(inner, 4, 0);
+    inner.add(sushiUvarint(durationS < 0 ? 0 : durationS));
+  }
+  await _sendEvent(eventField: 4, inner: inner.toBytes());
+}
+
 void _writeTag(BytesBuilder b, int field, int wire) =>
     b.add(sushiUvarint((field << 3) | wire));
 

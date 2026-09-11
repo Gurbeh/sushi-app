@@ -12,6 +12,7 @@ import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 
 class EpisodeDetailModel {
   final SeriesModel? series;
@@ -60,7 +61,13 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
         final episodeId = sushiEpisodeIdFromItemId(item.id);
         if (episodeId != null && item.mediaStreams.versionStreams.isEmpty) {
           final files = await ref.read(sushiCatalogControllerProvider).openFiles(episodeId: episodeId);
-          episode = item.copyWith(mediaStreams: sushiBuildMediaStreams(files));
+          final overlay = sushiUserDataFromFiles(files);
+          episode = item.copyWith(
+            mediaStreams: sushiBuildMediaStreams(files.files, preferredFileId: files.lastFileId),
+            userData: (item.userData.playbackPositionTicks == 0 && !item.userData.played && overlay != null)
+                ? overlay
+                : item.userData,
+          );
         }
         state = EpisodeDetailModel(
           series: series,

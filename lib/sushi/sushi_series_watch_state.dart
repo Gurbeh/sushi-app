@@ -6,6 +6,9 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/sushi/sushi_season_user_data.dart';
 
 /// Overlay client watch state onto catalog episodes.
@@ -17,6 +20,8 @@ SeriesModel sushiPaintSeriesWatchState(
   SeriesModel series, {
   Set<String> playedIds = const {},
   SushiContinueEntry? resume,
+  SushiFilesRes? files,
+  int? filesEpisodeId,
 }) {
   var withResume = sushiAttachResumeEpisode(series, resume);
   final episodes = withResume.availableEpisodes;
@@ -25,7 +30,13 @@ SeriesModel sushiPaintSeriesWatchState(
   final painted = [
     for (final episode in episodes)
       episode.copyWith(
-        userData: _watchUserData(episode, playedIds: playedIds, resume: resume),
+        userData: _watchUserData(
+          episode,
+          playedIds: playedIds,
+          resume: resume,
+          files: files,
+          filesEpisodeId: filesEpisodeId,
+        ),
       ),
   ];
 
@@ -47,6 +58,8 @@ UserData _watchUserData(
   EpisodeModel episode, {
   required Set<String> playedIds,
   SushiContinueEntry? resume,
+  SushiFilesRes? files,
+  int? filesEpisodeId,
 }) {
   if (playedIds.contains(episode.id)) {
     return episode.userData.copyWith(
@@ -61,6 +74,11 @@ UserData _watchUserData(
       progress: resume.progressPct,
       playbackPositionTicks: resume.positionMs * 10000,
     );
+  }
+  final epId = sushiEpisodeIdFromItemId(episode.id);
+  if (files != null && filesEpisodeId != null && epId == filesEpisodeId) {
+    final fromServer = sushiUserDataFromFiles(files);
+    if (fromServer != null) return fromServer;
   }
   return episode.userData;
 }

@@ -254,4 +254,33 @@ void main() {
     expect(version.audioStreams.single.displayTitle, 'Default');
     expect(version.defaultAudioStreamIndex, 0);
   });
+
+  test('preferredFileId selects that version', () {
+    final streams = sushiBuildMediaStreams(
+      const [
+        SushiFile(
+          fileId: 1,
+          qualityLabel: '1080p',
+          height: 1080,
+          audioLangs: 'en',
+          subLangs: '',
+          sizeBytes: 1,
+          durationS: 1,
+          state: SushiFileState.ready,
+        ),
+        SushiFile(
+          fileId: 2,
+          qualityLabel: '720p',
+          height: 720,
+          audioLangs: 'en',
+          subLangs: '',
+          sizeBytes: 1,
+          durationS: 1,
+          state: SushiFileState.ready,
+        ),
+      ],
+      preferredFileId: 2,
+    );
+    expect(streams.currentVersionStream?.id, 'sushi_file_2');
+  });
 }

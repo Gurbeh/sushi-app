@@ -4,6 +4,7 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -50,6 +51,23 @@ void main() {
     expect(painted.userData.playbackPositionTicks, 10 * 60 * 1000 * 10000);
   });
 
+  test('local continue wins over server files progress', () {
+    const resume = SushiContinueEntry(
+      tmdbId: 27205,
+      kind: SushiKind.movie,
+      title: 'Tenet',
+      year: 2020,
+      rating: 74,
+      poster: 'p',
+      positionMs: 10 * 60 * 1000,
+      durationMs: 40 * 60 * 1000,
+      atMs: 1,
+    );
+    const files = SushiFilesRes(files: [], positionS: 100, done: false, lastFileId: 9);
+    final painted = sushiPaintMovieWatchState(_movie(), resume: resume, files: files);
+    expect(painted.userData.playbackPositionTicks, 10 * 60 * 1000 * 10000);
+  });
+
   test('played flag wins over resume progress', () {
     const resume = SushiContinueEntry(
       tmdbId: 27205,
@@ -85,5 +103,37 @@ void main() {
     );
 
     expect(painted.userData.progress, 42);
+  });
+
+  test('server files progress paints when local continue is empty', () {
+    const files = SushiFilesRes(
+      files: [
+        SushiFile(
+          fileId: 3,
+          qualityLabel: '1080p',
+          height: 1080,
+          audioLangs: 'en',
+          subLangs: '',
+          sizeBytes: 1,
+          durationS: 2400,
+          state: SushiFileState.ready,
+        ),
+      ],
+      positionS: 600,
+      lastFileId: 3,
+    );
+
+    final painted = sushiPaintMovieWatchState(_movie(), files: files);
+
+    expect(painted.userData.progress, closeTo(25, 0.1));
+    expect(painted.userData.played, isFalse);
+    expect(painted.userData.playbackPositionTicks, 600 * 1000 * 10000);
+  });
+
+  test('server done marks the movie watched', () {
+    const files = SushiFilesRes(files: [], positionS: 7200, done: true, lastFileId: 3);
+    final painted = sushiPaintMovieWatchState(_movie(), files: files);
+    expect(painted.userData.played, isTrue);
+    expect(painted.userData.playbackPositionTicks, 0);
   });
 }

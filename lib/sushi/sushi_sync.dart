@@ -87,7 +87,7 @@ Future<SyncedItem?> _syncMovie(SyncNotifier sync, SushiCatalogController catalog
   if (tmdb == null) return null;
   final snap = await catalog.openTitle(tmdbId: tmdb, kind: SushiKind.movie);
   if (snap.page == null) return null;
-  final hydrated = sushiEnrichMovieModel(movie, snap.page!, snap.files);
+  final hydrated = sushiEnrichMovieModel(movie, snap.page!, snap.files, preferredFileId: snap.lastFileId);
   final file = sushiPickReadyFile(snap.files, versionStreamId: hydrated.streamModel?.currentVersionStream?.id);
   if (file == null) return null;
   return _createAndDownload(sync, hydrated, file);
@@ -104,7 +104,7 @@ Future<SyncedItem?> _syncEpisode(SyncNotifier sync, SushiCatalogController catal
   final episodeId = sushiEpisodeIdFromItemId(live.id);
   if (episodeId == null) return null;
   final files = await catalog.openFiles(episodeId: episodeId);
-  final file = sushiPickReadyFile(files, versionStreamId: live.streamModel?.currentVersionStream?.id);
+  final file = sushiPickReadyFile(files.files, versionStreamId: live.streamModel?.currentVersionStream?.id);
   if (file == null) return null;
 
   final seriesItem = await _upsert(sync, enriched);
@@ -156,7 +156,7 @@ Future<SyncedItem?> _syncEpisodeUnder(
   final episodeId = sushiEpisodeIdFromItemId(episode.id);
   if (episodeId == null) return null;
   final files = await catalog.openFiles(episodeId: episodeId);
-  final file = sushiPickReadyFile(files);
+  final file = sushiPickReadyFile(files.files);
   if (file == null) return null;
   return _createAndDownload(sync, episode, file, parent: seasonItem);
 }

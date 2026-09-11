@@ -154,28 +154,43 @@ class SushiCatalogController {
 
       final epId = episodeId ?? page?.episodes.firstOrNull?.episodeId;
       var files = const <SushiFile>[];
+      var positionS = 0;
+      var done = false;
+      var lastFileId = 0;
       if (epId != null && epId != 0) {
-        files = await openFiles(episodeId: epId, force: force);
+        final filesRes = await openFiles(episodeId: epId, force: force);
+        files = filesRes.files;
+        positionS = filesRes.positionS;
+        done = filesRes.done;
+        lastFileId = filesRes.lastFileId;
       }
       debugPrint('[sushi] title tmdb=$tmdbId lite=$lite fromCache=${cached != null} files=${files.length}');
-      return SushiTitleSnapshot(page: page, files: files, fromCache: cached != null, lite: lite);
+      return SushiTitleSnapshot(
+        page: page,
+        files: files,
+        fromCache: cached != null,
+        lite: lite,
+        positionS: positionS,
+        done: done,
+        lastFileId: lastFileId,
+      );
     });
   }
 
-  Future<List<SushiFile>> openFiles({required int episodeId, bool force = false}) {
+  Future<SushiFilesRes> openFiles({required int episodeId, bool force = false}) {
     return _exclusiveRead(() async {
       final cached = await _store.readFiles(episodeId);
       if (!force && cached != null && _clock().isBefore(cached.fetchedAt.add(sushiFilesTtl))) {
         debugPrint('[sushi] files cache episode=$episodeId n=${cached.files.length}');
-        return cached.files;
+        return SushiFilesRes(files: cached.files);
       }
       debugPrint('[sushi] files network episode=$episodeId');
       final live = await _fetchFiles(episodeId: episodeId);
       if (live != null) {
         await _store.replaceFiles(episodeId, live.files, _clock());
-        return live.files;
+        return live;
       }
-      return cached?.files ?? const [];
+      return SushiFilesRes(files: cached?.files ?? const []);
     });
   }
 

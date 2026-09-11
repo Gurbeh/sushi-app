@@ -63,7 +63,7 @@ int? sushiEpisodeIdFromItemId(String itemId) {
 /// one synthetic audio/sub stream per language code is all there is to build.
 ///
 /// Only `state == ready` files are offered — `pending`/`unavailable` have nothing to play yet.
-MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
+MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files, {int? preferredFileId}) {
   final ready = files.where((f) => f.state == SushiFileState.ready).toList();
   if (ready.isEmpty) {
     return MediaStreamsModel(versionStreams: const []);
@@ -137,7 +137,13 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files) {
     );
   }).toList();
 
-  return MediaStreamsModel(versionStreamIndex: 0, versionStreams: versions);
+  var index = 0;
+  if (preferredFileId != null && preferredFileId != 0) {
+    final wanted = '$_sushiFileIdPrefix$preferredFileId';
+    final i = versions.indexWhere((v) => v.id == wanted);
+    if (i >= 0) index = versions[i].index;
+  }
+  return MediaStreamsModel(versionStreamIndex: index, versionStreams: versions);
 }
 
 /// Poster + TMDB logo/backdrop for a title. Seasons/episodes copy this onto
@@ -158,7 +164,7 @@ ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) 
 /// Merges a fetched [SushiItemRes] (overview) and its files (mediaStreams) into an already-shown
 /// [MovieModel] — called after the home-rail placeholder is on screen, same "paint first, enrich
 /// after" shape `movies_details_provider.dart` already uses for Sushi.
-MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiFile> files) {
+MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiFile> files, {int? preferredFileId}) {
   final genreNames = item.genres
       .split(',')
       .map((s) => s.trim())
@@ -198,7 +204,7 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
             ],
       people: people.isEmpty ? base.overview.people : people,
     ),
-    mediaStreams: sushiBuildMediaStreams(files),
+    mediaStreams: sushiBuildMediaStreams(files, preferredFileId: preferredFileId),
     related: related,
     canDownload: sushiPickReadyFile(files) != null,
   );
@@ -376,10 +382,10 @@ SeriesModel sushiMergeSeasonEpisodes(SeriesModel series, int seasonNo, List<Epis
 
 /// Attaches the `/files` pick-list to the series play target. Pending-only / empty lists leave
 /// [ItemBaseModel.canDownload] false so Play/Sync stay hidden.
-SeriesModel sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files) {
+SeriesModel sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files, {int? preferredFileId}) {
   final playTarget = next.selectedEpisode ?? next.nextUp;
   if (playTarget == null) return next.copyWith(canDownload: false);
-  final streams = sushiBuildMediaStreams(files);
+  final streams = sushiBuildMediaStreams(files, preferredFileId: preferredFileId);
   final ready = streams.versionStreams.isNotEmpty;
   final targetId = playTarget.id;
   return next.copyWith(

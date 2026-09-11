@@ -1,4 +1,5 @@
 import 'package:fladder/models/items/item_shared_models.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/util/duration_extensions.dart';
 
 /// Matches server [DerivePlaybackPersistState] / Fladder [UserData.isPlayed].
@@ -34,5 +35,22 @@ UserData sushiDerivePlaybackUserData({
     progress: progress,
     played: false,
     lastPlayed: DateTime.now(),
+  );
+}
+
+/// Resume from `/files` when the local continue store has nothing. Local always wins (R-WRITE-1).
+UserData? sushiUserDataFromFiles(SushiFilesRes? files) {
+  if (files == null || !files.hasProgress) return null;
+  if (files.done) {
+    return const UserData(played: true, progress: 0, playbackPositionTicks: 0);
+  }
+  final durationS = files.resumeDurationS;
+  final positionMs = files.positionS * 1000;
+  final durationMs = durationS * 1000;
+  final progress = durationMs > 0 ? (positionMs / durationMs * 100).clamp(0.0, 100.0) : 0.0;
+  return UserData(
+    played: false,
+    progress: progress,
+    playbackPositionTicks: positionMs * 10000,
   );
 }
