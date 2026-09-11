@@ -1,0 +1,1 @@
+fix gofumpt catalog_test
