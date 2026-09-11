@@ -41,23 +41,31 @@ List<SushiRow> sushiHomePrefetchPlan(SushiCachedHome home, {int perRail = sushiH
 
 typedef SushiItemFetcher = Future<SushiItemRes?> Function({required int tmdbId, required int kind});
 typedef SushiFilesFetcher = Future<SushiFilesRes?> Function({required int episodeId});
+typedef SushiEpisodesFetcher = Future<SushiEpisodesRes?> Function({
+  required int tmdbId,
+  required int kind,
+  required int seasonNo,
+  int page,
+});
 typedef SushiHomeFetcher = Future<SushiHomeRes?> Function({required int tab});
 
 /// Client-first cache (docs/11): screens read SQLite, network only updates.
 ///
 /// Cached title → `/files` (lite). Miss → `/item` then `/files`. TMDB-only pages
-/// (empty episodes) are never written (R-CACHE-6).
+/// (no play-target, no season index) are never written (R-CACHE-6).
 class SushiCatalogController {
   SushiCatalogController(
     this._store, {
     SushiItemFetcher fetchItem = sushiFetchItem,
     SushiFilesFetcher fetchFiles = sushiFetchFiles,
+    SushiEpisodesFetcher fetchEpisodes = sushiFetchEpisodes,
     SushiHomeFetcher fetchHome = sushiFetchHome,
     DateTime Function()? clock,
     Duration prefetchGap = sushiPrefetchGap,
     Future<void> Function(Duration duration)? sleep,
   })  : _fetchItem = fetchItem,
         _fetchFiles = fetchFiles,
+        _fetchEpisodes = fetchEpisodes,
         _fetchHome = fetchHome,
         _clock = clock ?? DateTime.now,
         _prefetchGap = prefetchGap,
@@ -66,6 +74,7 @@ class SushiCatalogController {
   final SushiCatalogStore _store;
   final SushiItemFetcher _fetchItem;
   final SushiFilesFetcher _fetchFiles;
+  final SushiEpisodesFetcher _fetchEpisodes;
   final SushiHomeFetcher _fetchHome;
   final DateTime Function() _clock;
   final Duration _prefetchGap;
@@ -139,7 +148,7 @@ class SushiCatalogController {
         if (live != null) {
           page = live;
           lite = false;
-          if (live.episodes.isNotEmpty) await _store.writeTitle(live);
+          if (sushiItemResPlayable(live)) await _store.writeTitle(live);
         }
       }
 
@@ -167,6 +176,50 @@ class SushiCatalogController {
         return live.files;
       }
       return cached?.files ?? const [];
+    });
+  }
+
+  Future<List<SushiEpisode>?> peekSeason({
+    required int tmdbId,
+    required SushiKind kind,
+    required int seasonNo,
+  }) {
+    return _store.readSeason(tmdbId, sushiKindToWire(kind), seasonNo);
+  }
+
+  /// One season's episode list. Cached after the first full fetch (ADR 0028).
+  Future<List<SushiEpisode>> openSeason({
+    required int tmdbId,
+    required SushiKind kind,
+    required int seasonNo,
+    bool force = false,
+  }) {
+    return _exclusiveRead(() async {
+      final kindWire = sushiKindToWire(kind);
+      if (!force) {
+        final cached = await _store.readSeason(tmdbId, kindWire, seasonNo);
+        if (cached != null) return cached;
+      }
+      final all = <SushiEpisode>[];
+      var page = 0;
+      var pages = 1;
+      while (page < pages && page < 50) {
+        final live = await _fetchEpisodes(
+          tmdbId: tmdbId,
+          kind: kindWire,
+          seasonNo: seasonNo,
+          page: page,
+        );
+        if (live == null) break;
+        all.addAll(live.episodes);
+        pages = live.pages < 1 ? 1 : live.pages;
+        page++;
+        if (live.episodes.isEmpty) break;
+      }
+      if (all.isNotEmpty) {
+        await _store.writeSeason(tmdbId, kindWire, seasonNo, all);
+      }
+      return all;
     });
   }
 
@@ -225,7 +278,7 @@ class SushiCatalogController {
         if (await _store.readTitle(row.tmdbId, kind) != null) continue;
         debugPrint('[sushi] prefetch tmdb=${row.tmdbId}');
         final live = await _fetchItem(tmdbId: row.tmdbId, kind: kind);
-        if (live != null && live.episodes.isNotEmpty) {
+        if (live != null && sushiItemResPlayable(live)) {
           await _store.writeTitle(live);
         }
         if (_prefetchGap > Duration.zero && _queue.isNotEmpty && _p0 == 0 && epoch == _epoch) {

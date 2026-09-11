@@ -792,6 +792,279 @@ class EpisodeFileListsCompanion extends UpdateCompanion<EpisodeFileList> {
   }
 }
 
+class $SeasonEpisodeListsTable extends SeasonEpisodeLists
+    with TableInfo<$SeasonEpisodeListsTable, SeasonEpisodeList> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SeasonEpisodeListsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _tmdbIdMeta = const VerificationMeta('tmdbId');
+  @override
+  late final GeneratedColumn<int> tmdbId = GeneratedColumn<int>(
+      'tmdb_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<int> kind = GeneratedColumn<int>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _seasonNoMeta =
+      const VerificationMeta('seasonNo');
+  @override
+  late final GeneratedColumn<int> seasonNo = GeneratedColumn<int>(
+      'season_no', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _episodesJsonMeta =
+      const VerificationMeta('episodesJson');
+  @override
+  late final GeneratedColumn<String> episodesJson = GeneratedColumn<String>(
+      'episodes_json', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [tmdbId, kind, seasonNo, episodesJson];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'season_episode_lists';
+  @override
+  VerificationContext validateIntegrity(Insertable<SeasonEpisodeList> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('tmdb_id')) {
+      context.handle(_tmdbIdMeta,
+          tmdbId.isAcceptableOrUnknown(data['tmdb_id']!, _tmdbIdMeta));
+    } else if (isInserting) {
+      context.missing(_tmdbIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('season_no')) {
+      context.handle(_seasonNoMeta,
+          seasonNo.isAcceptableOrUnknown(data['season_no']!, _seasonNoMeta));
+    } else if (isInserting) {
+      context.missing(_seasonNoMeta);
+    }
+    if (data.containsKey('episodes_json')) {
+      context.handle(
+          _episodesJsonMeta,
+          episodesJson.isAcceptableOrUnknown(
+              data['episodes_json']!, _episodesJsonMeta));
+    } else if (isInserting) {
+      context.missing(_episodesJsonMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tmdbId, kind, seasonNo};
+  @override
+  SeasonEpisodeList map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SeasonEpisodeList(
+      tmdbId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}tmdb_id'])!,
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}kind'])!,
+      seasonNo: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}season_no'])!,
+      episodesJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}episodes_json'])!,
+    );
+  }
+
+  @override
+  $SeasonEpisodeListsTable createAlias(String alias) {
+    return $SeasonEpisodeListsTable(attachedDatabase, alias);
+  }
+}
+
+class SeasonEpisodeList extends DataClass
+    implements Insertable<SeasonEpisodeList> {
+  final int tmdbId;
+  final int kind;
+  final int seasonNo;
+  final String episodesJson;
+  const SeasonEpisodeList(
+      {required this.tmdbId,
+      required this.kind,
+      required this.seasonNo,
+      required this.episodesJson});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['tmdb_id'] = Variable<int>(tmdbId);
+    map['kind'] = Variable<int>(kind);
+    map['season_no'] = Variable<int>(seasonNo);
+    map['episodes_json'] = Variable<String>(episodesJson);
+    return map;
+  }
+
+  SeasonEpisodeListsCompanion toCompanion(bool nullToAbsent) {
+    return SeasonEpisodeListsCompanion(
+      tmdbId: Value(tmdbId),
+      kind: Value(kind),
+      seasonNo: Value(seasonNo),
+      episodesJson: Value(episodesJson),
+    );
+  }
+
+  factory SeasonEpisodeList.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SeasonEpisodeList(
+      tmdbId: serializer.fromJson<int>(json['tmdbId']),
+      kind: serializer.fromJson<int>(json['kind']),
+      seasonNo: serializer.fromJson<int>(json['seasonNo']),
+      episodesJson: serializer.fromJson<String>(json['episodesJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'tmdbId': serializer.toJson<int>(tmdbId),
+      'kind': serializer.toJson<int>(kind),
+      'seasonNo': serializer.toJson<int>(seasonNo),
+      'episodesJson': serializer.toJson<String>(episodesJson),
+    };
+  }
+
+  SeasonEpisodeList copyWith(
+          {int? tmdbId, int? kind, int? seasonNo, String? episodesJson}) =>
+      SeasonEpisodeList(
+        tmdbId: tmdbId ?? this.tmdbId,
+        kind: kind ?? this.kind,
+        seasonNo: seasonNo ?? this.seasonNo,
+        episodesJson: episodesJson ?? this.episodesJson,
+      );
+  SeasonEpisodeList copyWithCompanion(SeasonEpisodeListsCompanion data) {
+    return SeasonEpisodeList(
+      tmdbId: data.tmdbId.present ? data.tmdbId.value : this.tmdbId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      seasonNo: data.seasonNo.present ? data.seasonNo.value : this.seasonNo,
+      episodesJson: data.episodesJson.present
+          ? data.episodesJson.value
+          : this.episodesJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeasonEpisodeList(')
+          ..write('tmdbId: $tmdbId, ')
+          ..write('kind: $kind, ')
+          ..write('seasonNo: $seasonNo, ')
+          ..write('episodesJson: $episodesJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(tmdbId, kind, seasonNo, episodesJson);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SeasonEpisodeList &&
+          other.tmdbId == this.tmdbId &&
+          other.kind == this.kind &&
+          other.seasonNo == this.seasonNo &&
+          other.episodesJson == this.episodesJson);
+}
+
+class SeasonEpisodeListsCompanion extends UpdateCompanion<SeasonEpisodeList> {
+  final Value<int> tmdbId;
+  final Value<int> kind;
+  final Value<int> seasonNo;
+  final Value<String> episodesJson;
+  final Value<int> rowid;
+  const SeasonEpisodeListsCompanion({
+    this.tmdbId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.seasonNo = const Value.absent(),
+    this.episodesJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SeasonEpisodeListsCompanion.insert({
+    required int tmdbId,
+    required int kind,
+    required int seasonNo,
+    required String episodesJson,
+    this.rowid = const Value.absent(),
+  })  : tmdbId = Value(tmdbId),
+        kind = Value(kind),
+        seasonNo = Value(seasonNo),
+        episodesJson = Value(episodesJson);
+  static Insertable<SeasonEpisodeList> custom({
+    Expression<int>? tmdbId,
+    Expression<int>? kind,
+    Expression<int>? seasonNo,
+    Expression<String>? episodesJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (tmdbId != null) 'tmdb_id': tmdbId,
+      if (kind != null) 'kind': kind,
+      if (seasonNo != null) 'season_no': seasonNo,
+      if (episodesJson != null) 'episodes_json': episodesJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SeasonEpisodeListsCompanion copyWith(
+      {Value<int>? tmdbId,
+      Value<int>? kind,
+      Value<int>? seasonNo,
+      Value<String>? episodesJson,
+      Value<int>? rowid}) {
+    return SeasonEpisodeListsCompanion(
+      tmdbId: tmdbId ?? this.tmdbId,
+      kind: kind ?? this.kind,
+      seasonNo: seasonNo ?? this.seasonNo,
+      episodesJson: episodesJson ?? this.episodesJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (tmdbId.present) {
+      map['tmdb_id'] = Variable<int>(tmdbId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<int>(kind.value);
+    }
+    if (seasonNo.present) {
+      map['season_no'] = Variable<int>(seasonNo.value);
+    }
+    if (episodesJson.present) {
+      map['episodes_json'] = Variable<String>(episodesJson.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SeasonEpisodeListsCompanion(')
+          ..write('tmdbId: $tmdbId, ')
+          ..write('kind: $kind, ')
+          ..write('seasonNo: $seasonNo, ')
+          ..write('episodesJson: $episodesJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $HomeSnapshotsTable extends HomeSnapshots
     with TableInfo<$HomeSnapshotsTable, HomeSnapshot> {
   @override
@@ -1092,13 +1365,20 @@ abstract class _$SushiCatalogDatabase extends GeneratedDatabase {
   late final $ItemPagesTable itemPages = $ItemPagesTable(this);
   late final $EpisodeFileListsTable episodeFileLists =
       $EpisodeFileListsTable(this);
+  late final $SeasonEpisodeListsTable seasonEpisodeLists =
+      $SeasonEpisodeListsTable(this);
   late final $HomeSnapshotsTable homeSnapshots = $HomeSnapshotsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [catalogItems, itemPages, episodeFileLists, homeSnapshots];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        catalogItems,
+        itemPages,
+        episodeFileLists,
+        seasonEpisodeLists,
+        homeSnapshots
+      ];
 }
 
 typedef $$CatalogItemsTableCreateCompanionBuilder = CatalogItemsCompanion
@@ -1571,6 +1851,169 @@ typedef $$EpisodeFileListsTableProcessedTableManager = ProcessedTableManager<
     ),
     EpisodeFileList,
     PrefetchHooks Function()>;
+typedef $$SeasonEpisodeListsTableCreateCompanionBuilder
+    = SeasonEpisodeListsCompanion Function({
+  required int tmdbId,
+  required int kind,
+  required int seasonNo,
+  required String episodesJson,
+  Value<int> rowid,
+});
+typedef $$SeasonEpisodeListsTableUpdateCompanionBuilder
+    = SeasonEpisodeListsCompanion Function({
+  Value<int> tmdbId,
+  Value<int> kind,
+  Value<int> seasonNo,
+  Value<String> episodesJson,
+  Value<int> rowid,
+});
+
+class $$SeasonEpisodeListsTableFilterComposer
+    extends Composer<_$SushiCatalogDatabase, $SeasonEpisodeListsTable> {
+  $$SeasonEpisodeListsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get tmdbId => $composableBuilder(
+      column: $table.tmdbId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get seasonNo => $composableBuilder(
+      column: $table.seasonNo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get episodesJson => $composableBuilder(
+      column: $table.episodesJson, builder: (column) => ColumnFilters(column));
+}
+
+class $$SeasonEpisodeListsTableOrderingComposer
+    extends Composer<_$SushiCatalogDatabase, $SeasonEpisodeListsTable> {
+  $$SeasonEpisodeListsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get tmdbId => $composableBuilder(
+      column: $table.tmdbId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get seasonNo => $composableBuilder(
+      column: $table.seasonNo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get episodesJson => $composableBuilder(
+      column: $table.episodesJson,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$SeasonEpisodeListsTableAnnotationComposer
+    extends Composer<_$SushiCatalogDatabase, $SeasonEpisodeListsTable> {
+  $$SeasonEpisodeListsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get tmdbId =>
+      $composableBuilder(column: $table.tmdbId, builder: (column) => column);
+
+  GeneratedColumn<int> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get seasonNo =>
+      $composableBuilder(column: $table.seasonNo, builder: (column) => column);
+
+  GeneratedColumn<String> get episodesJson => $composableBuilder(
+      column: $table.episodesJson, builder: (column) => column);
+}
+
+class $$SeasonEpisodeListsTableTableManager extends RootTableManager<
+    _$SushiCatalogDatabase,
+    $SeasonEpisodeListsTable,
+    SeasonEpisodeList,
+    $$SeasonEpisodeListsTableFilterComposer,
+    $$SeasonEpisodeListsTableOrderingComposer,
+    $$SeasonEpisodeListsTableAnnotationComposer,
+    $$SeasonEpisodeListsTableCreateCompanionBuilder,
+    $$SeasonEpisodeListsTableUpdateCompanionBuilder,
+    (
+      SeasonEpisodeList,
+      BaseReferences<_$SushiCatalogDatabase, $SeasonEpisodeListsTable,
+          SeasonEpisodeList>
+    ),
+    SeasonEpisodeList,
+    PrefetchHooks Function()> {
+  $$SeasonEpisodeListsTableTableManager(
+      _$SushiCatalogDatabase db, $SeasonEpisodeListsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SeasonEpisodeListsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SeasonEpisodeListsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SeasonEpisodeListsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> tmdbId = const Value.absent(),
+            Value<int> kind = const Value.absent(),
+            Value<int> seasonNo = const Value.absent(),
+            Value<String> episodesJson = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SeasonEpisodeListsCompanion(
+            tmdbId: tmdbId,
+            kind: kind,
+            seasonNo: seasonNo,
+            episodesJson: episodesJson,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required int tmdbId,
+            required int kind,
+            required int seasonNo,
+            required String episodesJson,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SeasonEpisodeListsCompanion.insert(
+            tmdbId: tmdbId,
+            kind: kind,
+            seasonNo: seasonNo,
+            episodesJson: episodesJson,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SeasonEpisodeListsTableProcessedTableManager = ProcessedTableManager<
+    _$SushiCatalogDatabase,
+    $SeasonEpisodeListsTable,
+    SeasonEpisodeList,
+    $$SeasonEpisodeListsTableFilterComposer,
+    $$SeasonEpisodeListsTableOrderingComposer,
+    $$SeasonEpisodeListsTableAnnotationComposer,
+    $$SeasonEpisodeListsTableCreateCompanionBuilder,
+    $$SeasonEpisodeListsTableUpdateCompanionBuilder,
+    (
+      SeasonEpisodeList,
+      BaseReferences<_$SushiCatalogDatabase, $SeasonEpisodeListsTable,
+          SeasonEpisodeList>
+    ),
+    SeasonEpisodeList,
+    PrefetchHooks Function()>;
 typedef $$HomeSnapshotsTableCreateCompanionBuilder = HomeSnapshotsCompanion
     Function({
   Value<int> id,
@@ -1749,6 +2192,8 @@ class $SushiCatalogDatabaseManager {
       $$ItemPagesTableTableManager(_db, _db.itemPages);
   $$EpisodeFileListsTableTableManager get episodeFileLists =>
       $$EpisodeFileListsTableTableManager(_db, _db.episodeFileLists);
+  $$SeasonEpisodeListsTableTableManager get seasonEpisodeLists =>
+      $$SeasonEpisodeListsTableTableManager(_db, _db.seasonEpisodeLists);
   $$HomeSnapshotsTableTableManager get homeSnapshots =>
       $$HomeSnapshotsTableTableManager(_db, _db.homeSnapshots);
 }

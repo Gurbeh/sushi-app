@@ -28,9 +28,8 @@ class SushiSeriesDetailPlayButtons extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pickerSeasons = sushiSeriesPickerSeasons(series);
-    final episodeCount = pickerSeasons.fold<int>(0, (sum, season) => sum + season.episodes.length);
-    final showEpisodePicker =
-        episodeCount > 1;
+    final episodeCount = pickerSeasons.fold<int>(0, (sum, season) => sum + (season.episodeCount > 0 ? season.episodeCount : season.episodes.length));
+    final showEpisodePicker = episodeCount > 1;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

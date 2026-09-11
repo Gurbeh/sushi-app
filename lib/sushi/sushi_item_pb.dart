@@ -75,6 +75,55 @@ class SushiEpisode {
     }
     return SushiEpisode(episodeId: episodeId, seasonNo: seasonNo, episodeNo: episodeNo, title: title);
   }
+
+  Map<String, Object?> toJson() => {
+        'episodeId': episodeId,
+        'seasonNo': seasonNo,
+        'episodeNo': episodeNo,
+        'title': title,
+      };
+
+  static SushiEpisode fromJson(Map<String, dynamic> json) {
+    return SushiEpisode(
+      episodeId: (json['episodeId'] as num?)?.toInt() ?? 0,
+      seasonNo: (json['seasonNo'] as num?)?.toInt() ?? 0,
+      episodeNo: (json['episodeNo'] as num?)?.toInt() ?? 0,
+      title: json['title'] as String? ?? '',
+    );
+  }
+}
+
+/// Index row on a series title page (ADR 0028). Episode bodies arrive via /episodes.
+class SushiSeason {
+  const SushiSeason({required this.seasonNo, required this.episodeCount});
+
+  final int seasonNo;
+  final int episodeCount;
+
+  static SushiSeason decode(Uint8List bytes) {
+    var seasonNo = 0;
+    var episodeCount = 0;
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final field = tagR.value >> 3;
+      final wire = tagR.value & 0x7;
+      switch (field) {
+        case 1:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          seasonNo = v.value;
+        case 2:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          episodeCount = v.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
+      }
+    }
+    return SushiSeason(seasonNo: seasonNo, episodeCount: episodeCount);
+  }
 }
 
 /// One playable encoding of one episode (the pick-list, docs/12 §5).
@@ -338,6 +387,7 @@ class SushiItemRes {
     this.related = const [],
     this.collectionName = '',
     this.collection = const [],
+    this.seasons = const [],
     this.wire,
   });
 
@@ -353,6 +403,7 @@ class SushiItemRes {
   final List<SushiRow> related;
   final String collectionName;
   final List<SushiRow> collection;
+  final List<SushiSeason> seasons;
   /// Original protobuf bytes. Needed to persist a title page without a Dart encoder.
   final Uint8List? wire;
 
@@ -369,6 +420,7 @@ class SushiItemRes {
     final related = <SushiRow>[];
     var collectionName = '';
     final collection = <SushiRow>[];
+    final seasons = <SushiSeason>[];
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -434,6 +486,11 @@ class SushiItemRes {
           i = lenR.next;
           collection.add(SushiRow.decode(bytes.sublist(i, i + lenR.value)));
           i += lenR.value;
+        case 15:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          seasons.add(SushiSeason.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
@@ -451,6 +508,7 @@ class SushiItemRes {
       related: List.unmodifiable(related),
       collectionName: collectionName,
       collection: List.unmodifiable(collection),
+      seasons: List.unmodifiable(seasons),
       wire: bytes,
     );
   }
@@ -506,4 +564,86 @@ Uint8List sushiEncodeFilesReq({required int episodeId}) {
     out.add(sushiUvarint(episodeId));
   }
   return out.toBytes();
+}
+
+/// Encodes a `sushi.v1.EpisodesReq`.
+Uint8List sushiEncodeEpisodesReq({
+  required int tmdbId,
+  required int kind,
+  required int seasonNo,
+  int page = 0,
+}) {
+  final out = BytesBuilder();
+  void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
+  if (tmdbId != 0) {
+    writeTag(1, 0);
+    out.add(sushiUvarint(tmdbId));
+  }
+  if (kind != 0) {
+    writeTag(2, 0);
+    out.add(sushiUvarint(kind));
+  }
+  if (seasonNo != 0) {
+    writeTag(3, 0);
+    out.add(sushiUvarint(seasonNo));
+  }
+  if (page != 0) {
+    writeTag(4, 0);
+    out.add(sushiUvarint(page));
+  }
+  return out.toBytes();
+}
+
+/// Decoded `sushi.v1.EpisodesRes`.
+class SushiEpisodesRes {
+  const SushiEpisodesRes({
+    required this.episodes,
+    this.page = 0,
+    this.pages = 0,
+  });
+
+  final List<SushiEpisode> episodes;
+  final int page;
+  final int pages;
+
+  static SushiEpisodesRes decode(Uint8List bytes) {
+    final episodes = <SushiEpisode>[];
+    var page = 0;
+    var pages = 0;
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final field = tagR.value >> 3;
+      final wire = tagR.value & 0x7;
+      switch (field) {
+        case 1:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          episodes.add(SushiEpisode.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
+        case 2:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          page = v.value;
+        case 3:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          pages = v.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
+      }
+    }
+    return SushiEpisodesRes(
+      episodes: List.unmodifiable(episodes),
+      page: page,
+      pages: pages,
+    );
+  }
+}
+
+/// Playable catalog title: a movie episode id, or a series with a season index (ADR 0028).
+bool sushiItemResPlayable(SushiItemRes page) {
+  if (page.episodes.any((e) => e.episodeId != 0)) return true;
+  return page.seasons.any((s) => s.episodeCount > 0);
 }

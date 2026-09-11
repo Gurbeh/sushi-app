@@ -42,13 +42,29 @@ Uint8List _encodeEpisode({required int episodeId, required int seasonNo, require
   return out.toBytes();
 }
 
-Uint8List _encodeItemRes({required Uint8List row, required String overview, required int releasedOn, required List<Uint8List> episodes}) {
+Uint8List _encodeSeason({required int seasonNo, required int episodeCount}) {
+  final out = BytesBuilder();
+  if (seasonNo != 0) out.add(_varintField(1, seasonNo));
+  if (episodeCount != 0) out.add(_varintField(2, episodeCount));
+  return out.toBytes();
+}
+
+Uint8List _encodeItemRes({
+  required Uint8List row,
+  required String overview,
+  required int releasedOn,
+  required List<Uint8List> episodes,
+  List<Uint8List> seasons = const [],
+}) {
   final out = BytesBuilder();
   out.add(_lenDelim(1, row));
   if (overview.isNotEmpty) out.add(_lenDelim(2, utf8.encode(overview)));
   if (releasedOn != 0) out.add(_varintField(3, releasedOn));
   for (final e in episodes) {
     out.add(_lenDelim(4, e));
+  }
+  for (final s in seasons) {
+    out.add(_lenDelim(15, s));
   }
   return out.toBytes();
 }
@@ -115,17 +131,59 @@ void main() {
     expect(res.episodes.single.episodeId, 100);
   });
 
-  test('SushiItemRes decodes multiple episodes for a series', () {
+  test('SushiItemRes decodes season index and a single play-target', () {
     final rowBytes = _encodeRow(tmdbId: 1, kind: 2, title: 'A Show', year: 2020, rating: 70, poster: '');
     final ep1 = _encodeEpisode(episodeId: 10, seasonNo: 1, episodeNo: 1, title: 'Pilot');
-    final ep2 = _encodeEpisode(episodeId: 11, seasonNo: 1, episodeNo: 2, title: 'Episode Two');
-    final itemBytes = _encodeItemRes(row: rowBytes, overview: '', releasedOn: 0, episodes: [ep1, ep2]);
+    final s1 = _encodeSeason(seasonNo: 1, episodeCount: 2);
+    final s2 = _encodeSeason(seasonNo: 2, episodeCount: 1);
+    final itemBytes = _encodeItemRes(
+      row: rowBytes,
+      overview: '',
+      releasedOn: 0,
+      episodes: [ep1],
+      seasons: [s1, s2],
+    );
 
     final res = SushiItemRes.decode(itemBytes);
+    expect(res.episodes, hasLength(1));
+    expect(res.episodes.single.episodeId, 10);
+    expect(res.seasons, hasLength(2));
+    expect(res.seasons[0].seasonNo, 1);
+    expect(res.seasons[0].episodeCount, 2);
+    expect(res.seasons[1].seasonNo, 2);
+    expect(sushiItemResPlayable(res), isTrue);
+  });
+
+  test('sushiEncodeEpisodesReq encodes tmdb, kind, season, page', () {
+    final bytes = sushiEncodeEpisodesReq(tmdbId: 1396, kind: 2, seasonNo: 1, page: 3);
+    final decoded = <int, int>{};
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final v = sushiReadVarint(bytes, i);
+      i = v.next;
+      decoded[tagR.value >> 3] = v.value;
+    }
+    expect(decoded[1], 1396);
+    expect(decoded[2], 2);
+    expect(decoded[3], 1);
+    expect(decoded[4], 3);
+  });
+
+  test('SushiEpisodesRes decodes a season page', () {
+    final ep1 = _encodeEpisode(episodeId: 10, seasonNo: 1, episodeNo: 1, title: 'Pilot');
+    final ep2 = _encodeEpisode(episodeId: 11, seasonNo: 1, episodeNo: 2, title: 'Two');
+    final out = BytesBuilder()
+      ..add(_lenDelim(1, ep1))
+      ..add(_lenDelim(1, ep2))
+      ..add(_varintField(2, 0))
+      ..add(_varintField(3, 2));
+    final res = SushiEpisodesRes.decode(out.toBytes());
     expect(res.episodes, hasLength(2));
-    expect(res.episodes[0].seasonNo, 1);
-    expect(res.episodes[1].episodeNo, 2);
-    expect(res.episodes[1].title, 'Episode Two');
+    expect(res.episodes[1].title, 'Two');
+    expect(res.page, 0);
+    expect(res.pages, 2);
   });
 
   test('SushiItemRes decodes logo, people, related and collection', () {

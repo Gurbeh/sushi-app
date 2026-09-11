@@ -9,6 +9,7 @@ import 'package:fladder/sushi/sushi_item_pb.dart';
 
 class _MemStore implements SushiCatalogStore {
   final Map<String, SushiItemRes> titles = {};
+  final Map<String, List<SushiEpisode>> seasons = {};
   ({List<SushiFile> files, DateTime fetchedAt})? files;
   SushiCachedHome? home;
 
@@ -37,6 +38,15 @@ class _MemStore implements SushiCatalogStore {
   @override
   Future<void> replaceFiles(int episodeId, List<SushiFile> files, DateTime at) async {
     this.files = (files: files, fetchedAt: at);
+  }
+
+  @override
+  Future<List<SushiEpisode>?> readSeason(int tmdbId, int kind, int seasonNo) async =>
+      seasons['$tmdbId:$kind:$seasonNo'];
+
+  @override
+  Future<void> writeSeason(int tmdbId, int kind, int seasonNo, List<SushiEpisode> episodes) async {
+    seasons['$tmdbId:$kind:$seasonNo'] = episodes;
   }
 
   @override
@@ -100,6 +110,7 @@ SushiCatalogController _catalog(
   _MemStore store, {
   SushiItemFetcher? fetchItem,
   SushiFilesFetcher? fetchFiles,
+  SushiEpisodesFetcher? fetchEpisodes,
   SushiHomeFetcher? fetchHome,
   DateTime Function()? clock,
 }) {
@@ -107,6 +118,9 @@ SushiCatalogController _catalog(
     store,
     fetchItem: fetchItem ?? ({required tmdbId, required kind}) async => null,
     fetchFiles: fetchFiles ?? ({required episodeId}) async => const SushiFilesRes(files: []),
+    fetchEpisodes: fetchEpisodes ??
+        ({required tmdbId, required kind, required seasonNo, int page = 0}) async =>
+            const SushiEpisodesRes(episodes: []),
     fetchHome: fetchHome ?? ({required tab}) async => _homeRes(seq: 1),
     clock: clock,
     prefetchGap: Duration.zero,
@@ -374,5 +388,53 @@ void main() {
     await catalog.prefetchVisibleHome(_cachedHome(slider: [_row(8)]));
     await pumpEventQueue();
     expect(store.titles, isEmpty);
+  });
+
+  test('prefetch persists a series with a season index', () async {
+    final store = _MemStore();
+    final catalog = _catalog(
+      store,
+      fetchItem: ({required tmdbId, required kind}) async => SushiItemRes(
+        row: _row(tmdbId, kind: SushiKind.series),
+        overview: '',
+        releasedOn: 0,
+        episodes: const [],
+        seasons: const [SushiSeason(seasonNo: 1, episodeCount: 24)],
+        wire: Uint8List.fromList([1, 2, 3]),
+      ),
+    );
+    await catalog.prefetchVisibleHome(_cachedHome(slider: [_row(8, kind: SushiKind.series)]));
+    await pumpEventQueue();
+    expect(store.titles, isNotEmpty);
+  });
+
+  test('openSeason fetches pages and caches the season', () async {
+    final store = _MemStore();
+    var calls = 0;
+    final catalog = _catalog(
+      store,
+      fetchEpisodes: ({required tmdbId, required kind, required seasonNo, int page = 0}) async {
+        calls++;
+        if (page == 0) {
+          return const SushiEpisodesRes(
+            episodes: [SushiEpisode(episodeId: 1, seasonNo: 1, episodeNo: 1, title: 'Pilot')],
+            page: 0,
+            pages: 2,
+          );
+        }
+        return const SushiEpisodesRes(
+          episodes: [SushiEpisode(episodeId: 2, seasonNo: 1, episodeNo: 2, title: 'Two')],
+          page: 1,
+          pages: 2,
+        );
+      },
+    );
+
+    final first = await catalog.openSeason(tmdbId: 1396, kind: SushiKind.series, seasonNo: 1);
+    expect(first, hasLength(2));
+    expect(calls, 2);
+    final cached = await catalog.openSeason(tmdbId: 1396, kind: SushiKind.series, seasonNo: 1);
+    expect(cached, hasLength(2));
+    expect(calls, 2);
   });
 }

@@ -1,17 +1,24 @@
 import 'dart:developer';
 
 import 'package:chopper/chopper.dart';
-import 'package:fladder/models/items/special_feature_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/items/episode_model.dart';
+import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/season_model.dart';
-import 'package:fladder/sushi/sushi_virtual_episode_images.dart';
-import 'package:fladder/sushi/sushi_season_user_data.dart';
+import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/models/items/special_feature_model.dart';
 import 'package:fladder/providers/api_provider.dart';
+import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_config.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/sushi_season_user_data.dart';
+import 'package:fladder/sushi/sushi_virtual_episode_images.dart';
 import 'package:logging/logging.dart' as logging;
 
 final seasonDetailsProvider =
@@ -27,10 +34,11 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
   late final JellyService api = ref.read(jellyApiProvider);
 
   Future<Response?> fetchDetails(String seasonId, {SeasonModel? hint}) async {
-    
-      state = hint;
+    if (SushiConfig.isEnabled) {
+      await _loadSushiSeason(hint);
       return null;
-    
+    }
+
     SeasonModel? newState = hint;
 
     final season = await api.usersUserIdItemsItemIdGet(itemId: seasonId);
@@ -79,5 +87,38 @@ class SeasonDetailsNotifier extends StateNotifier<SeasonModel?> {
     }
     state = newState;
     return season;
+  }
+
+  Future<void> _loadSushiSeason(SeasonModel? hint) async {
+    state = hint;
+    if (hint == null) return;
+    final tmdbId = sushiTmdbIdFromItemId(hint.seriesId);
+    if (tmdbId == null) return;
+    final wire = await ref.read(sushiCatalogControllerProvider).openSeason(
+          tmdbId: tmdbId,
+          kind: SushiKind.series,
+          seasonNo: hint.season,
+        );
+    final series = ref.read(seriesDetailsProvider(hint.seriesId)) ??
+        SeriesModel(
+          originalTitle: '',
+          sortName: '',
+          status: '',
+          name: hint.seriesName,
+          id: hint.seriesId,
+          overview: hint.overview,
+          parentId: null,
+          playlistId: null,
+          images: hint.parentImages,
+          childCount: hint.episodeCount,
+          primaryRatio: null,
+          userData: const UserData(),
+        );
+    final loaded = sushiEpisodesFromWire(series, wire);
+    state = hint.copyWith(
+      episodes: loaded,
+      userData: sushiSeasonUserDataFromEpisodes(loaded),
+    );
+    ref.read(seriesDetailsProvider(hint.seriesId).notifier).mergeSeason(hint.season, loaded);
   }
 }

@@ -265,7 +265,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         );
                       }),
                     ),
-                  if (details.availableEpisodes?.isNotEmpty ?? false)
+                  if (_showSeriesEpisodeRail(details))
                     Builder(builder: (context) {
                       return EpisodePosters(
                         contentPadding: padding,
@@ -336,4 +336,14 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
           : SushiDetailLoadingContent(item: widget.item, padding: padding),
     );
   }
+}
+
+bool _showSeriesEpisodeRail(SeriesModel details) {
+  final episodes = details.availableEpisodes;
+  if (episodes == null || episodes.isEmpty) return false;
+  final seasons = details.seasons;
+  if (seasons != null && seasons.isNotEmpty) {
+    return seasons.any((s) => s.episodes.length > 1);
+  }
+  return true;
 }

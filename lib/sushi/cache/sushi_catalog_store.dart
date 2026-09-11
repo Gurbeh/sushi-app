@@ -50,6 +50,8 @@ abstract class SushiCatalogStore {
   Future<void> writeTitle(SushiItemRes page);
   Future<({List<SushiFile> files, DateTime fetchedAt})?> readFiles(int episodeId);
   Future<void> replaceFiles(int episodeId, List<SushiFile> files, DateTime at);
+  Future<List<SushiEpisode>?> readSeason(int tmdbId, int kind, int seasonNo);
+  Future<void> writeSeason(int tmdbId, int kind, int seasonNo, List<SushiEpisode> episodes);
   Future<SushiCachedHome?> readHome();
   Future<void> writeHome(SushiCachedHome home);
 }

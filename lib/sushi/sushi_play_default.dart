@@ -63,11 +63,15 @@ Future<List<EpisodeModel>> sushiEpisodeQueueFor(
   if (parentId == null || parentId.isEmpty) return const [];
   final tmdbId = sushiTmdbIdFromItemId(parentId);
   if (tmdbId == null) return const [];
-  final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
-  if (snap.page == null) return const [];
-  final series = sushiEnrichSeriesModel(episode.parentBaseModel, snap.page!);
+  final parent = episode.parentBaseModel;
+  if (parent is! SeriesModel) return const [];
+  final wire = await catalog.openSeason(
+    tmdbId: tmdbId,
+    kind: SushiKind.series,
+    seasonNo: episode.season,
+  );
   return [
-    for (final e in series.availableEpisodes ?? const <EpisodeModel>[])
+    for (final e in sushiEpisodesFromWire(parent, wire))
       if (e.playAble) e,
   ];
 }

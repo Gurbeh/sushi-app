@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/providers/items/series_details_provider.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:fladder/sushi/sushi_series_selected_episode.dart';
 import 'package:fladder/theme.dart';
@@ -30,22 +33,27 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
     with SingleTickerProviderStateMixin {
   static const _slideDuration = Duration(milliseconds: 380);
 
-  late final List<SushiSeriesPickerSeason> _seasons = sushiSeriesPickerSeasons(widget.series);
+  late List<SushiSeriesPickerSeason> _seasons;
   late final AnimationController _slideController;
   late final Animation<double> _slideCurve;
   final FocusNode _firstEpisodeFocus = FocusNode();
   SushiSeriesPickerSeason? _selectedSeason;
+  bool _loadingSeason = false;
 
   @override
   void initState() {
     super.initState();
+    _seasons = sushiSeriesPickerSeasons(widget.series);
     _slideController = AnimationController(vsync: this, duration: _slideDuration);
     _slideCurve = CurvedAnimation(parent: _slideController, curve: Curves.easeInOutCubic);
 
     if (_seasons.length == 1) {
       _selectedSeason = _seasons.first;
       _slideController.value = 1;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusFirstEpisode());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_ensureSeasonEpisodes(_seasons.first));
+        _focusFirstEpisode();
+      });
     }
   }
 
@@ -77,13 +85,31 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
     WidgetsBinding.instance.addPostFrameCallback((_) => jump());
   }
 
-  void _selectSeason(SushiSeriesPickerSeason season) {
-    setState(() => _selectedSeason = season);
+  Future<void> _selectSeason(SushiSeriesPickerSeason season) async {
+    setState(() {
+      _selectedSeason = season;
+      _loadingSeason = season.episodes.isEmpty;
+    });
     _scrollSheetToTop();
-    _slideController.forward(from: 0).whenComplete(() {
-      if (!mounted) return;
-      _scrollSheetToTop();
-      _focusFirstEpisode();
+    await _slideController.forward(from: 0);
+    if (!mounted) return;
+    await _ensureSeasonEpisodes(season);
+    if (!mounted) return;
+    _scrollSheetToTop();
+    _focusFirstEpisode();
+  }
+
+  Future<void> _ensureSeasonEpisodes(SushiSeriesPickerSeason season) async {
+    if (season.episodes.isNotEmpty) return;
+    setState(() => _loadingSeason = true);
+    final loaded = await ref.read(seriesDetailsProvider(widget.series.id).notifier).loadSeason(season.seasonNumber);
+    if (!mounted) return;
+    final next = season.copyWith(episodes: loaded);
+    setState(() {
+      _loadingSeason = false;
+      _selectedSeason = next;
+      final i = _seasons.indexWhere((s) => s.seasonNumber == season.seasonNumber);
+      if (i >= 0) _seasons[i] = next;
     });
   }
 
@@ -105,8 +131,8 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
   }
 
   String _seasonStepSubtitle(BuildContext context, SushiSeriesPickerSeason season) {
-    final playable = season.episodes.where((episode) => episode.playAble).length;
-    return context.localized.episode(playable);
+    final n = season.episodeCount > 0 ? season.episodeCount : season.episodes.where((episode) => episode.playAble).length;
+    return context.localized.episode(n);
   }
 
   Future<void> _playEpisode(EpisodeModel episode) async {
@@ -203,6 +229,22 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
   }
 
   List<Widget> _episodeTiles(BuildContext context, SushiSeriesPickerSeason season) {
+    if (_loadingSeason) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
+    }
+    if (season.episodes.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Text(context.localized.episode(0)),
+        ),
+      ];
+    }
     final l10n = context.localized;
 
     return season.episodes

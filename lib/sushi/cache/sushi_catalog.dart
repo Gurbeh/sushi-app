@@ -41,6 +41,16 @@ class EpisodeFileLists extends Table {
   Set<Column<Object>> get primaryKey => {episodeId};
 }
 
+class SeasonEpisodeLists extends Table {
+  IntColumn get tmdbId => integer()();
+  IntColumn get kind => integer()();
+  IntColumn get seasonNo => integer()();
+  TextColumn get episodesJson => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {tmdbId, kind, seasonNo};
+}
+
 class HomeSnapshots extends Table {
   IntColumn get id => integer()();
   IntColumn get seq => integer()();
@@ -52,12 +62,22 @@ class HomeSnapshots extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [CatalogItems, ItemPages, EpisodeFileLists, HomeSnapshots])
+@DriftDatabase(tables: [CatalogItems, ItemPages, EpisodeFileLists, SeasonEpisodeLists, HomeSnapshots])
 class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalogStore {
   SushiCatalogDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(seasonEpisodeLists);
+          }
+        },
+      );
 
   static QueryExecutor _openConnection() {
     return driftDatabase(
@@ -108,6 +128,31 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
         episodeId: Value(episodeId),
         filesJson: Value(jsonEncode([for (final f in files) f.toJson()])),
         fetchedAt: Value(at),
+      ),
+    );
+  }
+
+  @override
+  Future<List<SushiEpisode>?> readSeason(int tmdbId, int kind, int seasonNo) async {
+    final row = await (select(seasonEpisodeLists)
+          ..where((t) =>
+              t.tmdbId.equals(tmdbId) & t.kind.equals(kind) & t.seasonNo.equals(seasonNo)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    final list = jsonDecode(row.episodesJson) as List<dynamic>;
+    return [
+      for (final entry in list) SushiEpisode.fromJson(Map<String, dynamic>.from(entry as Map)),
+    ];
+  }
+
+  @override
+  Future<void> writeSeason(int tmdbId, int kind, int seasonNo, List<SushiEpisode> episodes) async {
+    await into(seasonEpisodeLists).insertOnConflictUpdate(
+      SeasonEpisodeListsCompanion(
+        tmdbId: Value(tmdbId),
+        kind: Value(kind),
+        seasonNo: Value(seasonNo),
+        episodesJson: Value(jsonEncode([for (final e in episodes) e.toJson()])),
       ),
     );
   }

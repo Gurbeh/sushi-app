@@ -19,14 +19,39 @@ class SushiSeriesPickerSeason {
     required this.seasonNumber,
     required this.name,
     required this.episodes,
+    this.episodeCount = 0,
   });
 
   final int seasonNumber;
   final String name;
   final List<EpisodeModel> episodes;
+  final int episodeCount;
+
+  SushiSeriesPickerSeason copyWith({List<EpisodeModel>? episodes}) {
+    return SushiSeriesPickerSeason(
+      seasonNumber: seasonNumber,
+      name: name,
+      episodes: episodes ?? this.episodes,
+      episodeCount: episodeCount,
+    );
+  }
 }
 
 List<SushiSeriesPickerSeason> sushiSeriesPickerSeasons(SeriesModel series) {
+  final indexed = series.seasons;
+  if (indexed != null && indexed.isNotEmpty) {
+    return [
+      for (final season in indexed)
+        if (season.season > 0 && season.episodeCount > 0)
+          SushiSeriesPickerSeason(
+            seasonNumber: season.season,
+            name: _oxPickerSeasonName(season, season.season),
+            episodes: season.episodes.where((episode) => episode.playAble).toList(),
+            episodeCount: season.episodeCount,
+          ),
+    ];
+  }
+
   final episodes = series.availableEpisodes?.where((episode) => episode.season > 0).toList() ?? [];
   if (episodes.isEmpty) return const [];
 
@@ -40,6 +65,7 @@ List<SushiSeriesPickerSeason> sushiSeriesPickerSeasons(SeriesModel series) {
           seasonNumber: entry.key,
           name: name,
           episodes: seasonEpisodes,
+          episodeCount: seasonEpisodes.length,
         );
       })
       .where((season) => season.episodes.isNotEmpty)

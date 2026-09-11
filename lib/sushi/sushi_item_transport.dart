@@ -8,7 +8,7 @@ import 'package:fladder/sushi/sushi_wire.dart';
 const _msgTypeItemRes = 4;
 const _msgTypeFilesRes = 6;
 
-/// Fetches one title's full record — overview and episode/season tree (docs/12 §4).
+/// Fetches one title page — overview, extras, and a thin season index (docs/12 §4, ADR 0028).
 /// Round-robins the API pool (ADR 0011). Returns null on any failure (never throws): a title
 /// page with no extra detail yet is a normal, recoverable state, not different from the home
 /// rails' own defensive style.
@@ -89,6 +89,51 @@ Future<SushiFilesRes?> sushiFetchFiles({required int episodeId}) async {
     return SushiFilesRes.decode(env.payload);
   } catch (e, st) {
     debugPrint('[sushi] files fetch failed: $e\n$st');
+    return null;
+  }
+}
+
+Future<SushiEpisodesRes?> sushiFetchEpisodes({
+  required int tmdbId,
+  required int kind,
+  required int seasonNo,
+  int page = 0,
+}) async {
+  final assignment = await SushiAssignmentStore.load();
+  if (assignment == null ||
+      assignment.pending ||
+      assignment.apiSendTargets.isEmpty) {
+    debugPrint('[sushi] episodes: no assignment yet, skipping fetch');
+    return null;
+  }
+
+  final corr = sushiNewCorrBase36();
+  final requestText = sushiEncodeRequestText(
+    'episodes',
+    corr,
+    sushiEncodeEpisodesReq(tmdbId: tmdbId, kind: kind, seasonNo: seasonNo, page: page),
+  );
+
+  try {
+    final reply = await sushiSendTextAndWaitReply(
+      username: sushiNextApiBot(assignment),
+      text: requestText,
+      timeoutMs: 10000,
+    );
+    final env = SushiEnvelope.decode(reply);
+    if (env.type == SushiEnvelope.msgTypeErr) {
+      debugPrint(
+          '[sushi] episodes: server returned ERR tmdbId=$tmdbId season=$seasonNo corr=${env.corr}');
+      return null;
+    }
+    if (env.type != SushiEnvelope.msgTypeEpisodesRes) {
+      debugPrint(
+          '[sushi] episodes: unexpected msgType=${env.type} tmdbId=$tmdbId season=$seasonNo');
+      return null;
+    }
+    return SushiEpisodesRes.decode(env.payload);
+  } catch (e, st) {
+    debugPrint('[sushi] episodes fetch failed: $e\n$st');
     return null;
   }
 }

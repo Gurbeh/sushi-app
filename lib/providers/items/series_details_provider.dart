@@ -126,6 +126,33 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     sushiPlayWarmup.scheduleFromStreams(episodeModel?.mediaStreams);
   }
 
+  void mergeSeason(int seasonNo, List<EpisodeModel> loaded) {
+    final current = state;
+    if (current == null) return;
+    state = sushiMergeSeasonEpisodes(current, seasonNo, loaded);
+  }
+
+  Future<List<EpisodeModel>> loadSeason(int seasonNo) async {
+    final current = state;
+    if (current == null) return const [];
+    final tmdbId = sushiTmdbIdFromItemId(current.id);
+    if (tmdbId == null) return const [];
+    final season = current.seasons?.firstWhereOrNull((s) => s.season == seasonNo);
+    if (season != null &&
+        season.episodeCount > 0 &&
+        season.episodes.length >= season.episodeCount) {
+      return season.episodes;
+    }
+    final wire = await ref.read(sushiCatalogControllerProvider).openSeason(
+          tmdbId: tmdbId,
+          kind: SushiKind.series,
+          seasonNo: seasonNo,
+        );
+    final loaded = sushiEpisodesFromWire(current, wire);
+    mergeSeason(seasonNo, loaded);
+    return loaded;
+  }
+
   Future<SeriesModel> _paintWatchState(SeriesModel series) async {
     final tmdbId = sushiTmdbIdFromItemId(series.id);
     final resume = tmdbId == null

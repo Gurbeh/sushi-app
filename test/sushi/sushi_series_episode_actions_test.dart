@@ -3,6 +3,7 @@ import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/overview_model.dart';
+import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +28,34 @@ EpisodeModel _episode({required String id, required int episode}) {
   );
 }
 
-SeriesModel _series({EpisodeModel? selected, List<EpisodeModel>? episodes}) {
+SeasonModel _season({required int season, required int episodeCount, List<EpisodeModel> episodes = const []}) {
+  return SeasonModel(
+    parentImages: null,
+    seasonName: 'Season $season',
+    episodes: episodes,
+    episodeCount: episodeCount,
+    seriesId: 'series-1',
+    season: season,
+    seriesName: 'Show',
+    name: 'Season $season',
+    id: 'season-$season',
+    overview: const OverviewModel(),
+    parentId: 'series-1',
+    playlistId: null,
+    images: null,
+    childCount: episodeCount,
+    primaryRatio: null,
+    userData: const UserData(),
+    canDelete: false,
+    canDownload: true,
+  );
+}
+
+SeriesModel _series({
+  EpisodeModel? selected,
+  List<EpisodeModel>? episodes,
+  List<SeasonModel>? seasons,
+}) {
   return SeriesModel(
     originalTitle: '',
     sortName: '',
@@ -43,6 +71,7 @@ SeriesModel _series({EpisodeModel? selected, List<EpisodeModel>? episodes}) {
     userData: const UserData(),
     selectedEpisode: selected,
     availableEpisodes: episodes,
+    seasons: seasons,
   );
 }
 
@@ -130,5 +159,21 @@ void main() {
     final seasons = sushiSeriesPickerSeasons(series);
     expect(seasons.length, 1);
     expect(seasons.single.seasonNumber, 1);
+  });
+
+  test('sushiSeriesPickerSeasons uses season index even with empty episode lists', () {
+    final series = _series(
+      episodes: const [],
+      seasons: [
+        _season(season: 1, episodeCount: 12),
+        _season(season: 2, episodeCount: 13),
+      ],
+    );
+
+    final seasons = sushiSeriesPickerSeasons(series);
+    expect(seasons.length, 2);
+    expect(seasons.first.episodeCount, 12);
+    expect(seasons.last.episodeCount, 13);
+    expect(seasons.last.episodes, isEmpty);
   });
 }

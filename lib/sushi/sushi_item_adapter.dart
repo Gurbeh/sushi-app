@@ -205,7 +205,11 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
 }
 
 List<EpisodeModel> sushiEpisodesFromItem(SeriesModel series, SushiItemRes item) {
-  final sorted = item.episodes.where((e) => e.episodeId != 0).toList()
+  return sushiEpisodesFromWire(series, item.episodes);
+}
+
+List<EpisodeModel> sushiEpisodesFromWire(SeriesModel series, List<SushiEpisode> episodes) {
+  final sorted = episodes.where((e) => e.episodeId != 0).toList()
     ..sort((a, b) {
       final bySeason = a.seasonNo.compareTo(b.seasonNo);
       return bySeason != 0 ? bySeason : a.episodeNo.compareTo(b.episodeNo);
@@ -232,6 +236,38 @@ List<EpisodeModel> sushiEpisodesFromItem(SeriesModel series, SushiItemRes item) 
         canDelete: false,
         canDownload: true,
         jellyType: BaseItemKind.episode,
+      ),
+  ];
+}
+
+List<SeasonModel> sushiSeasonsFromIndex(
+  SeriesModel series,
+  List<SushiSeason> index,
+  List<EpisodeModel> known,
+) {
+  final bySeason = known.episodesBySeason;
+  return [
+    for (final s in index)
+      SeasonModel(
+        parentImages: series.images,
+        seasonName: s.seasonNo == 0 ? 'Specials' : 'Season ${s.seasonNo}',
+        episodes: bySeason[s.seasonNo] ?? const [],
+        episodeCount: s.episodeCount,
+        seriesId: series.id,
+        season: s.seasonNo,
+        seriesName: series.name,
+        name: s.seasonNo == 0 ? 'Specials' : 'Season ${s.seasonNo}',
+        id: '$_sushiSeasonIdPrefix${series.id}_${s.seasonNo}',
+        overview: series.overview,
+        parentId: series.id,
+        playlistId: null,
+        images: series.images,
+        childCount: s.episodeCount,
+        primaryRatio: 0.7,
+        userData: UserData(unPlayedItemCount: s.episodeCount),
+        canDelete: false,
+        canDownload: true,
+        jellyType: BaseItemKind.season,
       ),
   ];
 }
@@ -291,7 +327,12 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
   final images = sushiTitleImages(base.id, base.images, item);
   final withImages = base.copyWith(images: images);
   final episodes = sushiEpisodesFromItem(withImages, item);
-  final seasons = sushiSeasonsFromEpisodes(withImages, episodes);
+  final seasons = item.seasons.isNotEmpty
+      ? sushiSeasonsFromIndex(withImages, item.seasons, episodes)
+      : sushiSeasonsFromEpisodes(withImages, episodes);
+  final episodeCount = item.seasons.isNotEmpty
+      ? item.seasons.fold<int>(0, (n, s) => n + s.episodeCount)
+      : episodes.length;
 
   return withImages.copyWith(
     overview: base.overview.copyWith(
@@ -309,8 +350,27 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
     related: related,
     availableEpisodes: episodes,
     seasons: seasons,
-    childCount: episodes.length,
+    childCount: episodeCount,
     canDownload: false,
+  );
+}
+
+SeriesModel sushiMergeSeasonEpisodes(SeriesModel series, int seasonNo, List<EpisodeModel> loaded) {
+  final kept = [
+    for (final episode in series.availableEpisodes ?? const <EpisodeModel>[])
+      if (episode.season != seasonNo) episode,
+  ];
+  final merged = [...kept, ...loaded]
+    ..sort((a, b) {
+      final bySeason = a.season.compareTo(b.season);
+      return bySeason != 0 ? bySeason : a.episode.compareTo(b.episode);
+    });
+  return series.copyWith(
+    availableEpisodes: merged,
+    seasons: [
+      for (final season in series.seasons ?? const <SeasonModel>[])
+        season.season == seasonNo ? season.copyWith(episodes: loaded) : season,
+    ],
   );
 }
 
