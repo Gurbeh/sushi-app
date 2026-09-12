@@ -1,17 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/models/items/episode_model.dart';
-import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
-import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
 
 /// Fladder [PlaybackModelHelper.loadNewVideo] reuses [oldModel.playbackQueue] without
@@ -20,37 +16,9 @@ import 'package:fladder/sushi/sushi_play_default.dart';
 class SushiPlaybackModelHelper extends PlaybackModelHelper {
   const SushiPlaybackModelHelper({required super.ref});
 
-  PlaybackModel? _withQueueAnchor(PlaybackModel? model, String itemId) {
-    if (model == null) return null;
-    return model.updatePlaybackQueue(model.playbackQueue.jumpToItem(itemId));
-  }
-
-  ItemBaseModel _prepareQueuedItem(ItemBaseModel item) {
-    return switch (item) {
-      EpisodeModel episode => sushiPrepareEpisodeMediaStreams(episode, ref) ?? episode,
-      MovieModel movie => sushiPrepareMovieMediaStreams(movie, ref) ?? movie,
-      _ => item,
-    };
-  }
-
   @override
   Future<PlaybackModel?> loadNewVideo(ItemBaseModel newItem) async {
-    
-      return _loadNewSushiVideo(newItem);
-    
-    ref.read(videoPlayerProvider).pause();
-    ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(buffering: true));
-    final currentModel = ref.read(playBackModel);
-    final prepared = _prepareQueuedItem(newItem);
-    final patchedOld = _withQueueAnchor(currentModel, prepared.id);
-    final newModel = await createPlaybackModel(
-      null,
-      prepared,
-      oldModel: patchedOld,
-    );
-    if (newModel == null) return null;
-    ref.read(videoPlayerProvider.notifier).loadPlaybackItem(newModel, Duration.zero);
-    return newModel;
+    return _loadNewSushiVideo(newItem);
   }
 
   /// Sushi has no Jellyfin PlaybackInfo, so next/previous-episode navigation resolves the new

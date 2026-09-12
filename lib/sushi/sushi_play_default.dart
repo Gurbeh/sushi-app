@@ -19,6 +19,7 @@ import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
 /// Resolves the item's selected quality (docs/12 §5's pick-list, applied in
 /// `sushi_item_adapter.dart`) to a playable [SushiPlaybackModel] via Sushi's own `/play` delivery
@@ -40,7 +41,14 @@ Future<ItemBaseModel> sushiHydrateForPlay(ItemBaseModel item, SushiCatalogContro
     if (tmdbId == null) return item;
     final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.movie);
     if (snap.page == null) return item;
-    return sushiEnrichMovieModel(item, snap.page!, snap.files, preferredFileId: snap.lastFileId);
+    final localPreference = await sushiReadVariantPreference('movie:$tmdbId');
+    return sushiEnrichMovieModel(
+      item,
+      snap.page!,
+      snap.files,
+      preferredFileId: snap.lastFileId,
+      localPreference: localPreference,
+    );
   }
   if (item is SeriesModel) {
     if (item.availableEpisodes?.isNotEmpty == true) return item;
@@ -143,7 +151,13 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
     final episodeId = sushiEpisodeIdFromItemId(item.id);
     if (episodeId == null) return null;
     final files = await catalog.openFiles(episodeId: episodeId);
-    streams = sushiBuildMediaStreams(files.files, preferredFileId: files.lastFileId);
+    final preferenceKey = sushiVariantPreferenceKeyFor(item);
+    final localPreference = preferenceKey == null ? null : await sushiReadVariantPreference(preferenceKey);
+    streams = sushiBuildMediaStreams(
+      files.files,
+      preferredFileId: files.lastFileId,
+      localPreference: localPreference,
+    );
     fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
     final overlay = sushiUserDataFromFiles(files);
     if (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played) {

@@ -188,7 +188,7 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                               sushiOnUserMediaStreamsChanged(
                                 ref,
                                 changed,
-                                itemId: details.episode!.id,
+                                details.episode!,
                               );
                               final updateEpisode = details.episode!.copyWith(
                                 mediaStreams: changed,

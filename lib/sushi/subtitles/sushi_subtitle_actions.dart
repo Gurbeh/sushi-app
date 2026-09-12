@@ -107,6 +107,13 @@ class SushiSubtitleOpResult {
   static const noResults = SushiSubtitleOpResult(ok: false, errorCode: 'no_results');
   static const failed = SushiSubtitleOpResult(ok: false, errorCode: 'failed');
   static const busy = SushiSubtitleOpResult(ok: false, errorCode: 'busy');
+  // Result was superseded (user navigated to a different item mid-request) — not a
+  // real failure, so callers should not surface a "failed" toast for this.
+  static const stale = SushiSubtitleOpResult(ok: false, errorCode: 'stale');
+  // Gemini call itself failed (network/HTTP/key-rejected), distinct from a source-fetch failure.
+  static const translateServiceFailed = SushiSubtitleOpResult(ok: false, errorCode: 'translate_service_failed');
+  // Translation succeeded but the player rejected applying it.
+  static const applyFailed = SushiSubtitleOpResult(ok: false, errorCode: 'apply_failed');
 }
 
 class SushiAiKeySetupInfo {
@@ -280,10 +287,15 @@ Future<SushiSubtitleOpResult> _sushiRunTranslateToPersianBody(
     });
     final nowFa = await gemini.translateCuesToPersian(window.now, key);
     if (gen != _translateGen || startedFor != _subtitleSessionItemId) {
-      return SushiSubtitleOpResult.failed;
+      _log('translate_stale', {'gen': gen, 'currentGen': _translateGen});
+      return SushiSubtitleOpResult.stale;
     }
     sushiRememberSideloadedSrt(nowFa);
-    await p.setSubtitleFromText(nowFa, title: 'AI Persian', language: 'fa');
+    final applied = await p.setSubtitleFromText(nowFa, title: 'AI Persian', language: 'fa');
+    if (!applied) {
+      _log('translate_apply_failed', {'chars': nowFa.length});
+      return SushiSubtitleOpResult.applyFailed;
+    }
     sushiRead(src, sushiActiveSubtitleProvider.notifier).state =
         const SushiActiveSubtitle(auto: false, label: 'AI Persian');
     _log('translate_applied', {'chars': nowFa.length, 'phase': 'window', 'cues': window.now.length});
@@ -298,6 +310,9 @@ Future<SushiSubtitleOpResult> _sushiRunTranslateToPersianBody(
       ));
     }
     return const SushiSubtitleOpResult(ok: true, label: 'AI Persian');
+  } on SushiGeminiException catch (e, st) {
+    _log('translate_service_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
+    return SushiSubtitleOpResult.translateServiceFailed;
   } catch (e, st) {
     _log('translate_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
     return SushiSubtitleOpResult.failed;
@@ -322,7 +337,11 @@ Future<void> _translateRestInBackground({
     if (gen != _translateGen || startedFor != _subtitleSessionItemId) return;
     final merged = sushiMergeSrtByTiming(nowCues, sushiParseSrt(rest));
     sushiRememberSideloadedSrt(merged);
-    await player.setSubtitleFromText(merged, title: 'AI Persian', language: 'fa');
+    final applied = await player.setSubtitleFromText(merged, title: 'AI Persian', language: 'fa');
+    if (!applied) {
+      _log('translate_apply_failed', {'chars': merged.length, 'phase': 'full'});
+      return;
+    }
     _log('translate_applied', {'chars': merged.length, 'phase': 'full'});
   } catch (e, st) {
     _log('translate_bg_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
@@ -476,7 +495,11 @@ Future<SushiSubtitleOpResult> _applyFile(
   required String labelPrefix,
 }) async {
   sushiRememberSideloadedSrt(file.text);
-  await player.setSubtitleFromText(file.text, title: labelPrefix, language: 'fa');
+  final applied = await player.setSubtitleFromText(file.text, title: labelPrefix, language: 'fa');
+  if (!applied) {
+    _log('apply_failed', {'chars': file.text.length, 'label': labelPrefix, 'auto': auto});
+    return SushiSubtitleOpResult.applyFailed;
+  }
   sushiRead(src, sushiActiveSubtitleProvider.notifier).state =
       SushiActiveSubtitle(auto: auto, label: labelPrefix);
   _log('applied', {'chars': file.text.length, 'label': labelPrefix, 'auto': auto});

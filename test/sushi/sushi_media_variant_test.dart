@@ -112,5 +112,42 @@ void main() {
       expect(meta.delivery, SushiStreamDelivery.dubbed);
       expect(meta.qualityHeight, 1080);
     });
+
+    test('extracts resolution from an underscore-delimited raw filename', () {
+      final meta = sushiClassifyVersionStream(_stream(
+        index: 0,
+        name: 'One_Night_Only_2026_1080p_10bit_WEB_DL_6CH_x265_SoftSub_DigiMovi.mkv',
+      ));
+      expect(meta.qualityHeight, 1080);
+      expect(meta.delivery, SushiStreamDelivery.softSub);
+    });
+  });
+
+  group('sushiFindVersionStreamIndexForPreference', () {
+    test('returns null with no preference set', () {
+      final streams = [
+        _stream(index: 0, name: '1080p SoftSub Persian', height: 1080, hasSubs: true),
+        _stream(index: 1, name: '720p SoftSub Persian', height: 720, hasSubs: true),
+      ];
+      expect(
+        sushiFindVersionStreamIndexForPreference(streams, SushiMediaVariantPreference.unset),
+        isNull,
+      );
+    });
+
+    test('returns null with fewer than two versions even if a preference is set', () {
+      final streams = [_stream(index: 0, name: '1080p SoftSub Persian', height: 1080, hasSubs: true)];
+      const pref = SushiMediaVariantPreference(qualityHeight: 720);
+      expect(sushiFindVersionStreamIndexForPreference(streams, pref), isNull);
+    });
+
+    test('finds the matching index when a preference matches', () {
+      final streams = [
+        _stream(index: 0, name: '1080p SoftSub Persian', height: 1080, hasSubs: true),
+        _stream(index: 1, name: '720p SoftSub Persian', height: 720, hasSubs: true),
+      ];
+      const pref = SushiMediaVariantPreference(qualityHeight: 720);
+      expect(sushiFindVersionStreamIndexForPreference(streams, pref), 1);
+    });
   });
 }

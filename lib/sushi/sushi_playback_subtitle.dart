@@ -24,29 +24,46 @@ int? sushiResolveSubtitleStreamIndex({
   required List<SubStreamModel>? subStreams,
   String? mediaSourceName,
 }) {
-  
+  bool isPersianTrack(int? index) {
+    if (index == null || index == -1) return false;
+    final track = subStreams?.firstWhereOrNull((s) => s.index == index);
+    if (track == null) return false;
+    return SushiPersianLanguage.isPersianLanguage(track.language) ||
+        SushiPersianLanguage.isPersianLanguage(track.displayTitle);
+  }
+
+  final persianIndex = sushiPreferredPersianStreamIndex(subStreams);
 
   final selectedOn = selectedIndex != null &&
       selectedIndex != -1 &&
       subStreams?.any((s) => s.index == selectedIndex) == true;
-  if (selectedOn) return selectedIndex;
+  if (selectedOn) {
+    // A Persian soft track exists but the current pick isn't it — prefer Persian.
+    if (persianIndex != null && !isPersianTrack(selectedIndex)) {
+      return persianIndex;
+    }
+    return selectedIndex;
+  }
 
   if (sushiMediaSourceLooksHardSub(mediaSourceName)) {
     return -1;
   }
 
-  // Explicit server Off — do not force preferred fa/en over it.
+  // Server default Off — still prefer an available Persian soft track over staying off.
   if (serverDefaultIndex == -1) {
-    return -1;
+    return persianIndex ?? -1;
   }
 
   if (serverDefaultIndex != null &&
       serverDefaultIndex != -1 &&
       subStreams?.any((s) => s.index == serverDefaultIndex) == true) {
+    if (persianIndex != null && !isPersianTrack(serverDefaultIndex)) {
+      return persianIndex;
+    }
     return serverDefaultIndex;
   }
 
-  return sushiPreferredSubtitleStreamIndex(subStreams) ?? selectedIndex;
+  return persianIndex ?? sushiPreferredSubtitleStreamIndex(subStreams) ?? selectedIndex;
 }
 
 /// Muxed/external tracks have a codec and/or URL. Sushi `sub_langs` catalog
@@ -91,8 +108,8 @@ SushiStartSubtitle sushiStartSubtitleChoice({
   return SushiStartSubtitle.automaticOnline;
 }
 
-/// Persian first, then English, else first real track.
-int? sushiPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
+/// First playable Persian (Farsi) track, or null when none is available.
+int? sushiPreferredPersianStreamIndex(List<SubStreamModel>? subStreams) {
   if (subStreams == null || subStreams.isEmpty) return null;
   final real = subStreams.where((s) => s.index != -1).toList();
   if (real.isEmpty) return null;
@@ -102,7 +119,17 @@ int? sushiPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
         SushiPersianLanguage.isPersianLanguage(s.language) ||
         SushiPersianLanguage.isPersianLanguage(s.displayTitle),
   );
-  if (persian != null) return persian.index;
+  return persian?.index;
+}
+
+/// Persian first, then English, else first real track.
+int? sushiPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
+  if (subStreams == null || subStreams.isEmpty) return null;
+  final real = subStreams.where((s) => s.index != -1).toList();
+  if (real.isEmpty) return null;
+
+  final persianIndex = sushiPreferredPersianStreamIndex(subStreams);
+  if (persianIndex != null) return persianIndex;
 
   final english = real.firstWhereOrNull((s) {
     final title = s.displayTitle.trim().toLowerCase();

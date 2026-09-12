@@ -634,20 +634,26 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// Sushi Automatic / Online / Translate: inject SRT.
   /// Native VideoPlayerActivity is a separate Exo surface. Dart `_player` is often
   /// still LibMPV — do not also load into mpv (it dumps the whole SRT into logcat).
-  Future<void> setSubtitleFromText(String data, {String? title, String? language}) async {
+  /// Returns whether the subtitle was actually applied. Only the native-Exo pigeon
+  /// path can observe a real failure (missing media item/activity) — the Dart-side
+  /// players have no failure signal to report, so they're assumed to have succeeded
+  /// once the underlying call returns.
+  Future<bool> setSubtitleFromText(String data, {String? title, String? language}) async {
     if (nativeActivityStarted) {
       if (_player is NativePlayer) {
         await _player?.setSubtitleFromText(data, title: title, language: language);
+        return true;
       } else {
         final ok = await VideoPlayerApi().setSubtitleFromText(data, title, language);
         log(
           'sushi_sub_from_text native_exo chars=${data.length} ok=$ok',
           name: 'sushi.subs',
         );
+        return ok;
       }
-      return;
     }
     await _player?.setSubtitleFromText(data, title: title, language: language);
+    return true;
   }
 
   Future<void> setVolume(double volume) async => _player?.setVolume(volume);

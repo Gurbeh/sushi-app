@@ -29,6 +29,12 @@ String sushiVersionStreamLabel(
 }) {
   final serverName = stream.name.trim();
   if (serverName.isNotEmpty) {
+    if (_looksLikeRawFilename(serverName)) {
+      final composed = _labelFromRawFilename(stream, serverName, l10n: l10n);
+      if (composed.isNotEmpty) {
+        return composed;
+      }
+    }
     if (l10n != null) {
       return _localizeServerVariantLabel(l10n, serverName);
     }
@@ -183,6 +189,94 @@ String _normalizeSource(String value) {
     default:
       return value;
   }
+}
+
+// Separator-aware "boundary" — `\b` doesn't break between `_`/`.` and a digit/letter,
+// so an underscore/dot-delimited release filename (`..._1080p_...`) never matches `\b`-anchored
+// regexes. These match/require a non-alphanumeric char (or string edge) around the token instead.
+const _rawTokenBefore = r'(?:^|[^a-z0-9])';
+const _rawTokenAfter = r'(?:$|[^a-z0-9])';
+
+final _rawResolutionRegex = RegExp(
+  '$_rawTokenBefore(2160|1440|1080|720|576|480|360)p$_rawTokenAfter',
+  caseSensitive: false,
+);
+final _rawCodecRegex = RegExp(
+  '$_rawTokenBefore(x264|x265|h\\.?264|h\\.?265|hevc|avc)$_rawTokenAfter',
+  caseSensitive: false,
+);
+final _rawBitDepthRegex = RegExp(
+  '$_rawTokenBefore(8|10|12)[\\s_.-]?bit$_rawTokenAfter',
+  caseSensitive: false,
+);
+
+/// A server `qualityLabel` is normally pre-formatted as `' - '`-joined segments
+/// (`"1080p - soft sub - WEB-DL"`). When the server instead sends a raw release
+/// filename (underscore/dot separated, e.g. `One_Night_Only_2026_1080p_..._DigiMovi.mkv`),
+/// that whole string is one unsplit segment and passes through the segment localizer
+/// untouched — this detects that case so it can be routed through token parsing instead.
+bool _looksLikeRawFilename(String name) {
+  if (name.contains(' - ')) return false;
+  final lower = name.toLowerCase();
+  final looksLikeFile = lower.endsWith('.mkv') || lower.endsWith('.mp4') || lower.endsWith('.avi');
+  final separatorCount = RegExp(r'[_.]').allMatches(name).length;
+  if (separatorCount < 3 && !looksLikeFile) return false;
+  return looksLikeFile ||
+      _rawResolutionRegex.hasMatch(name) ||
+      _rawCodecRegex.hasMatch(name);
+}
+
+String _canonicalCodecToken(String match) {
+  final lower = match.toLowerCase().replaceAll('.', '');
+  if (lower == 'hevc' || lower == 'h265' || lower == 'x265') return 'x265';
+  if (lower == 'avc' || lower == 'h264' || lower == 'x264') return 'x264';
+  return match;
+}
+
+String _deliveryShortToken(AppLocalizations? l10n, SushiStreamDelivery delivery) {
+  switch (delivery) {
+    case SushiStreamDelivery.softSub:
+      return l10n?.sushiVariantSoftSub ?? 'SoftSub';
+    case SushiStreamDelivery.hardSub:
+      return l10n?.sushiVariantHardSubGeneric ?? 'HardSub';
+    case SushiStreamDelivery.dubbed:
+      return l10n?.sushiVariantDubbedGeneric ?? 'Dubbed';
+    case SushiStreamDelivery.original:
+    case SushiStreamDelivery.unknown:
+      return '';
+  }
+}
+
+/// Synthesizes a clean label (e.g. `1080p x265 10bit SoftSub`) from a raw release
+/// filename by extracting the common tokens client-side, since the server sent the
+/// filename verbatim instead of a pre-formatted label.
+String _labelFromRawFilename(VersionStreamModel stream, String rawName, {AppLocalizations? l10n}) {
+  final meta = sushiClassifyVersionStream(stream);
+  final tokens = <String>[];
+
+  final resMatch = _rawResolutionRegex.firstMatch(rawName);
+  if (resMatch != null) {
+    tokens.add('${resMatch.group(1)}p');
+  } else if (meta.qualityHeight != null) {
+    tokens.add('${meta.qualityHeight}p');
+  }
+
+  final codecMatch = _rawCodecRegex.firstMatch(rawName);
+  if (codecMatch != null) {
+    tokens.add(_canonicalCodecToken(codecMatch.group(1)!));
+  }
+
+  final bitDepthMatch = _rawBitDepthRegex.firstMatch(rawName);
+  if (bitDepthMatch != null) {
+    tokens.add('${bitDepthMatch.group(1)}bit');
+  }
+
+  final deliveryToken = _deliveryShortToken(l10n, meta.delivery);
+  if (deliveryToken.isNotEmpty) {
+    tokens.add(deliveryToken);
+  }
+
+  return tokens.join(' ');
 }
 
 String? _primaryLanguage(VersionStreamModel stream) {

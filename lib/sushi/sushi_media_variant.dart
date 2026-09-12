@@ -1,14 +1,15 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
-import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/sushi/sushi_playback_prefetch.dart';
 import 'package:fladder/sushi/sushi_share.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
 /// Delivery / track flavor for a file variant (soft sub, dubbed, etc.).
 enum SushiStreamDelivery {
@@ -19,7 +20,8 @@ enum SushiStreamDelivery {
   unknown,
 }
 
-/// User's last explicit version pick (persisted locally).
+/// User's last explicit version pick for one title (movie or series), persisted locally
+/// per-title in [sushiVariantPreferenceKeyFor] — see `sushi_variant_preference_store.dart`.
 class SushiMediaVariantPreference {
   const SushiMediaVariantPreference({
     this.qualityHeight,
@@ -34,31 +36,6 @@ class SushiMediaVariantPreference {
 
   static const unset = SushiMediaVariantPreference();
 
-  static const _qualityKey = 'ox_media_variant_quality_height';
-  static const _deliveryKey = 'ox_media_variant_delivery';
-
-  static Future<SushiMediaVariantPreference> load(SharedPreferences prefs) async {
-    final height = prefs.getInt(_qualityKey);
-    final deliveryRaw = prefs.getString(_deliveryKey);
-    return SushiMediaVariantPreference(
-      qualityHeight: height,
-      delivery: deliveryRaw == null ? null : SushiStreamDelivery.values.byName(deliveryRaw),
-    );
-  }
-
-  Future<void> save(SharedPreferences prefs) async {
-    if (qualityHeight != null) {
-      await prefs.setInt(_qualityKey, qualityHeight!);
-    } else {
-      await prefs.remove(_qualityKey);
-    }
-    if (delivery != null) {
-      await prefs.setString(_deliveryKey, delivery!.name);
-    } else {
-      await prefs.remove(_deliveryKey);
-    }
-  }
-
   SushiMediaVariantPreference copyWith({
     int? qualityHeight,
     SushiStreamDelivery? delivery,
@@ -69,39 +46,6 @@ class SushiMediaVariantPreference {
       qualityHeight: clearQuality ? null : (qualityHeight ?? this.qualityHeight),
       delivery: clearDelivery ? null : (delivery ?? this.delivery),
     );
-  }
-}
-
-final sushiMediaVariantPreferenceProvider =
-    NotifierProvider<SushiMediaVariantPreferenceNotifier, SushiMediaVariantPreference>(
-  SushiMediaVariantPreferenceNotifier.new,
-);
-
-class SushiMediaVariantPreferenceNotifier extends Notifier<SushiMediaVariantPreference> {
-  SharedPreferences? _prefs;
-
-  @override
-  SushiMediaVariantPreference build() {
-    Future.microtask(_loadFromDisk);
-    return SushiMediaVariantPreference.unset;
-  }
-
-  Future<void> _loadFromDisk() async {
-    _prefs ??= await SharedPreferences.getInstance();
-    final loaded = await SushiMediaVariantPreference.load(_prefs!);
-    state = loaded;
-  }
-
-  Future<void> rememberStream(VersionStreamModel stream) async {
-    
-    final meta = sushiClassifyVersionStream(stream);
-    final next = SushiMediaVariantPreference(
-      qualityHeight: meta.qualityHeight,
-      delivery: meta.delivery == SushiStreamDelivery.unknown ? null : meta.delivery,
-    );
-    state = next;
-    _prefs ??= await SharedPreferences.getInstance();
-    await next.save(_prefs!);
   }
 }
 
@@ -150,7 +94,10 @@ SushiStreamDelivery _deliveryFromLabel(String blob, VersionStreamModel stream) {
 }
 
 int? _qualityHeightFromLabel(String blob) {
-  final match = RegExp(r'\b(2160|1440|1080|720|576|480|360)p?\b').firstMatch(blob);
+  // `\b` doesn't break between `_`/`.` and a digit, so it silently misses resolution
+  // tokens in underscore/dot-delimited release filenames (`..._1080p_...`). `blob` is
+  // already lower-cased by the caller.
+  final match = RegExp(r'(?:^|[^a-z0-9])(2160|1440|1080|720|576|480|360)p?(?:$|[^a-z0-9])').firstMatch(blob);
   if (match == null) return null;
   return int.tryParse(match.group(1)!);
 }
@@ -185,9 +132,26 @@ int sushiPickVersionStreamIndex(
       .toList();
 
   if (preference.hasUserChoice) {
-    return _pickWithPreference(classified, preference);
+    final idx = _findIndexForPreference(classified, preference);
+    if (idx != null) return idx;
   }
   return _pickColdDefault(classified);
+}
+
+/// Locates a [streams] index that reasonably matches [preference], or null when [streams]
+/// has nothing to match against (fewer than 2 versions, or no preference set). Unlike
+/// [sushiPickVersionStreamIndex] this never falls back to a cold-start default — callers use
+/// that to distinguish "the local preference actually matched something" from "there was
+/// nothing to go on," so they can fall back to a different signal (e.g. the server's last
+/// played file) before finally cold-starting.
+int? sushiFindVersionStreamIndexForPreference(
+  List<VersionStreamModel> streams,
+  SushiMediaVariantPreference? preference,
+) {
+  if (preference == null || !preference.hasUserChoice) return null;
+  if (streams.length <= 1) return null;
+  final classified = streams.map((stream) => (stream: stream, meta: sushiClassifyVersionStream(stream))).toList();
+  return _findIndexForPreference(classified, preference);
 }
 
 int _pickColdDefault(List<({VersionStreamModel stream, SushiVersionStreamMeta meta})> classified) {
@@ -210,7 +174,7 @@ int _pickColdDefault(List<({VersionStreamModel stream, SushiVersionStreamMeta me
   return classified.first.stream.index;
 }
 
-int _pickWithPreference(
+int? _findIndexForPreference(
   List<({VersionStreamModel stream, SushiVersionStreamMeta meta})> classified,
   SushiMediaVariantPreference preference,
 ) {
@@ -254,7 +218,7 @@ int _pickWithPreference(
     if (match != null) return match.stream.index;
   }
 
-  return classified.first.stream.index;
+  return null;
 }
 
 List<int> _qualityTiersToTry(int? preferred) {
@@ -279,36 +243,47 @@ List<SushiStreamDelivery> _deliveryFallbacks(
   return [...base, SushiStreamDelivery.original, SushiStreamDelivery.unknown];
 }
 
-MediaStreamsModel sushiApplyPreferredVersionStream(
-  Ref ref,
+/// Applies a locally remembered per-title [preference] to already-built [streams] (used for
+/// the series episode-list rail, where each episode's streams were built without a
+/// `preferredFileId`/`localPreference` at fetch time). The main movie/episode load paths
+/// instead pass the preference straight into [sushiBuildMediaStreams].
+MediaStreamsModel sushiApplyVersionStreamPreference(
   MediaStreamsModel streams,
+  SushiMediaVariantPreference? preference,
 ) {
   if (streams.versionStreams.length <= 1) {
     return streams;
   }
-  final pref = ref.read(sushiMediaVariantPreferenceProvider);
-  final idx = sushiPickVersionStreamIndex(streams.versionStreams, pref);
+  final idx = sushiPickVersionStreamIndex(streams.versionStreams, preference ?? SushiMediaVariantPreference.unset);
   if (idx == (streams.versionStreamIndex ?? 0)) return streams;
   return streams.copyWith(versionStreamIndex: idx);
 }
 
-void sushiRememberMediaStreamsSelection(WidgetRef ref, MediaStreamsModel streams) {
-  
+/// Persists [streams]'s currently selected version as the new per-title preference for
+/// [owner] (a movie, or an episode — remembered against its series so every episode shares
+/// the pick). Fire-and-forget; the in-memory model already reflects the choice immediately.
+void sushiRememberMediaStreamsSelection(ItemBaseModel owner, MediaStreamsModel streams) {
   final current = streams.currentVersionStream;
   if (current == null) return;
-  ref.read(sushiMediaVariantPreferenceProvider.notifier).rememberStream(current);
+  final key = sushiVariantPreferenceKeyFor(owner);
+  if (key == null) return;
+  final meta = sushiClassifyVersionStream(current);
+  final pref = SushiMediaVariantPreference(
+    qualityHeight: meta.qualityHeight,
+    delivery: meta.delivery == SushiStreamDelivery.unknown ? null : meta.delivery,
+  );
+  unawaited(sushiWriteVariantPreference(key, pref));
 }
 
 MediaStreamsModel sushiOnUserMediaStreamsChanged(
   WidgetRef ref,
-  MediaStreamsModel changed, {
-  String? itemId,
-}) {
-  sushiRememberMediaStreamsSelection(ref, changed);
-  
-    sushiPlayWarmup.scheduleFromStreams(changed);
-  
-  if (itemId != null && itemId.isNotEmpty) {
+  MediaStreamsModel changed,
+  ItemBaseModel owner,
+) {
+  sushiRememberMediaStreamsSelection(owner, changed);
+  sushiPlayWarmup.scheduleFromStreams(changed);
+  final itemId = owner.id;
+  if (itemId.isNotEmpty) {
     final msId = changed.currentVersionStream?.id;
     if (msId != null && msId.isNotEmpty) {
       SushiPlaybackPrefetch.scheduleForItem(ref.read, itemId, mediaSourceId: msId);
@@ -317,25 +292,26 @@ MediaStreamsModel sushiOnUserMediaStreamsChanged(
   return changed;
 }
 
-MovieModel? sushiPrepareMovieMediaStreams(MovieModel? movie, Ref ref) {
-  if (movie == null) return movie;
-  var item = sushiApplyShareMediaSourceToMovie(movie, ref) ?? movie;
-  final streams = sushiApplyPreferredVersionStream(ref, item.mediaStreams);
-  if (streams == item.mediaStreams) return item;
-  return item.copyWith(mediaStreams: streams);
-}
-
-EpisodeModel? sushiPrepareEpisodeMediaStreams(EpisodeModel? episode, Ref ref) {
+EpisodeModel? sushiPrepareEpisodeMediaStreams(
+  EpisodeModel? episode,
+  Ref ref, {
+  SushiMediaVariantPreference? localPreference,
+}) {
   if (episode == null) return episode;
   var item = sushiApplyShareMediaSourceToEpisode(episode, ref) ?? episode;
-  final streams = sushiApplyPreferredVersionStream(ref, item.mediaStreams);
+  final streams = sushiApplyVersionStreamPreference(item.mediaStreams, localPreference);
   if (streams == item.mediaStreams) return item;
   return item.copyWith(mediaStreams: streams);
 }
 
-List<EpisodeModel> sushiPrepareEpisodeListMediaStreams(Ref ref, List<EpisodeModel> episodes) {
+List<EpisodeModel> sushiPrepareEpisodeListMediaStreams(
+  Ref ref,
+  List<EpisodeModel> episodes, {
+  SushiMediaVariantPreference? localPreference,
+}) {
   if (episodes.isEmpty) return episodes;
   return episodes
-      .map((episode) => sushiPrepareEpisodeMediaStreams(episode, ref) ?? episode)
+      .map((episode) =>
+          sushiPrepareEpisodeMediaStreams(episode, ref, localPreference: localPreference) ?? episode)
       .toList();
 }

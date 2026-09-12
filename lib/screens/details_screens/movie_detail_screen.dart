@@ -211,7 +211,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                   sushiOnUserMediaStreamsChanged(
                                     ref,
                                     changed,
-                                    itemId: details.id,
+                                    details,
                                   );
                                   ref
                                       .read(providerInstance.notifier)

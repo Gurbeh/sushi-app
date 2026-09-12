@@ -24,6 +24,8 @@ const _kNoResults = 'No subtitles found';
 const _kApplied = 'Subtitle loaded';
 const _kFailed = 'Could not load subtitle';
 const _kTranslateFailed = 'AI translate failed';
+const _kTranslateServiceFailed = 'Translation service failed — try again';
+const _kTranslateApplyFailed = "Translated but the player couldn't load it — try again";
 const _kTranslating = 'Translating to Persian…';
 const _kTranslated = 'Persian subtitle applied';
 const _kNoSource = 'Need a text subtitle first — try Online subtitles';
@@ -197,6 +199,12 @@ Future<void> sushiTranslateSubtitle({
     _toast(messenger, _kTranslated);
     return;
   }
+  if (result.errorCode == 'stale') {
+    // Superseded by navigating to a different item mid-request — not a real
+    // failure, and the toast would be misleading on whatever screen the user is
+    // on now, so stay silent (already logged for debugging).
+    return;
+  }
   if (result.errorCode == 'missing_key') {
     final ctx = navigator.context;
     if (ctx.mounted) {
@@ -206,6 +214,14 @@ Future<void> sushiTranslateSubtitle({
   }
   if (result.errorCode == 'no_source') {
     _toast(messenger, _kNoSource);
+    return;
+  }
+  if (result.errorCode == 'translate_service_failed') {
+    _toast(messenger, _kTranslateServiceFailed);
+    return;
+  }
+  if (result.errorCode == 'apply_failed') {
+    _toast(messenger, _kTranslateApplyFailed);
     return;
   }
   _toast(messenger, _kTranslateFailed);
@@ -263,19 +279,24 @@ class _AiKeyMissingDialogState extends State<_AiKeyMissingDialog> {
   Widget build(BuildContext context) {
     final setup = widget.setup;
     final showQr = !setup.telegramInstalled || _showQr;
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final onSurfaceVariant = theme.colorScheme.onSurfaceVariant;
+    final linkColor = theme.colorScheme.primary;
     return AlertDialog(
-      title: const Text(_kTranslate),
+      backgroundColor: theme.colorScheme.surface,
+      title: Text(_kTranslate, style: theme.textTheme.titleLarge?.copyWith(color: onSurface)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(_kAiKeyMissing),
+          Text(_kAiKeyMissing, style: theme.textTheme.bodyMedium?.copyWith(color: onSurfaceVariant)),
           const SizedBox(height: 16),
           if (showQr) ...[
             QrImageView(data: setup.deepLink, size: 220, backgroundColor: Colors.white),
             if (setup.telegramInstalled)
               TextButton(
                 onPressed: () => setState(() => _showQr = false),
-                child: const Text('Hide QR'),
+                child: Text('Hide QR', style: TextStyle(color: linkColor)),
               ),
           ] else
             Row(
@@ -283,7 +304,7 @@ class _AiKeyMissingDialogState extends State<_AiKeyMissingDialog> {
                 Expanded(
                   child: FilledButton(
                     onPressed: _openBot,
-                    child: const Text(_kSetApiKey),
+                    child: Text(_kSetApiKey, style: TextStyle(color: theme.colorScheme.onPrimary)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -297,8 +318,11 @@ class _AiKeyMissingDialogState extends State<_AiKeyMissingDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: widget.onRetry, child: const Text(_kRetry)),
-        TextButton(onPressed: () => Navigator.of(context, rootNavigator: true).pop(), child: const Text('Close')),
+        TextButton(onPressed: widget.onRetry, child: Text(_kRetry, style: TextStyle(color: linkColor))),
+        TextButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          child: Text('Close', style: TextStyle(color: linkColor)),
+        ),
       ],
     );
   }
@@ -418,10 +442,15 @@ class _OnlineSubtitleDialogState extends ConsumerState<_OnlineSubtitleDialog> {
       'head': head.length > 80 ? head.substring(0, 80) : head,
     });
     sushiRememberSideloadedSrt(file.text);
+    final applied =
+        await player.setSubtitleFromText(file.text, title: '${pack.title} · ${file.name}', language: 'fa');
+    if (!mounted) return;
+    if (!applied) {
+      _toast(messenger, _kFailed);
+      return;
+    }
     ref.read(sushiActiveSubtitleProvider.notifier).state =
         SushiActiveSubtitle(auto: false, label: '${pack.title} · ${file.name}');
-    await player.setSubtitleFromText(file.text, title: '${pack.title} · ${file.name}', language: 'fa');
-    if (!mounted) return;
     navigator.pop();
     _toast(messenger, _kApplied);
   }

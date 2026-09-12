@@ -55,7 +55,7 @@ void main() {
     );
   });
 
-  test('server Off is respected (no forced Persian)', () {
+  test('server Off is overridden by an available Persian softsub', () {
     final streams = [
       SubStreamModel.no(),
       _sub(index: 2, language: 'fa', displayTitle: 'Persian'),
@@ -67,7 +67,40 @@ void main() {
         subStreams: streams,
         mediaSourceName: '1080p - soft sub',
       ),
+      2,
+    );
+  });
+
+  test('server Off with no Persian available stays Off', () {
+    final streams = [
+      SubStreamModel.no(),
+      _sub(index: 2, language: 'eng', displayTitle: 'English'),
+    ];
+    expect(
+      sushiResolveSubtitleStreamIndex(
+        selectedIndex: null,
+        serverDefaultIndex: -1,
+        subStreams: streams,
+        mediaSourceName: '1080p - soft sub',
+      ),
       -1,
+    );
+  });
+
+  test('server default is non-Persian (English) but Persian available -> Persian wins', () {
+    final streams = [
+      SubStreamModel.no(),
+      _sub(index: 2, language: 'eng', displayTitle: 'English'),
+      _sub(index: 3, language: 'fa', displayTitle: 'Persian'),
+    ];
+    expect(
+      sushiResolveSubtitleStreamIndex(
+        selectedIndex: 2,
+        serverDefaultIndex: 2,
+        subStreams: streams,
+        mediaSourceName: '1080p - soft sub',
+      ),
+      3,
     );
   });
 

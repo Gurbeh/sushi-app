@@ -13,6 +13,7 @@ import 'package:fladder/models/items/person_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 const _sushiFileIdPrefix = 'sushi_file_';
@@ -63,7 +64,11 @@ int? sushiEpisodeIdFromItemId(String itemId) {
 /// one synthetic audio/sub stream per language code is all there is to build.
 ///
 /// Only `state == ready` files are offered — `pending`/`unavailable` have nothing to play yet.
-MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files, {int? preferredFileId}) {
+MediaStreamsModel sushiBuildMediaStreams(
+  List<SushiFile> files, {
+  int? preferredFileId,
+  SushiMediaVariantPreference? localPreference,
+}) {
   final ready = files.where((f) => f.state == SushiFileState.ready).toList();
   if (ready.isEmpty) {
     return MediaStreamsModel(versionStreams: const []);
@@ -137,11 +142,16 @@ MediaStreamsModel sushiBuildMediaStreams(List<SushiFile> files, {int? preferredF
     );
   }).toList();
 
-  var index = 0;
-  if (preferredFileId != null && preferredFileId != 0) {
-    final wanted = '$_sushiFileIdPrefix$preferredFileId';
-    final i = versions.indexWhere((v) => v.id == wanted);
-    if (i >= 0) index = versions[i].index;
+  // A locally remembered per-title pick (the user explicitly switched to it before) wins over
+  // the server's last-played file, which otherwise wins over the plain first-file fallback.
+  var index = sushiFindVersionStreamIndexForPreference(versions, localPreference);
+  if (index == null) {
+    index = 0;
+    if (preferredFileId != null && preferredFileId != 0) {
+      final wanted = '$_sushiFileIdPrefix$preferredFileId';
+      final i = versions.indexWhere((v) => v.id == wanted);
+      if (i >= 0) index = versions[i].index;
+    }
   }
   return MediaStreamsModel(versionStreamIndex: index, versionStreams: versions);
 }
@@ -164,7 +174,13 @@ ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) 
 /// Merges a fetched [SushiItemRes] (overview) and its files (mediaStreams) into an already-shown
 /// [MovieModel] — called after the home-rail placeholder is on screen, same "paint first, enrich
 /// after" shape `movies_details_provider.dart` already uses for Sushi.
-MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiFile> files, {int? preferredFileId}) {
+MovieModel sushiEnrichMovieModel(
+  MovieModel base,
+  SushiItemRes item,
+  List<SushiFile> files, {
+  int? preferredFileId,
+  SushiMediaVariantPreference? localPreference,
+}) {
   final genreNames = item.genres
       .split(',')
       .map((s) => s.trim())
@@ -204,7 +220,7 @@ MovieModel sushiEnrichMovieModel(MovieModel base, SushiItemRes item, List<SushiF
             ],
       people: people.isEmpty ? base.overview.people : people,
     ),
-    mediaStreams: sushiBuildMediaStreams(files, preferredFileId: preferredFileId),
+    mediaStreams: sushiBuildMediaStreams(files, preferredFileId: preferredFileId, localPreference: localPreference),
     related: related,
     canDownload: sushiPickReadyFile(files) != null,
   );
@@ -382,10 +398,15 @@ SeriesModel sushiMergeSeasonEpisodes(SeriesModel series, int seasonNo, List<Epis
 
 /// Attaches the `/files` pick-list to the series play target. Pending-only / empty lists leave
 /// [ItemBaseModel.canDownload] false so Play/Sync stay hidden.
-SeriesModel sushiApplySeriesFiles(SeriesModel next, List<SushiFile> files, {int? preferredFileId}) {
+SeriesModel sushiApplySeriesFiles(
+  SeriesModel next,
+  List<SushiFile> files, {
+  int? preferredFileId,
+  SushiMediaVariantPreference? localPreference,
+}) {
   final playTarget = next.selectedEpisode ?? next.nextUp;
   if (playTarget == null) return next.copyWith(canDownload: false);
-  final streams = sushiBuildMediaStreams(files, preferredFileId: preferredFileId);
+  final streams = sushiBuildMediaStreams(files, preferredFileId: preferredFileId, localPreference: localPreference);
   final ready = streams.versionStreams.isNotEmpty;
   final targetId = playTarget.id;
   return next.copyWith(

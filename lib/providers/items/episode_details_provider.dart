@@ -13,6 +13,7 @@ import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
 class EpisodeDetailModel {
   final SeriesModel? series;
@@ -62,8 +63,15 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
         if (episodeId != null && item.mediaStreams.versionStreams.isEmpty) {
           final files = await ref.read(sushiCatalogControllerProvider).openFiles(episodeId: episodeId);
           final overlay = sushiUserDataFromFiles(files);
+          final preferenceKey = sushiVariantPreferenceKeyFor(item);
+          final localPreference =
+              preferenceKey == null ? null : await sushiReadVariantPreference(preferenceKey);
           episode = item.copyWith(
-            mediaStreams: sushiBuildMediaStreams(files.files, preferredFileId: files.lastFileId),
+            mediaStreams: sushiBuildMediaStreams(
+              files.files,
+              preferredFileId: files.lastFileId,
+              localPreference: localPreference,
+            ),
             userData: (item.userData.playbackPositionTicks == 0 && !item.userData.played && overlay != null)
                 ? overlay
                 : item.userData,

@@ -17,6 +17,7 @@ import 'package:fladder/sushi/sushi_library_item_ratings.dart';
 import 'package:fladder/sushi/sushi_season_user_data.dart';
 import 'package:fladder/sushi/sushi_series_details_loader.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 import 'package:fladder/sushi/sushi_virtual_episode_images.dart';
 import 'package:fladder/sushi/sushi_env.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -150,6 +151,8 @@ Future<SeriesModel> sushiLoadSeriesCatalogPhase(
     episodeItems = episodes.body?.items ?? const [];
   }
 
+  final preferenceKey = sushiVariantPreferenceKeyFor(base);
+  final localPreference = preferenceKey == null ? null : await sushiReadVariantPreference(preferenceKey);
   final newEpisodes = sushiPrepareEpisodeListMediaStreams(
     ref,
     sushiApplyVirtualEpisodeImages(
@@ -157,6 +160,7 @@ Future<SeriesModel> sushiLoadSeriesCatalogPhase(
       episodeItems,
       ref,
     ),
+    localPreference: localPreference,
   );
 
   final episodesCanDownload = newEpisodes.any((episode) => episode.canDownload == true);

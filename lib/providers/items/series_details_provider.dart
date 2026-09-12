@@ -19,6 +19,7 @@ import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_screen_telemetry.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
 final seriesDetailsProvider =
     StateNotifierProvider.autoDispose.family<SeriesDetailViewNotifier, SeriesModel?, String>((ref, id) {
@@ -61,6 +62,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
               painted,
               cached.files,
               preferredFileId: cached.lastFileId,
+              localPreference: await sushiReadVariantPreference('series:$tmdbId'),
             );
             sushiPlayWarmup.scheduleFromStreams(
               (painted.selectedEpisode ?? painted.nextUp)?.mediaStreams,
@@ -108,7 +110,12 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         files: files,
         filesEpisodeId: playEpisodeId,
       );
-      state = sushiApplySeriesFiles(next, files.files, preferredFileId: files.lastFileId);
+      state = sushiApplySeriesFiles(
+        next,
+        files.files,
+        preferredFileId: files.lastFileId,
+        localPreference: await sushiReadVariantPreference('series:$tmdbId'),
+      );
       sushiPlayWarmup.scheduleFromStreams(
         (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
       );

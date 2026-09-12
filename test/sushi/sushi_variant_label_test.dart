@@ -114,4 +114,25 @@ void main() {
     );
     expect(label, '1080p - ${l10n.sushiVariantSoftSub} - 10Bit WEB-DL x265 - 500 MB');
   });
+
+  test('composes a clean label from a raw release filename', () async {
+    final l10n = await loadEn();
+    final label = sushiVersionStreamLabel(
+      _stream(
+        name: 'One_Night_Only_2026_1080p_10bit_WEB_DL_6CH_x265_SoftSub_DigiMovi.mkv',
+        hasSubs: true,
+      ),
+      l10n: l10n,
+    );
+    expect(label, '1080p x265 10bit ${l10n.sushiVariantSoftSub}');
+  });
+
+  test('a plain single-segment server label is not treated as a raw filename', () async {
+    final l10n = await loadEn();
+    final label = sushiVersionStreamLabel(
+      _stream(name: 'Original', hasSubs: false),
+      l10n: l10n,
+    );
+    expect(label, 'Original');
+  });
 }

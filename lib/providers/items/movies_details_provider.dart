@@ -16,10 +16,12 @@ import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/sushi_movie_watch_state.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
 part 'movies_details_provider.g.dart';
 
@@ -56,11 +58,13 @@ class MovieDetails extends _$MovieDetails {
         final catalog = ref.read(sushiCatalogControllerProvider);
         final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.movie);
         if (cached?.page != null) {
+          final localPreference = await _localVariantPreference(enrichBase);
           var painted = sushiEnrichMovieModel(
             enrichBase,
             cached!.page!,
             cached.files,
             preferredFileId: cached.lastFileId,
+            localPreference: localPreference,
           );
           painted = await _paintWatchState(painted, files: cached.filesRes);
           if (loadGen != _loadGeneration) return null;
@@ -95,11 +99,13 @@ class MovieDetails extends _$MovieDetails {
         return;
       }
       final enrichBase = state ?? item;
+      final localPreference = await _localVariantPreference(enrichBase);
       var next = sushiEnrichMovieModel(
         enrichBase,
         snap.page!,
         snap.files,
         preferredFileId: snap.lastFileId,
+        localPreference: localPreference,
       );
       next = await _paintWatchState(next, files: snap.filesRes);
       if (loadGen != _loadGeneration) return;
@@ -122,6 +128,12 @@ class MovieDetails extends _$MovieDetails {
     if (current == null) return;
     _loadGeneration++;
     state = current.copyWith(userData: userData);
+  }
+
+  Future<SushiMediaVariantPreference?> _localVariantPreference(ItemBaseModel item) async {
+    final key = sushiVariantPreferenceKeyFor(item);
+    if (key == null) return null;
+    return sushiReadVariantPreference(key);
   }
 
   Future<MovieModel> _paintWatchState(MovieModel movie, {SushiFilesRes? files}) {
