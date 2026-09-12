@@ -85,10 +85,15 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
     WidgetsBinding.instance.addPostFrameCallback((_) => jump());
   }
 
+  bool _seasonFullyLoaded(SushiSeriesPickerSeason season) {
+    if (season.episodeCount <= 0) return season.episodes.isNotEmpty;
+    return season.episodes.length >= season.episodeCount;
+  }
+
   Future<void> _selectSeason(SushiSeriesPickerSeason season) async {
     setState(() {
       _selectedSeason = season;
-      _loadingSeason = season.episodes.isEmpty;
+      _loadingSeason = !_seasonFullyLoaded(season);
     });
     _scrollSheetToTop();
     await _slideController.forward(from: 0);
@@ -100,7 +105,7 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
   }
 
   Future<void> _ensureSeasonEpisodes(SushiSeriesPickerSeason season) async {
-    if (season.episodes.isNotEmpty) return;
+    if (_seasonFullyLoaded(season)) return;
     setState(() => _loadingSeason = true);
     final loaded = await ref.read(seriesDetailsProvider(widget.series.id).notifier).loadSeason(season.seasonNumber);
     if (!mounted) return;
@@ -150,7 +155,7 @@ class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodeP
     final showEpisodeHeader = _slideController.value > 0.5 && _selectedSeason != null;
 
     return PopScope(
-      canPop: _slideController.value == 0 && !_slideController.isAnimating,
+      canPop: _seasons.length <= 1 || (_slideController.value == 0 && !_slideController.isAnimating),
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _slideController.value > 0) {
           _backToSeasons();
