@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
+import 'package:fladder/models/boxset_model.dart';
 import 'package:fladder/models/collection_types.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/folder_model.dart';
@@ -121,9 +122,11 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       final libraryTotalCount = newLibraryItemCounts[itemId];
       if (libraryTotalCount != null && lastIndices != null && libraryTotalCount <= lastIndices) return;
 
-      final result = currentModel is PlaylistModel
-          ? await _loadPlaylistItems(id: itemId, startIndex: lastIndices, limit: pageSize)
-          : await _loadLibrary(id: itemId, startIndex: lastIndices, limit: pageSize);
+      final result = switch (currentModel) {
+        PlaylistModel _ => await _loadPlaylistItems(id: itemId, startIndex: lastIndices, limit: pageSize),
+        BoxSetModel _ => await _loadBoxsetItems(id: itemId, startIndex: lastIndices, limit: pageSize),
+        _ => await _loadLibrary(id: itemId, startIndex: lastIndices, limit: pageSize),
+      };
 
       if (result != null) {
         newLibraryItemCounts[itemId] = result.totalRecordCount ?? 0;
@@ -195,6 +198,11 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     LibraryFilterModel filters,
   ) async {
     if (SushiConfig.isEnabled) {
+      if (viewModelId == sushiViewLater) {
+        state = state.copyWith(views: {sushiWatchLaterView(): true});
+        loadModel(filters.copyWith(hideEmptyShows: false));
+        return;
+      }
       final sushiViews = sushiSyntheticViews();
       Map<ViewModel, bool> mapped = {for (final v in sushiViews) v: false};
       final selected = mapped.keys.firstWhereOrNull((e) => e.id == viewModelId);
@@ -259,6 +267,15 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       ];
       if (playlists.isNotEmpty) {
         state = state.copyWith(folderOverwrite: playlists);
+        return;
+      }
+      final boxsets = [
+        for (final id in ids)
+          if (sushiBoxsetIdFromItemId(id) case final collectionId?)
+            sushiBoxsetStub(collectionId: collectionId),
+      ];
+      if (boxsets.isNotEmpty) {
+        state = state.copyWith(folderOverwrite: boxsets);
         return;
       }
     }
@@ -436,6 +453,15 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
         startIndex: startIndex,
       );
     }
+    if (scope == SushiListScope.boxsets) {
+      final items = res.boxsets.map(sushiBoxsetMetaToItem).toList();
+      return ServerQueryResult(
+        original: const [],
+        items: items,
+        totalRecordCount: items.length,
+        startIndex: startIndex,
+      );
+    }
     final items = res.rows.map(sushiRowToItemBaseModel).toList();
     final total = res.cursor == 0
         ? (startIndex ?? 0) + items.length
@@ -492,6 +518,40 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       }.toList(),
     );
     return response.body;
+  }
+
+  Future<ServerQueryResult?> _loadBoxsetItems({
+    ViewModel? viewModel,
+    String? id,
+    int? startIndex,
+    int? limit,
+  }) async {
+    if (SushiConfig.isEnabled) {
+      final rawId = viewModel?.id ?? id ?? '';
+      final collectionId = sushiBoxsetIdFromItemId(rawId) ?? 0;
+      if (collectionId == 0) {
+        return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
+      }
+      final res = await sushiFetchList(
+        scope: SushiListScope.boxset,
+        cursor: startIndex ?? 0,
+        collectionId: collectionId,
+      );
+      if (res == null) {
+        return ServerQueryResult(original: const [], items: const [], totalRecordCount: 0, startIndex: startIndex);
+      }
+      final items = res.rows.map(sushiRowToItemBaseModel).toList();
+      final total = res.cursor == 0
+          ? (startIndex ?? 0) + items.length
+          : (startIndex ?? 0) + items.length + 1;
+      return ServerQueryResult(
+        original: const [],
+        items: items,
+        totalRecordCount: total,
+        startIndex: startIndex,
+      );
+    }
+    return _loadLibrary(id: viewModel?.id ?? id, startIndex: startIndex, limit: limit);
   }
 
   Future<List<ItemBaseModel>> fetchSuggestions(String searchTerm, {int limit = 25}) async {
@@ -703,8 +763,11 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
     List<ItemBaseModel> itemsToPlay = [];
 
     Future<void> handleItemLoading(String itemId, ItemBaseModel currentModel) async {
-      final result =
-          currentModel is PlaylistModel ? await _loadPlaylistItems(id: itemId) : await _loadLibrary(id: itemId);
+      final result = switch (currentModel) {
+        PlaylistModel _ => await _loadPlaylistItems(id: itemId),
+        BoxSetModel _ => await _loadBoxsetItems(id: itemId),
+        _ => await _loadLibrary(id: itemId),
+      };
 
       itemsToPlay = result?.items ?? [];
     }

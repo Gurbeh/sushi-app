@@ -39,6 +39,11 @@ List<ViewModel> sushiSyntheticViews() => [
       _sushiView(id: sushiViewPlaylists, name: 'Playlists', type: CollectionType.playlists),
     ];
 
+/// Not part of [sushiSyntheticViews] (Watch later has no drawer entry there — it's reached via
+/// the bottom-nav WatchLaterRoute), so callers that resolve a viewModelId to a view must check
+/// for it separately or a lookup against the synthetic list alone will miss it.
+ViewModel sushiWatchLaterView() => _sushiView(id: sushiViewLater, name: 'Watch later', type: CollectionType.movies);
+
 SushiListScope? sushiScopeForViewId(String id, {bool favourites = false}) {
   if (favourites) return SushiListScope.favorites;
   return switch (id) {

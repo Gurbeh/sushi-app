@@ -15,6 +15,8 @@ enum SushiListScope {
   later,
   playlists,
   playlist,
+  forYou,
+  boxset,
 }
 
 enum SushiListSort { unspecified, name, year, rating, added }
@@ -27,6 +29,8 @@ int _scopeWire(SushiListScope s) => switch (s) {
       SushiListScope.later => 5,
       SushiListScope.playlists => 6,
       SushiListScope.playlist => 7,
+      SushiListScope.forYou => 8,
+      SushiListScope.boxset => 9,
       _ => 0,
     };
 
@@ -38,6 +42,8 @@ SushiListScope _scopeFromWire(int v) => switch (v) {
       5 => SushiListScope.later,
       6 => SushiListScope.playlists,
       7 => SushiListScope.playlist,
+      8 => SushiListScope.forYou,
+      9 => SushiListScope.boxset,
       _ => SushiListScope.unspecified,
     };
 
@@ -87,16 +93,73 @@ class SushiPlaylistMeta {
   }
 }
 
+class SushiBoxsetMeta {
+  const SushiBoxsetMeta({
+    required this.collectionId,
+    required this.name,
+    required this.poster,
+    required this.itemCount,
+  });
+  final int collectionId;
+  final String name;
+  final String poster;
+  final int itemCount;
+
+  static SushiBoxsetMeta decode(Uint8List bytes) {
+    var collectionId = 0;
+    var name = '';
+    var poster = '';
+    var itemCount = 0;
+    var i = 0;
+    while (i < bytes.length) {
+      final tagR = sushiReadVarint(bytes, i);
+      i = tagR.next;
+      final field = tagR.value >> 3;
+      final wire = tagR.value & 0x7;
+      switch (field) {
+        case 1:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          collectionId = v.value;
+        case 2:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          name = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 3:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          poster = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
+        case 4:
+          final v = sushiReadVarint(bytes, i);
+          i = v.next;
+          itemCount = v.value;
+        default:
+          i = sushiSkipField(bytes, i, wire);
+      }
+    }
+    return SushiBoxsetMeta(collectionId: collectionId, name: name, poster: poster, itemCount: itemCount);
+  }
+}
+
 class SushiListRes {
-  const SushiListRes({required this.rows, required this.cursor, this.playlists = const []});
+  const SushiListRes({
+    required this.rows,
+    required this.cursor,
+    this.playlists = const [],
+    this.boxsets = const [],
+  });
   final List<SushiRow> rows;
   final int cursor;
   final List<SushiPlaylistMeta> playlists;
+  final List<SushiBoxsetMeta> boxsets;
 
   static SushiListRes decode(Uint8List bytes) {
     final rows = <SushiRow>[];
     var cursor = 0;
     final playlists = <SushiPlaylistMeta>[];
+    final boxsets = <SushiBoxsetMeta>[];
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -118,6 +181,11 @@ class SushiListRes {
           i = lenR.next;
           playlists.add(SushiPlaylistMeta.decode(bytes.sublist(i, i + lenR.value)));
           i += lenR.value;
+        case 4:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          boxsets.add(SushiBoxsetMeta.decode(bytes.sublist(i, i + lenR.value)));
+          i += lenR.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
@@ -126,6 +194,7 @@ class SushiListRes {
       rows: List.unmodifiable(rows),
       cursor: cursor,
       playlists: List.unmodifiable(playlists),
+      boxsets: List.unmodifiable(boxsets),
     );
   }
 }
@@ -139,6 +208,7 @@ Uint8List sushiEncodeListReq({
   String q = '',
   int cursor = 0,
   int playlistId = 0,
+  int collectionId = 0,
 }) {
   final out = BytesBuilder();
   void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
@@ -179,6 +249,10 @@ Uint8List sushiEncodeListReq({
   if (playlistId != 0) {
     writeTag(8, 0);
     out.add(sushiUvarint(playlistId));
+  }
+  if (collectionId != 0) {
+    writeTag(9, 0);
+    out.add(sushiUvarint(collectionId));
   }
   return out.toBytes();
 }

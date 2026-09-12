@@ -12,6 +12,7 @@ import 'package:fladder/models/views_model.dart';
 import 'package:fladder/sushi/sushi_home_dashboard_order.dart';
 import 'package:fladder/sushi/sushi_dashboard_skeleton.dart';
 import 'package:fladder/sushi/providers/sushi_favorites_dashboard.dart';
+import 'package:fladder/sushi/providers/sushi_foryou_dashboard.dart';
 import 'package:fladder/sushi/providers/sushi_watchlist_dashboard.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
@@ -42,6 +43,15 @@ Iterable<Widget> sushiDashboardRecentlyAddedRows({
   for (final id in order) {
     if (excludes.contains(id)) continue;
 
+    if (id == SushiHomeDashboardOrder.forYouId) {
+      rows.add(
+        SushiForYouPosterRow(
+          contentPadding: padding,
+          tvMode: useTVExpandedLayout,
+        ),
+      );
+      continue;
+    }
     if (id == SushiHomeDashboardOrder.watchLaterId) {
       rows.add(
         SushiWatchLaterPosterRow(
@@ -175,6 +185,35 @@ class SushiFavoritesPosterRow extends ConsumerWidget {
       label: context.localized.favorites,
       onLabelClick: () => context.router.push(const FavouritesRoute()),
       posters: items,
+    );
+  }
+}
+
+class SushiForYouPosterRow extends ConsumerWidget {
+  const SushiForYouPosterRow({
+    required this.contentPadding,
+    required this.tvMode,
+    super.key,
+  });
+
+  final EdgeInsets contentPadding;
+  final bool tvMode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final forYouAsync = ref.watch(sushiForYouDashboardProvider);
+    return forYouAsync.when(
+      data: (data) {
+        if (data.items.isEmpty) return const SizedBox.shrink();
+        return PosterRow(
+          tvMode: tvMode,
+          contentPadding: contentPadding,
+          label: context.localized.sushiForYou,
+          posters: data.items,
+        );
+      },
+      loading: () => SushiPosterRowSkeleton(contentPadding: contentPadding),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

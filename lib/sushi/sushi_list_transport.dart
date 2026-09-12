@@ -48,6 +48,7 @@ Future<SushiListRes?> sushiFetchList({
   String q = '',
   int cursor = 0,
   int playlistId = 0,
+  int collectionId = 0,
 }) async {
   final assignment = await SushiAssignmentStore.load();
   if (assignment == null ||
@@ -68,6 +69,7 @@ Future<SushiListRes?> sushiFetchList({
       q: q,
       cursor: cursor,
       playlistId: playlistId,
+      collectionId: collectionId,
     ),
   );
   try {

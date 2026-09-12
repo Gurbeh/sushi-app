@@ -2903,6 +2903,8 @@
   "@sushiFollowAdded": {},
   "sushiFollowRemoved": "Removed from your follows",
   "@sushiFollowRemoved": {},
+  "sushiForYou": "For You",
+  "@sushiForYou": {},
   "sushiWatchlist": "Watch Later",
   "@sushiWatchlist": {},
   "sushiUnwatchlist": "Remove from Watch Later",

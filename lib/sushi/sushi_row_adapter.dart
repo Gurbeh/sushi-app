@@ -1,4 +1,5 @@
 import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
+import 'package:fladder/models/boxset_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
@@ -12,6 +13,7 @@ import 'package:fladder/sushi/sushi_list_pb.dart';
 
 const _sushiTmdbIdPrefix = 'sushi_tmdb_';
 const _sushiPlaylistIdPrefix = 'sushi_playlist_';
+const _sushiBoxsetIdPrefix = 'sushi_boxset_';
 
 ImageData? sushiTmdbImage(String strippedPath, {required String key, String size = 'w500', String extension = 'jpg'}) {
   if (strippedPath.isEmpty) return null;
@@ -32,6 +34,48 @@ int? sushiTmdbIdFromItemId(String itemId) {
 int? sushiPlaylistIdFromItemId(String itemId) {
   if (!itemId.startsWith(_sushiPlaylistIdPrefix)) return null;
   return int.tryParse(itemId.substring(_sushiPlaylistIdPrefix.length));
+}
+
+/// Recovers the TMDB collection id from an id built by [sushiBoxsetMetaToItem], or null if
+/// [itemId] isn't one of ours (mirrors [sushiPlaylistIdFromItemId]).
+int? sushiBoxsetIdFromItemId(String itemId) {
+  if (!itemId.startsWith(_sushiBoxsetIdPrefix)) return null;
+  return int.tryParse(itemId.substring(_sushiBoxsetIdPrefix.length));
+}
+
+/// Maps one [SushiBoxsetMeta] card into a [BoxSetModel] carrying the collection's own identity
+/// (name/poster/count), not a member movie's — the bug this adapter replaces (ADR 0009).
+BoxSetModel sushiBoxsetMetaToItem(SushiBoxsetMeta meta) {
+  return sushiBoxsetStub(
+    collectionId: meta.collectionId,
+    name: meta.name,
+    poster: meta.poster,
+    itemCount: meta.itemCount,
+  );
+}
+
+BoxSetModel sushiBoxsetStub({
+  required int collectionId,
+  String name = '',
+  String poster = '',
+  int itemCount = 0,
+}) {
+  return BoxSetModel(
+    name: name.isEmpty ? 'Collection' : name,
+    id: '$_sushiBoxsetIdPrefix$collectionId',
+    overview: const OverviewModel(),
+    parentId: null,
+    playlistId: null,
+    images: ImagesData(
+      primary: sushiTmdbImage(poster, key: '$_sushiBoxsetIdPrefix$collectionId'),
+    ),
+    childCount: itemCount == 0 ? null : itemCount,
+    primaryRatio: 0.7,
+    userData: const UserData(),
+    canDelete: false,
+    canDownload: false,
+    jellyType: BaseItemKind.boxset,
+  );
 }
 
 /// Compact-row lists have no episode/child counts. `childCount: 0` would make Fladder's
