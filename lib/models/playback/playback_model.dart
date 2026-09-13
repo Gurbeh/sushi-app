@@ -825,7 +825,11 @@ class PlaybackModelHelper {
     }
     if (newModel == null) return;
     if (newModel.runtimeType != playbackModel.runtimeType || newModel is TranscodePlaybackModel) {
-      ref.read(videoPlayerProvider.notifier).loadPlaybackItem(newModel, currentPosition);
+      ref.read(videoPlayerProvider.notifier).loadPlaybackItem(
+            newModel,
+            currentPosition,
+            preserveSelection: true,
+          );
     }
   }
 }

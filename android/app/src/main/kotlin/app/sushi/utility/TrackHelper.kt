@@ -89,25 +89,6 @@ fun ExoPlayer.clearAudioTrack(disable: Boolean = true) {
 }
 
 @OptIn(UnstableApi::class)
-fun ExoPlayer.isAudioTrackDisabled(): Boolean {
-    val selector = trackSelector as? DefaultTrackSelector ?: return true
-    return C.TRACK_TYPE_AUDIO in selector.parameters.disabledTrackTypes
-}
-
-@OptIn(UnstableApi::class)
-fun ExoPlayer.isInternalAudioTrackSelected(audioTrack: InternalTrack): Boolean {
-    if (isAudioTrackDisabled()) return false
-    val selector = trackSelector as? DefaultTrackSelector ?: return false
-    val mapped = selector.currentMappedTrackInfo ?: return false
-    if (audioTrack.rendererIndex >= mapped.rendererCount) return false
-    val groups = mapped.getTrackGroups(audioTrack.rendererIndex)
-    if (audioTrack.groupIndex >= groups.length) return false
-    val group = groups[audioTrack.groupIndex]
-    val override = selector.parameters.overrides[group] ?: return false
-    return audioTrack.trackIndex in override.trackIndices
-}
-
-@OptIn(UnstableApi::class)
 fun ExoPlayer.getSubtitleTracks(): List<InternalTrack> {
     val selector = trackSelector as? DefaultTrackSelector ?: return emptyList()
     val mapped = selector.currentMappedTrackInfo ?: return emptyList()

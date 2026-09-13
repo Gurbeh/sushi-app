@@ -179,7 +179,18 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     }
   }
 
-  Future<bool> loadPlaybackItem(PlaybackModel model, Duration startPosition) async {
+  Future<bool> loadPlaybackItem(
+    PlaybackModel model,
+    Duration startPosition, {
+    // shouldReload() reopens the SAME video (new URL after an audio/quality
+    // switch), not a fresh one — model.mediaStreams.defaultSubStreamIndex is
+    // already the user's current, deliberate pick at that point. Re-running
+    // sushiResolveSubtitleStreamIndex's "prefer Persian" default-selection
+    // heuristic here would override that pick back to Persian on every such
+    // reload, which is what made a manually chosen (non-Persian) subtitle keep
+    // snapping back after switching audio tracks.
+    bool preserveSelection = false,
+  }) async {
     if (SushiEnv.isEnabled) {
       SushiStreamLog.event('player_load_start', fields: {
         'itemId': model.item.id,
@@ -250,12 +261,14 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       final resolvedAudio = sushiResolvePlaybackAudioStream(model);
       await state.setAudioTrack(resolvedAudio, model);
-      final resolvedSubIndex = sushiResolveSubtitleStreamIndex(
-        selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
-        serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
-        subStreams: model.subStreams,
-        mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
-      );
+      final resolvedSubIndex = preserveSelection
+          ? model.mediaStreams?.defaultSubStreamIndex
+          : sushiResolveSubtitleStreamIndex(
+              selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
+              serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
+              subStreams: model.subStreams,
+              mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
+            );
       final resolvedSub = model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
       // Route through PlaybackModel.setSubtitle (not state.setSubtitleTrack directly) so
       // mediaStreams.defaultSubStreamIndex reflects what auto-selection (e.g. preferred Persian

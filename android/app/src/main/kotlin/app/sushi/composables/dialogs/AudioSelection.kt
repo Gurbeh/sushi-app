@@ -26,7 +26,6 @@ import app.sushi.objects.Translate
 import app.sushi.objects.VideoPlayerObject
 import app.sushi.utility.InternalTrack
 import app.sushi.utility.clearAudioTrack
-import app.sushi.utility.isInternalAudioTrackSelected
 import app.sushi.utility.setInternalAudioTrack
 
 /** Server sent a per-track audio list that actually covers every muxed Exo track (Off + one row each). */
@@ -114,18 +113,26 @@ fun AudioPicker(
 
     val listState = rememberLazyListState()
 
-    LaunchedEffect(selectedIndex, internalAudioTracks) {
-        val selectedTrack = internalAudioTracks.firstOrNull { player.isInternalAudioTrackSelected(it) }
-        if (selectedTrack == null) {
+    LaunchedEffect(selectedIndex, effectiveAudioTracks, internalAudioTracks) {
+        if (selectedIndex == -1) {
             focusOffTrack.requestFocus()
             return@LaunchedEffect
         }
 
-        val internalIndex = internalAudioTracks.indexOf(selectedTrack)
+        val internalIndex = internalAudioTracks.indices.firstOrNull { idx ->
+            val trackIndex = effectiveAudioTracks.elementAtOrNull(idx)?.index?.toInt() ?: idx
+            trackIndex == selectedIndex
+        } ?: -1
+
+        if (internalIndex < 0) {
+            focusOffTrack.requestFocus()
+            return@LaunchedEffect
+        }
+
         val lazyColumnIndex = internalIndex + 1
 
         listState.scrollToItem(lazyColumnIndex)
-        focusRequesters[selectedTrack]?.requestFocus()
+        focusRequesters[internalAudioTracks[internalIndex]]?.requestFocus()
     }
 
     CustomModalBottomSheet(
@@ -158,10 +165,16 @@ fun AudioPicker(
 
             internalAudioTracks.forEachIndexed { index, track ->
                 val serverTrack = effectiveAudioTracks.elementAtOrNull(index)
-                // Ground truth is what ExoPlayer is actually decoding, not the separately tracked
-                // "selected index" state — that state can go stale (e.g. when a track has no
-                // matching server entry) while this track is genuinely the one playing.
-                val selected = player.isInternalAudioTrackSelected(track)
+                // Always keep currentAudioTrackIndex in sync with the row actually clicked, even
+                // when there's no matching server entry — otherwise it goes stale and a later
+                // track re-apply (see the LaunchedEffect above) reverts playback to the old
+                // default track.
+                val trackIndex = serverTrack?.index?.toInt() ?: index
+                // Compare against the reactive (StateFlow-backed) selectedIndex, not a plain
+                // player query — reading player.isInternalAudioTrackSelected() here has nothing
+                // for Compose to observe, so the tick would only refresh on the next unrelated
+                // recomposition (e.g. reopening the sheet) instead of right after the click.
+                val selected = selectedIndex == trackIndex
 
                 item {
                     TrackButton(
@@ -169,11 +182,6 @@ fun AudioPicker(
                             .fillMaxWidth()
                             .focusRequester(focusRequesters[track]!!),
                         onClick = {
-                            // Always keep currentAudioTrackIndex in sync with the row actually
-                            // clicked, even when there's no matching server entry — otherwise it
-                            // goes stale and a later track re-apply (see the LaunchedEffect above)
-                            // reverts playback to the old default track.
-                            val trackIndex = serverTrack?.index?.toInt() ?: index
                             VideoPlayerObject.setAudioTrackIndex(trackIndex)
                             player.setInternalAudioTrack(track)
                         },
