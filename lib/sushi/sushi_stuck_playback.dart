@@ -155,8 +155,26 @@ bool sushiPlaybackLooksFrozenMidStream({
   return true;
 }
 
+/// Cancelable handle for [sushiScheduleStuckPlaybackWatch].
+///
+/// A plain [Timer] cannot represent this watch: each check reschedules itself onto a *new*
+/// one-shot Timer, so a caller holding only the Timer returned by the initial call would be
+/// calling cancel() on an already-fired Timer as soon as one tick had elapsed — a no-op that
+/// left the real, currently-running Timer (held only by the closure) ticking forever. That bug
+/// let stuck-playback polling outlive the player screen it was watching, accumulating orphaned
+/// 12s-interval timers across every exit that happened after the first tick.
+class StuckPlaybackWatch {
+  Timer? _timer;
+  bool _cancelled = false;
+
+  void cancel() {
+    _cancelled = true;
+    _timer?.cancel();
+  }
+}
+
 /// Periodically detects start-stuck and mid-stream freeze on Android native + MPV; auto-repairs.
-Timer? sushiScheduleStuckPlaybackWatch({
+StuckPlaybackWatch? sushiScheduleStuckPlaybackWatch({
   required SushiRead read,
   required String itemId,
   required String? streamUrl,
@@ -165,26 +183,37 @@ Timer? sushiScheduleStuckPlaybackWatch({
 }) {
   if (!_shouldScheduleStuckWatch(read)) return null;
 
+  final watch = StuckPlaybackWatch();
   var retriesUsed = 0;
   var telemetrySentForIncident = false;
   var exhaustedReported = false;
-  Timer? timer;
   final tracker = SushiStuckPlaybackTracker(startPosition: startPosition);
   final startResumeGraceUntil = startPosition > const Duration(seconds: 30)
       ? DateTime.now().add(startResumeSeekGrace)
       : null;
 
-  Future<void> runStuckCheck() async {
+  // Declared as late variables (rather than function-declaration statements) so the two can
+  // reference each other: `reschedule` calls `runStuckCheck` before it exists yet, which Dart
+  // only allows for a variable, not a local function declaration.
+  late final void Function() reschedule;
+  late final Future<void> Function() runStuckCheck;
+
+  reschedule = () {
+    if (watch._cancelled) return;
+    watch._timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
+  };
+
+  runStuckCheck = () async {
+    if (watch._cancelled) return;
+
     final sessionRef = SushiStreamRepairBridge.ref;
     if (sessionRef == null) {
-      timer?.cancel();
       return;
     }
 
     final playback = sessionRef.read(mediaPlaybackProvider);
     final model = sessionRef.read(playBackModel);
     if (model == null || model.item.id != itemId) {
-      timer?.cancel();
       return;
     }
 
@@ -228,7 +257,7 @@ Timer? sushiScheduleStuckPlaybackWatch({
       retriesUsed = 0;
       telemetrySentForIncident = false;
       exhaustedReported = false;
-      timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
+      reschedule();
       return;
     }
 
@@ -247,7 +276,7 @@ Timer? sushiScheduleStuckPlaybackWatch({
           transient: false,
         ));
       }
-      timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
+      reschedule();
       return;
     }
 
@@ -262,7 +291,7 @@ Timer? sushiScheduleStuckPlaybackWatch({
           extra: {'retries': retriesUsed},
         ));
       }
-      timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
+      reschedule();
       return;
     }
 
@@ -290,15 +319,15 @@ Timer? sushiScheduleStuckPlaybackWatch({
     await sessionRef.read(videoPlayerProvider.notifier).loadPlaybackItem(retryModel, resumeAt);
 
     tracker.resetIncident();
-    timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
-  }
+    reschedule();
+  };
 
-  timer = Timer(stuckPlaybackCheckDelay, () => unawaited(runStuckCheck()));
-  return timer;
+  reschedule();
+  return watch;
 }
 
 /// Back-compat alias.
-Timer? sushiScheduleNativeStuckPlaybackWatch({
+StuckPlaybackWatch? sushiScheduleNativeStuckPlaybackWatch({
   required SushiRead read,
   required String itemId,
   required String? streamUrl,

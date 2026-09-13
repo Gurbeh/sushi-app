@@ -110,7 +110,7 @@ abstract class BaseAppWrapperState<T extends BaseAppWrapper> extends ConsumerSta
 
     final ignoreLifeCycle = ref.read(lockScreenActiveProvider) ||
         ref.read(userProvider) == null ||
-        ref.read(videoPlayerProvider).lastState?.playing == nativeActivityStarted;
+        ((ref.read(videoPlayerProvider).lastState?.playing ?? false) && nativeActivityStarted);
 
     if (ignoreLifeCycle) {
       _lastPaused = DateTime.now();

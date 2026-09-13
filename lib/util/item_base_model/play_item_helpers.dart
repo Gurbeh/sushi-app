@@ -1098,7 +1098,7 @@ Future<void> _playVideo(
         actualStartPosition,
       );
 
-  Timer? stuckWatch;
+  StuckPlaybackWatch? stuckWatch;
   if (loadedCorrectly && SushiEnv.isEnabled) {
     stuckWatch = sushiScheduleStuckPlaybackWatch(
       read: read,

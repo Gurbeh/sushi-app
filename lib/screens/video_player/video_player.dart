@@ -14,6 +14,9 @@ import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/screens/video_player/components/video_player_guide_wrapper.dart';
 import 'package:fladder/screens/video_player/components/video_player_next_wrapper.dart';
 import 'package:fladder/screens/video_player/video_player_controls.dart';
+import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_playback_repair.dart';
+import 'package:fladder/sushi/sushi_stuck_playback.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/themes_data.dart';
 import 'package:fladder/widgets/shared/back_intent_dpad.dart';
@@ -30,6 +33,7 @@ class _VideoPlayerState extends ConsumerState<VideoPlayer> with WidgetsBindingOb
 
   bool errorPlaying = false;
   bool playing = false;
+  bool _resumeRecoveryInFlight = false;
 
   late PlaybackModel? currentPlaybackModel = ref.read(playBackModel);
 
@@ -39,7 +43,12 @@ class _VideoPlayerState extends ConsumerState<VideoPlayer> with WidgetsBindingOb
     if (!(AdaptiveLayout.of(context).isDesktop || kIsWeb)) {
       switch (state) {
         case AppLifecycleState.resumed:
-          if (playing) ref.read(videoPlayerProvider).play();
+          if (playing) {
+            ref.read(videoPlayerProvider).play();
+            if (SushiEnv.isEnabled && sushiUsesNativePlayer(ref)) {
+              unawaited(_recoverNativePlayerAfterResume());
+            }
+          }
           break;
         case AppLifecycleState.hidden:
         case AppLifecycleState.paused:
@@ -49,6 +58,37 @@ class _VideoPlayerState extends ConsumerState<VideoPlayer> with WidgetsBindingOb
         default:
           break;
       }
+    }
+  }
+
+  /// TV standby can kill the native VideoPlayerActivity while the Flutter engine (and this
+  /// widget) stay alive: [NativePlayer.play] then keeps sending Pigeon calls into a dead
+  /// Activity, so the screen comes back black and the play button does nothing. There is no
+  /// signal telling Dart the Activity died, so this samples position/buffer right after resume
+  /// and, if nothing moved a few seconds later, does the one full reload (relaunch + reopen +
+  /// reseek) that already exists for mid-stream repair. Bounded to a single attempt per resume
+  /// so it can't turn into the repeated-reload/RAM-spike pattern that repair is deliberately
+  /// disabled for during ordinary playback (see sushi_stuck_playback.dart).
+  Future<void> _recoverNativePlayerAfterResume() async {
+    if (_resumeRecoveryInFlight) return;
+    final model = ref.read(playBackModel);
+    if (model == null) return;
+    _resumeRecoveryInFlight = true;
+    try {
+      final before = ref.read(mediaPlaybackProvider);
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (!mounted) return;
+      if (ref.read(playBackModel)?.item.id != model.item.id) return;
+
+      final after = ref.read(mediaPlaybackProvider);
+      final stuck = !after.buffering && (after.position - before.position).inMilliseconds.abs() < 500;
+      if (!stuck) return;
+
+      final resumeAt = after.position;
+      final refreshed = await sushiRefreshPlaybackWithForceRepair(ref.read, model, startPosition: resumeAt);
+      await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(refreshed ?? model, resumeAt);
+    } finally {
+      _resumeRecoveryInFlight = false;
     }
   }
 
@@ -79,6 +119,13 @@ class _VideoPlayerState extends ConsumerState<VideoPlayer> with WidgetsBindingOb
     final padding = MediaQuery.of(context).padding;
 
     final playerController = ref.watch(videoPlayerProvider.select((value) => value));
+
+    // didChangeAppLifecycleState reads this outside the widget tree's build/rebuild cycle, so it
+    // needs a plain field kept in sync here rather than a ref.watch of its own.
+    ref.listen(
+      mediaPlaybackProvider.select((value) => value.playing),
+      (previous, next) => playing = next,
+    );
 
     //Watch playbackModel type changes to switch between normal players
     ref.listen(
