@@ -73,6 +73,7 @@ import app.sushi.composables.dialogs.SubtitlePicker
 import app.sushi.composables.dialogs.SushiAiKeyMissingSheet
 import app.sushi.composables.dialogs.SushiOnlineSubtitleSheet
 import app.sushi.composables.dialogs.SushiSubtitleBusyOverlay
+import app.sushi.composables.dialogs.sushiTranslateErrorMessage
 import app.sushi.composables.shared.CurrentTime
 import app.sushi.objects.PlayerSettingsObject
 import app.sushi.objects.VideoPlayerObject
@@ -97,6 +98,7 @@ fun CustomVideoControls(
     val showSubDialog = remember { mutableStateOf(false) }
     var showOnlineSheet by remember { mutableStateOf(false) }
     var showAiKeySheet by remember { mutableStateOf(false) }
+    var aiKeySheetMessage by remember { mutableStateOf<String?>(null) }
     var subtitleBusy by remember { mutableStateOf<String?>(null) }
     var pendingSubtitle by remember { mutableStateOf(SushiSubtitlePending.None) }
     var showChapterDialog by remember { mutableStateOf(false) }
@@ -457,7 +459,21 @@ fun CustomVideoControls(
                             r.ok -> android.widget.Toast.makeText(
                                 activity, r.label ?: "Persian subtitle applied", android.widget.Toast.LENGTH_SHORT,
                             ).show()
-                            r.errorCode == "missing_key" -> showAiKeySheet = true
+                            r.errorCode == "missing_key" -> {
+                                aiKeySheetMessage = null
+                                showAiKeySheet = true
+                            }
+                            // Both cases are plausibly a bad/exhausted key — route to the same
+                            // bot/QR sheet used for "no key yet" so the user can swap it in place,
+                            // just with copy that explains this isn't a first-time setup.
+                            r.errorCode == "translate_quota_exceeded" -> {
+                                aiKeySheetMessage = sushiTranslateErrorMessage(r.errorCode)
+                                showAiKeySheet = true
+                            }
+                            r.errorCode == "translate_service_failed" -> {
+                                aiKeySheetMessage = sushiTranslateErrorMessage(r.errorCode)
+                                showAiKeySheet = true
+                            }
                             r.errorCode == "no_source" -> android.widget.Toast.makeText(
                                 activity,
                                 "Need a text subtitle first — try Online subtitles",
@@ -477,7 +493,10 @@ fun CustomVideoControls(
         SushiOnlineSubtitleSheet(onDismissRequest = { showOnlineSheet = false })
     }
     if (showAiKeySheet) {
-        SushiAiKeyMissingSheet(onDismissRequest = { showAiKeySheet = false })
+        SushiAiKeyMissingSheet(
+            onDismissRequest = { showAiKeySheet = false },
+            initialMessage = aiKeySheetMessage,
+        )
     }
     subtitleBusy?.let { SushiSubtitleBusyOverlay(it) }
 

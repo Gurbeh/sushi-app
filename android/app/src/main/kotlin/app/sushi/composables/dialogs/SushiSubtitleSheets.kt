@@ -164,8 +164,26 @@ fun SushiOnlineSubtitleSheet(onDismissRequest: () -> Unit) {
     }
 }
 
+/** Mirrors the Flutter-side toast copy in sushi_online_subtitle_sheet.dart so both surfaces
+ *  say the same understandable thing instead of leaking a raw error code to the user. */
+fun sushiTranslateErrorMessage(code: String?): String = when (code) {
+    "no_source" -> "Need a text subtitle first — try Online subtitles"
+    "translate_service_failed" -> "Translation service failed — try again"
+    "translate_quota_exceeded" ->
+        "Gemini credits are depleted — top up billing at ai.studio/projects, then retry"
+    "apply_failed" -> "Translated but the player couldn't load it — try again"
+    "busy" -> "Still translating…"
+    "stale" -> "Cancelled — you switched titles"
+    else -> "Could not translate"
+}
+
+/**
+ * Also opened for translate failures that plausibly mean "this key is bad" (quota exhausted,
+ * service rejected it) — not just "no key yet" — so [initialMessage] overrides the default
+ * first-time-setup copy while still offering the same bot/QR re-set path.
+ */
 @Composable
-fun SushiAiKeyMissingSheet(onDismissRequest: () -> Unit) {
+fun SushiAiKeyMissingSheet(onDismissRequest: () -> Unit, initialMessage: String? = null) {
     var setup by remember { mutableStateOf<SushiAiKeySetup?>(null) }
     var showQr by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -185,7 +203,7 @@ fun SushiAiKeyMissingSheet(onDismissRequest: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text("Translate with AI (Persian)")
-            Text("AI translate needs a free Gemini API key. Set it in the Sushi bot.")
+            Text(initialMessage ?: "AI translate needs a free Gemini API key. Set it in the Sushi bot.")
             if (status != null) Text(status!!)
             val info = setup
             if (info == null) {
@@ -249,7 +267,7 @@ fun SushiAiKeyMissingSheet(onDismissRequest: () -> Unit) {
                                         it.onSuccess { s -> setup = s }
                                     }
                                 } else {
-                                    status = r.errorCode ?: "Could not translate"
+                                    status = sushiTranslateErrorMessage(r.errorCode)
                                 }
                             },
                             onFailure = { status = it.message },

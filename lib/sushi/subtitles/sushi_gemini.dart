@@ -50,27 +50,34 @@ class SushiGeminiClient {
           'sushi_gemini_batch ${i + 1}/${batches.length} cues=${batch.length}',
           name: 'sushi.subs',
         );
-        var reply = '';
-        try {
-          reply = await generateContent(
-            apiKey: apiKey,
-            prompt: _prompt(sushiNumberedCuePayload(batch)),
-          );
-        } on SushiGeminiException catch (e) {
-          if (!e.message.contains('HTTP 429')) rethrow;
-          await Future<void>.delayed(const Duration(seconds: 2));
-          reply = await generateContent(
-            apiKey: apiKey,
-            prompt: _prompt(sushiNumberedCuePayload(batch)),
-          );
-        }
-        out[i] = sushiApplyNumberedTranslations(batch, reply);
+        out[i] = await _translateBatch(batch, apiKey);
       }
     }
 
     final n = concurrency.clamp(1, batches.length);
     await Future.wait(List.generate(n, (_) => worker()));
     return sushiBuildSrt([for (final b in out) ...b!]);
+  }
+
+  /// One retry covers both a transient 429 and a batch that came back basically untranslated
+  /// (bad numbering, a refusal, a reply cut short) — real Persian prose essentially never equals
+  /// its English source line-for-line, so a majority pass-through means the batch failed, not
+  /// that nothing needed changing. Silently keeping the English here is what let a whole chunk of
+  /// "AI Persian" quietly read as English mid-movie once playback reached it.
+  Future<List<SushiSrtCue>> _translateBatch(List<SushiSrtCue> batch, String apiKey, {bool retried = false}) async {
+    String reply;
+    try {
+      reply = await generateContent(apiKey: apiKey, prompt: _prompt(sushiNumberedCuePayload(batch)));
+    } on SushiGeminiException catch (e) {
+      if (retried || !e.message.contains('HTTP 429')) rethrow;
+      await Future<void>.delayed(const Duration(seconds: 2));
+      return _translateBatch(batch, apiKey, retried: true);
+    }
+    final translated = sushiApplyNumberedTranslations(batch, reply);
+    final unchanged = _sushiUnchangedCueCount(batch, translated);
+    if (unchanged * 2 <= batch.length) return translated;
+    if (!retried) return _translateBatch(batch, apiKey, retried: true);
+    throw SushiGeminiException('incomplete translation ($unchanged/${batch.length} lines unchanged)');
   }
 
   Future<String> generateContent({required String apiKey, required String prompt}) async {
@@ -91,7 +98,9 @@ class SushiGeminiClient {
         return text;
       } on SushiGeminiException catch (e) {
         last = e;
-        if (e.message.startsWith('HTTP 400')) continue;
+        // 429 = this model's quota/rate-limit is exhausted, not that the key is bad —
+        // fall through to the next model instead of aborting the whole translation.
+        if (e.message.startsWith('HTTP 400') || e.message.startsWith('HTTP 429')) continue;
         if (!e.message.startsWith('HTTP 404')) rethrow;
         final next = e.suggestedModel ?? sushiGeminiSuggestedModel(e.message);
         if (next != null && !tried.contains(next)) queue.add(next);
@@ -145,6 +154,17 @@ class SushiGeminiClient {
   }
 
   void close() => _client.close();
+}
+
+/// How many lines [translated] left byte-for-byte identical to [original] — the signal that
+/// [SushiGeminiClient._translateBatch] uses to tell "Gemini legitimately left a name/number
+/// alone" (a few) apart from "this batch didn't get translated at all" (most/all of them).
+int _sushiUnchangedCueCount(List<SushiSrtCue> original, List<SushiSrtCue> translated) {
+  var n = 0;
+  for (var i = 0; i < original.length && i < translated.length; i++) {
+    if (translated[i].text.trim() == original[i].text.trim()) n++;
+  }
+  return n;
 }
 
 String sushiGeminiExtractText(String body) {

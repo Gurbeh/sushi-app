@@ -1,10 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fladder/models/items/episode_model.dart';
+import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/sushi/playback/sushi_persian_language.dart';
+import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
@@ -112,9 +118,18 @@ class SushiSubtitleOpResult {
   static const stale = SushiSubtitleOpResult(ok: false, errorCode: 'stale');
   // Gemini call itself failed (network/HTTP/key-rejected), distinct from a source-fetch failure.
   static const translateServiceFailed = SushiSubtitleOpResult(ok: false, errorCode: 'translate_service_failed');
+  // Every fallback model rejected the request with 429 RESOURCE_EXHAUSTED — the key's Gemini
+  // billing/credits are depleted, not a transient rate limit. Retrying won't help until topped up.
+  static const translateQuotaExceeded = SushiSubtitleOpResult(ok: false, errorCode: 'translate_quota_exceeded');
   // Translation succeeded but the player rejected applying it.
   static const applyFailed = SushiSubtitleOpResult(ok: false, errorCode: 'apply_failed');
 }
+
+/// Google's RESOURCE_EXHAUSTED for depleted prepaid credits (billing, account-wide) looks the
+/// same as a per-model 429 in the exception message — distinguish it so the UI can point the
+/// user at billing instead of suggesting a retry that can never succeed.
+bool sushiGeminiQuotaExhausted(String message) =>
+    message.contains('RESOURCE_EXHAUSTED') || message.contains('prepayment credits');
 
 class SushiAiKeySetupInfo {
   const SushiAiKeySetupInfo({required this.deepLink, required this.telegramInstalled});
@@ -312,6 +327,7 @@ Future<SushiSubtitleOpResult> _sushiRunTranslateToPersianBody(
     return const SushiSubtitleOpResult(ok: true, label: 'AI Persian');
   } on SushiGeminiException catch (e, st) {
     _log('translate_service_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
+    if (sushiGeminiQuotaExhausted(e.message)) return SushiSubtitleOpResult.translateQuotaExceeded;
     return SushiSubtitleOpResult.translateServiceFailed;
   } catch (e, st) {
     _log('translate_error', {'error': e.toString(), 'stack': st.toString().split('\n').take(3).join(' | ')});
@@ -363,6 +379,17 @@ Future<String?> _fetchTranslateSourceSrt(Object src) async {
     _log('translate_source', {'via': 'memory', 'chars': cached.length});
     return cached;
   }
+  // The file's own muxed/attached track (any non-Persian language) is a guaranteed timing
+  // match for THIS exact media source — try it before searching external catalogs, which can
+  // return a mistimed or wrong-cut file (see the Forced-subtitle bug this was added alongside).
+  final embedded = await _fetchEmbeddedTranslateSourceSrt(src);
+  if (embedded != null && embedded.isNotEmpty) {
+    _cachedTranslateEn = embedded;
+    _cachedTranslateEnKey = cacheKey;
+    sushiRememberSideloadedSrt(embedded);
+    _log('translate_source', {'via': 'embedded', 'chars': embedded.length});
+    return embedded;
+  }
   final os = await _fetchOpenSubtitlesEnglish(src);
   if (os != null && os.isNotEmpty) {
     _cachedTranslateEn = os;
@@ -380,6 +407,64 @@ Future<String?> _fetchTranslateSourceSrt(Object src) async {
     return en.file.text;
   }
   return null;
+}
+
+/// Bitmap/image subtitle codecs Jellyfin can't hand back as text — a `.srt` fetch for one of
+/// these would come back empty or garbage, not a translatable transcript.
+const _sushiImageSubtitleCodecs = {
+  'pgssub',
+  'dvdsub',
+  'dvd_subtitle',
+  'dvbsub',
+  'dvb_subtitle',
+  'vobsub',
+  'xsub',
+  'hdmv_pgs_subtitle',
+};
+
+/// Picks a text-based, non-Persian, non-Off track with a fetchable delivery URL — preferring
+/// English when more than one language is muxed in. Persian is excluded because translating it
+/// would be Farsi-to-Farsi (doc 15 §12's "2017 same-title collision" case); any other language
+/// works since Gemini's prompt doesn't pin a source language.
+SubStreamModel? _pickEmbeddedTranslateSource(List<SubStreamModel>? subStreams) {
+  if (subStreams == null || subStreams.isEmpty) return null;
+  final candidates = subStreams.where((s) {
+    if (s.index == -1) return false;
+    if ((s.url ?? '').trim().isEmpty) return false;
+    if (_sushiImageSubtitleCodecs.contains(s.codec.trim().toLowerCase())) return false;
+    if (SushiPersianLanguage.isPersianLanguage(s.language) ||
+        SushiPersianLanguage.isPersianLanguage(s.displayTitle)) {
+      return false;
+    }
+    return true;
+  }).toList();
+  if (candidates.isEmpty) return null;
+  final english = candidates.firstWhereOrNull(
+    (s) => sushiIsEnglishLanguage(s.language) || s.displayTitle.toLowerCase().contains('english'),
+  );
+  return english ?? candidates.first;
+}
+
+/// The file's own muxed/attached subtitle, fetched straight from the Jellyfin server (same
+/// `.srt` delivery URL the player itself would use) — no title search, so no risk of matching
+/// the wrong release or a Forced-only file.
+Future<String?> _fetchEmbeddedTranslateSourceSrt(Object src) async {
+  final subStreams = sushiRead(src, playBackModel)?.subStreams;
+  final picked = _pickEmbeddedTranslateSource(subStreams);
+  final url = picked?.url?.trim();
+  if (picked == null || url == null || url.isEmpty) return null;
+  try {
+    final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+    if (resp.statusCode < 200 || resp.statusCode >= 300) return null;
+    var text = utf8.decode(resp.bodyBytes, allowMalformed: true);
+    if (text.startsWith('﻿')) text = text.substring(1);
+    text = text.trim();
+    if (sushiParseSrt(text).isEmpty) return null;
+    return text;
+  } catch (e) {
+    _log('embedded_source_error', {'error': e.toString(), 'lang': picked.language});
+    return null;
+  }
 }
 
 Future<({SubplusSubFile file, String label})?> _fetchSubplusFile(Object src, {required String lang}) async {

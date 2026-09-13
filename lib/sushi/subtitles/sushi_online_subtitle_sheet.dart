@@ -25,6 +25,8 @@ const _kApplied = 'Subtitle loaded';
 const _kFailed = 'Could not load subtitle';
 const _kTranslateFailed = 'AI translate failed';
 const _kTranslateServiceFailed = 'Translation service failed — try again';
+const _kTranslateQuotaExceeded =
+    'Gemini credits are depleted — top up billing at ai.studio/projects, then retry';
 const _kTranslateApplyFailed = "Translated but the player couldn't load it — try again";
 const _kTranslating = 'Translating to Persian…';
 const _kTranslated = 'Persian subtitle applied';
@@ -216,8 +218,31 @@ Future<void> sushiTranslateSubtitle({
     _toast(messenger, _kNoSource);
     return;
   }
+  // Both plausibly mean "this key is bad" (quota exhausted / service rejected it) — reuse the
+  // same bot/QR key-setup dialog so the user can swap the key in place, with copy that makes
+  // clear this isn't a first-time-setup nag.
+  if (result.errorCode == 'translate_quota_exceeded') {
+    final ctx = navigator.context;
+    if (ctx.mounted) {
+      await showSushiAiKeyMissingDialog(
+        ctx,
+        messenger: messenger,
+        container: container,
+        message: _kTranslateQuotaExceeded,
+      );
+    }
+    return;
+  }
   if (result.errorCode == 'translate_service_failed') {
-    _toast(messenger, _kTranslateServiceFailed);
+    final ctx = navigator.context;
+    if (ctx.mounted) {
+      await showSushiAiKeyMissingDialog(
+        ctx,
+        messenger: messenger,
+        container: container,
+        message: _kTranslateServiceFailed,
+      );
+    }
     return;
   }
   if (result.errorCode == 'apply_failed') {
@@ -231,6 +256,7 @@ Future<void> showSushiAiKeyMissingDialog(
   BuildContext context, {
   required ScaffoldMessengerState messenger,
   required ProviderContainer container,
+  String message = _kAiKeyMissing,
 }) async {
   final setup = await sushiAiKeySetupInfo();
   if (!context.mounted) return;
@@ -239,6 +265,7 @@ Future<void> showSushiAiKeyMissingDialog(
     useRootNavigator: true,
     builder: (ctx) => _AiKeyMissingDialog(
       setup: setup,
+      message: message,
       onRetry: () async {
         Navigator.of(ctx, rootNavigator: true).pop();
         await sushiTranslateSubtitle(
@@ -253,9 +280,10 @@ Future<void> showSushiAiKeyMissingDialog(
 }
 
 class _AiKeyMissingDialog extends StatefulWidget {
-  const _AiKeyMissingDialog({required this.setup, required this.onRetry});
+  const _AiKeyMissingDialog({required this.setup, required this.message, required this.onRetry});
 
   final SushiAiKeySetupInfo setup;
+  final String message;
   final VoidCallback onRetry;
 
   @override
@@ -289,7 +317,7 @@ class _AiKeyMissingDialogState extends State<_AiKeyMissingDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(_kAiKeyMissing, style: theme.textTheme.bodyMedium?.copyWith(color: onSurfaceVariant)),
+          Text(widget.message, style: theme.textTheme.bodyMedium?.copyWith(color: onSurfaceVariant)),
           const SizedBox(height: 16),
           if (showQr) ...[
             QrImageView(data: setup.deepLink, size: 220, backgroundColor: Colors.white),

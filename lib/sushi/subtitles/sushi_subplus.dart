@@ -93,9 +93,25 @@ bool _subplusFileLooksSdh(SubplusSubFile f) {
       n.contains(' sdh');
 }
 
-/// Movie pack: skip SDH when a hearing-impaired copy sits next to a dialogue track.
+/// "Forced" releases only carry the handful of lines for on-screen/foreign-language text, not
+/// full dialogue — picking one as an Automatic sideload or (worse) an AI-translate source yields
+/// a near-empty subtitle whose few cues rarely land near the current playback position, so it
+/// never appears to load even though the sideload itself "succeeds".
+bool _subplusFileLooksForced(SubplusSubFile f) {
+  final n = f.name.toLowerCase();
+  return n.contains('[forced]') ||
+      n.contains('.forced.') ||
+      n.contains('_forced') ||
+      n.contains('-forced') ||
+      n.contains(' forced');
+}
+
+/// Movie pack: prefer a full dialogue track over SDH or forced-only copies sitting in the same
+/// pack; fall back to SDH, then to forced, then to whatever's left, rather than returning null.
 SubplusSubFile? pickMovieSubFile(List<SubplusSubFile> files) {
   if (files.isEmpty) return null;
+  final full = files.where((f) => !_subplusFileLooksSdh(f) && !_subplusFileLooksForced(f)).toList();
+  if (full.isNotEmpty) return full.first;
   final noSdh = files.where((f) => !_subplusFileLooksSdh(f)).toList();
   return (noSdh.isNotEmpty ? noSdh : files).first;
 }
