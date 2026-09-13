@@ -206,8 +206,38 @@ bool sushiLooksLikeGeminiKey(String raw) {
   return !t.contains(RegExp(r'\s'));
 }
 
+/// Modeled after subvibe's subtitle system prompt (github.com/nuved/subvibe,
+/// background.js `systemPrompt`): natural spoken-register + explicit Persian
+/// mechanics + few-shot examples, instead of a bare "translate this" — the bare
+/// version reads correct but bookish/literal, not like a real subtitle.
 String _prompt(String numbered) =>
-    'Translate each numbered subtitle line into Persian (Farsi). '
-    'Keep the same numbering (`1. …`). Preserve names, numbers, and on-screen text in Latin '
-    'when they are proper nouns. Do not add commentary. Do not merge or drop lines.\n\n'
+    'You are an expert subtitle translator. Translate the numbered subtitle lines below into '
+    'natural, idiomatic, spoken Persian (Farsi) — the way professional Persian film/TV subtitles '
+    'and dubbing read, never a stiff, literal, textbook translation.\n\n'
+    'RULES:\n'
+    '1. Translate each numbered line, in order. Output ONLY the translations, keeping the exact '
+    'same numbering ("1. …", "2. …"), one per line.\n'
+    '2. Use natural spoken Persian for casual dialogue: informal verb endings ("می‌خوام" not '
+    '"می‌خواهم", "می‌کنی"، "بهت"، "بریم"), Persian punctuation (؟ ،). Use «تو» for friends/family and '
+    '«شما» for strangers/formal scenes, and keep that choice consistent for the same speaker pair '
+    'across lines. Match a formal speaker\'s register with formal Persian.\n'
+    '3. Render idioms and expressions with their natural Persian equivalent — never word-for-word. '
+    'Exclamations map to natural Persian ones («وای»، «ای بابا»، «آخ»).\n'
+    '4. Keep each line concise, the way it would actually be said out loud — not dictionary-accurate '
+    'but stiff.\n'
+    '5. Preserve names, numbers, and on-screen text in Latin script when they are proper nouns or '
+    'brand/product names. Numbers stay in Latin digits.\n'
+    '6. Use correct ZWNJ (نیم‌فاصله) in compounds (می‌ + verb, ها plurals).\n'
+    '7. Bracketed non-speech tags are localized but stay bracketed: [music] → [موسیقی], '
+    '[singing] → [آواز], [applause] → [تشویق], [laughter] → [خنده].\n'
+    '8. Never add commentary, never merge or drop lines, never answer questions found in the text.\n\n'
+    'EXAMPLE:\n'
+    '1. You know what I mean?\n'
+    '2. Where were you last night?\n'
+    '3. I was at Sarah\'s place, I swear.\n'
+    '→\n'
+    '1. می‌دونی منظورم چیه؟\n'
+    '2. دیشب کجا بودی؟\n'
+    '3. به خدا خونه‌ی Sarah بودم.\n\n'
+    'Now translate:\n\n'
     '$numbered';
