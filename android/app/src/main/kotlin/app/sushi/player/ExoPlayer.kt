@@ -283,9 +283,16 @@ internal fun ExoPlayer(
                     impl.subsInitialized = true
                     scheduleApplyDefaults()
                 } else if ((hadNoExoSubtitleTracks && subTracks.isNotEmpty()) ||
-                    (hadNoExoAudioTracks && audioTracks.isNotEmpty())
+                    (hadNoExoAudioTracks && audioTracks.isNotEmpty()) ||
+                    impl.pendingSelectSushiExt
                 ) {
-                    // Late-mapped text or audio tracks after the initial snapshot.
+                    // Late-mapped text or audio tracks after the initial snapshot, or a
+                    // sideloaded AI/online subtitle (sideloadSushiSubtitle) still waiting to be
+                    // selected. sideloadSushiSubtitle's setMediaItem()+prepare() re-maps every
+                    // track and fires this callback again with audio/sub already non-empty, so
+                    // without this branch scheduleApplyDefaults() never runs: the pending
+                    // subtitle selection is silently dropped and the previously-chosen audio
+                    // track's override is never reasserted against the freshly remapped groups.
                     scheduleApplyDefaults()
                 }
             }

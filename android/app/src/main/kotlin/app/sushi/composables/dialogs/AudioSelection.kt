@@ -1,5 +1,6 @@
 package app.sushi.composables.dialogs
 
+import AudioTrack
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,13 +16,48 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import app.sushi.messengers.properlySetSubAndAudioTracks
 import app.sushi.objects.Localized
 import app.sushi.objects.Translate
 import app.sushi.objects.VideoPlayerObject
+import app.sushi.utility.InternalTrack
 import app.sushi.utility.clearAudioTrack
+import app.sushi.utility.isInternalAudioTrackSelected
 import app.sushi.utility.setInternalAudioTrack
+
+/** Server sent a per-track audio list that actually covers every muxed Exo track (Off + one row each). */
+private fun hasUsableServerAudioList(server: List<AudioTrack>, internalCount: Int): Boolean =
+    server.size - 1 >= internalCount
+
+/** Off + one row per muxed Exo audio track, labeled from the track's own container language/label.
+ *  Used when the server's per-file audio metadata under-reports the real tracks (e.g. Sushi's
+ *  `audio_langs` listing fewer languages than are actually muxed in), which otherwise leaves the
+ *  extra track(s) with no label and no way to ever show as "selected". Position mirrors
+ *  [internal] the way [properlySetSubAndAudioTracks] expects: index 0 is Off, index i+1 is
+ *  internal[i]. */
+private fun muxedFallbackAudioRows(internal: List<InternalTrack>): List<AudioTrack> {
+    if (internal.isEmpty()) return emptyList()
+    val off = AudioTrack(
+        name = "Off",
+        languageCode = "",
+        codec = "",
+        index = -1L,
+        external = false,
+    )
+    return listOf(off) + internal.mapIndexed { i, t ->
+        AudioTrack(
+            name = t.language?.trim()?.uppercase()?.ifBlank { null } ?: t.label.ifBlank { "Track ${i + 1}" },
+            languageCode = t.language.orEmpty(),
+            codec = t.codec.orEmpty(),
+            index = i.toLong(),
+            external = false,
+        )
+    }
+}
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -35,6 +71,42 @@ fun AudioPicker(
 
     if (internalAudioTracks.isEmpty()) return
 
+    val effectiveAudioTracks = remember(audioTracks, internalAudioTracks) {
+        if (hasUsableServerAudioList(audioTracks, internalAudioTracks.size)) {
+            audioTracks.drop(1)
+        } else {
+            muxedFallbackAudioRows(internalAudioTracks).drop(1)
+        }
+    }
+
+    // Keep the shared playback data (and properlySetSubAndAudioTracks's own idea of the track
+    // list) patched to match reality, the same way SubtitlePicker reconciles its list — otherwise
+    // a later re-apply (e.g. after sideloading an AI/online subtitle) looks up the old, too-short
+    // server list and silently snaps audio back to the default track.
+    LaunchedEffect(audioTracks, internalAudioTracks) {
+        if (internalAudioTracks.isEmpty()) return@LaunchedEffect
+        if (hasUsableServerAudioList(audioTracks, internalAudioTracks.size)) return@LaunchedEffect
+        val impl = VideoPlayerObject.implementation
+        val cur = impl.playbackData.value ?: return@LaunchedEffect
+        val built = muxedFallbackAudioRows(internalAudioTracks)
+        if (built.isEmpty() || cur.audioTracks == built) return@LaunchedEffect
+        val prevDef = cur.defaultAudioTrack
+        val userPickedOff = VideoPlayerObject.currentAudioTrackIndex.value == -1
+        val newDef = when {
+            userPickedOff -> -1L
+            built.any { it.index == prevDef } -> prevDef
+            else -> 0L
+        }
+        impl.playbackData.value = cur.copy(audioTracks = built, defaultAudioTrack = newDef)
+        VideoPlayerObject.setAudioTrackIndex(newDef.toInt(), init = true)
+        val patched = impl.playbackData.value
+        if (patched != null) {
+            Handler(Looper.getMainLooper()).post {
+                player.properlySetSubAndAudioTracks(patched)
+            }
+        }
+    }
+
     val focusOffTrack = remember { FocusRequester() }
     val focusRequesters = remember(internalAudioTracks) {
         internalAudioTracks.associateWith { FocusRequester() }
@@ -42,24 +114,18 @@ fun AudioPicker(
 
     val listState = rememberLazyListState()
 
-    LaunchedEffect(selectedIndex, audioTracks, internalAudioTracks) {
-        if (selectedIndex == -1) {
+    LaunchedEffect(selectedIndex, internalAudioTracks) {
+        val selectedTrack = internalAudioTracks.firstOrNull { player.isInternalAudioTrackSelected(it) }
+        if (selectedTrack == null) {
             focusOffTrack.requestFocus()
             return@LaunchedEffect
         }
 
-        val serverTrackIndex = audioTracks.indexOfFirst { it.index == selectedIndex.toLong() }
-
-        if (serverTrackIndex <= 0) {
-            focusOffTrack.requestFocus()
-            return@LaunchedEffect
-        }
-
-        val internalIndex = serverTrackIndex - 1
+        val internalIndex = internalAudioTracks.indexOf(selectedTrack)
         val lazyColumnIndex = internalIndex + 1
 
         listState.scrollToItem(lazyColumnIndex)
-        focusRequesters[internalAudioTracks[internalIndex]]?.requestFocus()
+        focusRequesters[selectedTrack]?.requestFocus()
     }
 
     CustomModalBottomSheet(
@@ -91,8 +157,11 @@ fun AudioPicker(
             }
 
             internalAudioTracks.forEachIndexed { index, track ->
-                val serverTrack = audioTracks.elementAtOrNull(index + 1)
-                val selected = serverTrack?.index?.toInt() == selectedIndex
+                val serverTrack = effectiveAudioTracks.elementAtOrNull(index)
+                // Ground truth is what ExoPlayer is actually decoding, not the separately tracked
+                // "selected index" state — that state can go stale (e.g. when a track has no
+                // matching server entry) while this track is genuinely the one playing.
+                val selected = player.isInternalAudioTrackSelected(track)
 
                 item {
                     TrackButton(
@@ -100,12 +169,17 @@ fun AudioPicker(
                             .fillMaxWidth()
                             .focusRequester(focusRequesters[track]!!),
                         onClick = {
-                            serverTrack?.index?.let { VideoPlayerObject.setAudioTrackIndex(it.toInt()) }
+                            // Always keep currentAudioTrackIndex in sync with the row actually
+                            // clicked, even when there's no matching server entry — otherwise it
+                            // goes stale and a later track re-apply (see the LaunchedEffect above)
+                            // reverts playback to the old default track.
+                            val trackIndex = serverTrack?.index?.toInt() ?: index
+                            VideoPlayerObject.setAudioTrackIndex(trackIndex)
                             player.setInternalAudioTrack(track)
                         },
                         selected = selected
                     ) {
-                        Text(serverTrack?.name ?: "")
+                        Text(serverTrack?.name ?: track.label.ifBlank { "Track ${index + 1}" })
                     }
                 }
             }
