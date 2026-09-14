@@ -147,9 +147,15 @@ String? sushiLastSideloadedSrt() => _lastSideloadedSrt;
 void sushiRememberSideloadedSrt(String text) => _lastSideloadedSrt = text;
 
 /// Drop the previous title's AI/Automatic sideload so it cannot land on this item minutes later.
-void sushiBeginPlaybackSubtitleSession(Object src, String itemId) {
-  if (_subtitleSessionItemId == itemId) return;
-  _subtitleSessionItemId = itemId;
+/// [sessionKey] must change whenever playback actually restarts fresh — item id alone is not
+/// enough: picking a different file of the SAME item (e.g. a different upload/quality from
+/// outside the player) reopens the player with a session id equal to the last one, so the stale
+/// "AI Persian" / "Automatic" active-subtitle marker survived and kept showing as on even though
+/// nothing had been sideloaded onto this new file. Callers should key on item id + the specific
+/// version/file id, not item id alone.
+void sushiBeginPlaybackSubtitleSession(Object src, String sessionKey) {
+  if (_subtitleSessionItemId == sessionKey) return;
+  _subtitleSessionItemId = sessionKey;
   _translateGen++;
   _lastSideloadedSrt = null;
   _cachedTranslateEn = null;
@@ -158,7 +164,7 @@ void sushiBeginPlaybackSubtitleSession(Object src, String itemId) {
   try {
     sushiRead(src, sushiActiveSubtitleProvider.notifier).state = null;
   } catch (_) {}
-  _log('session_reset', {'itemId': itemId, 'gen': _translateGen});
+  _log('session_reset', {'sessionKey': sessionKey, 'gen': _translateGen});
 }
 
 Future<List<SubplusPack>> sushiSearchOnlinePacks(Object src) async {

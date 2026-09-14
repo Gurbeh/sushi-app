@@ -809,8 +809,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     );
   }
 
-  void beginSushiSubtitleSession(String itemId) {
-    sushiBeginPlaybackSubtitleSession(ref, itemId);
+  void beginSushiSubtitleSession(String sessionKey) {
+    sushiBeginPlaybackSubtitleSession(ref, sessionKey);
   }
 
   /// Playable Farsi already on → keep it. Hardsub → Off, unless the audio is English (an

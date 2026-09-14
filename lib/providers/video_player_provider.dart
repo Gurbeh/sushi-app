@@ -203,7 +203,12 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     await init();
 
     if (SushiEnv.isEnabled) {
-      state.beginSushiSubtitleSession(model.item.id);
+      // Item id alone is not a unique playback session: picking a different file of the SAME
+      // item from outside the player (e.g. another upload/quality of the same movie) keeps the
+      // item id unchanged, so the AI/Automatic subtitle "active" marker from the previous file
+      // would otherwise survive and show as on even though nothing was sideloaded onto this one.
+      final sessionKey = '${model.item.id}|${model.mediaStreams?.currentVersionStream?.id ?? ''}';
+      state.beginSushiSubtitleSession(sessionKey);
     }
 
     ref.read(playBackModel)?.dispose();
