@@ -226,6 +226,13 @@ release_parse_args() {
 
   if [[ -z "${RELEASE_SUMMARY}" ]]; then
     release_prompt_summary
+  else
+    RELEASE_SUMMARY="$(release_sanitize_summary "${RELEASE_SUMMARY}")"
+    if [[ -z "${RELEASE_SUMMARY}" ]]; then
+      echo "error: release summary required (one-line description)" >&2
+      release_show_help "$0"
+      exit 1
+    fi
   fi
 }
 
@@ -236,15 +243,26 @@ release_trim() {
   printf '%s' "${s}"
 }
 
+# Arrow keys in a raw `read` become CSI (ESC[D left, ESC[C right) and land in
+# the commit + changelog. Confirm echo even looks fine: the sequences move the
+# cursor instead of showing as junk. Strip them from every summary source.
+release_sanitize_summary() {
+  local s="$1"
+  s="$(printf '%s' "${s}" | sed $'s/\x1b\\[[0-9;?]*[A-Za-z]//g; s/\x1b.//g')"
+  s="$(printf '%s' "${s}" | tr -d '\000-\010\013-\037\177')"
+  release_trim "${s}"
+}
+
 release_prompt_summary() {
   if [[ -r /dev/tty ]]; then
     printf 'Release summary (one-line description): ' >/dev/tty
-    IFS= read -r RELEASE_SUMMARY </dev/tty || true
+    # -e: readline so arrows edit the line instead of appending ESC[D / ESC[C.
+    IFS= read -e -r RELEASE_SUMMARY </dev/tty || true
   elif [[ -t 0 ]]; then
     printf 'Release summary (one-line description): '
-    IFS= read -r RELEASE_SUMMARY || true
+    IFS= read -e -r RELEASE_SUMMARY || true
   fi
-  RELEASE_SUMMARY="$(release_trim "${RELEASE_SUMMARY:-}")"
+  RELEASE_SUMMARY="$(release_sanitize_summary "${RELEASE_SUMMARY:-}")"
   if [[ -z "${RELEASE_SUMMARY}" ]]; then
     echo "error: release summary required (one-line description)" >&2
     release_show_help "$0"
