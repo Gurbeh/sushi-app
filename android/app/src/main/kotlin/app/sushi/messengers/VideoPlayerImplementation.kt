@@ -365,6 +365,7 @@ class VideoPlayerImplementation(
             .filter { it.id != SUSHI_EXT_SUB_ID }
         if (kept.size == (current.localConfiguration?.subtitleConfigurations?.size ?: 0)) return true
         pendingSelectSushiExt = false
+        VideoPlayerObject.sushiExternalSubtitleActive.value = false
         sushiExtFile = null
         val pos = exo.currentPosition.coerceAtLeast(0L)
         val play = exo.playWhenReady
@@ -582,6 +583,7 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                     it.label.contains("auto", ignoreCase = true)
             } ?: internalSubTracks.last()
             VideoPlayerObject.implementation.pendingSelectSushiExt = false
+            VideoPlayerObject.sushiExternalSubtitleActive.value = true
             Log.d(
                 OX_NATIVE_PLY_TAG,
                 "select sushi ext label=${sushi.label} lang=${sushi.language} tracks=${internalSubTracks.size}",
@@ -593,6 +595,10 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                 } catch (_: Exception) {
                 }
             }
+        } else if (VideoPlayerObject.sushiExternalSubtitleActive.value) {
+            // A Sushi auto/online subtitle is the active track; currentSubtitleTrackIndex still
+            // holds the stale pre-Automatic server default, so letting the block below run on a
+            // later onTracksChanged (seek/buffer/TV resume) would silently revert the selection.
         } else {
         val listPos = playableData.subtitleTracks.indexOfFirst { it.index == currentSubIndex }
         val wantedSubIndex: Int = when {

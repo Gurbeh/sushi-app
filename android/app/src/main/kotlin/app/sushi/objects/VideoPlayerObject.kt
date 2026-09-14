@@ -58,6 +58,12 @@ object VideoPlayerObject {
     val currentAudioTrackIndex =
         MutableStateFlow((implementation.playbackData.value?.defaultAudioTrack ?: -1).toInt())
 
+    // True while a Sushi auto/online/translated subtitle (sideloaded outside the server's
+    // subStreams list) is the active track. currentSubtitleTrackIndex has no slot for it, so
+    // this flag keeps the picker UI and properlySetSubAndAudioTracks's default-track fallback
+    // from treating the stale server default index as still selected.
+    val sushiExternalSubtitleActive = MutableStateFlow(false)
+
     val exoAudioTracks = MutableStateFlow<List<InternalTrack>>(emptyList())
     val exoSubTracks = MutableStateFlow<List<InternalTrack>>(emptyList())
 

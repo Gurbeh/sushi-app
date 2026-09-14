@@ -69,6 +69,7 @@ fun SubtitlePicker(
     onTranslate: () -> Unit = {},
 ) {
     val selectedIndex by VideoPlayerObject.currentSubtitleTrackIndex.collectAsState()
+    val sushiExternalActive by VideoPlayerObject.sushiExternalSubtitleActive.collectAsState()
     val subTitles by VideoPlayerObject.subtitleTracks.collectAsState(emptyList())
     val internalSubTracks by VideoPlayerObject.exoSubTracks.collectAsState(emptyList())
 
@@ -165,7 +166,9 @@ fun SubtitlePicker(
             }
             effectiveSubTitles.forEachIndexed { index, serverSub ->
                 val isOffTrack = index == 0
-                val selected = serverSub.index == selectedIndex.toLong()
+                // While a Sushi auto/online subtitle is active, none of the server/muxed rows
+                // represent it (currentSubtitleTrackIndex is stale), so don't highlight one.
+                val selected = !sushiExternalActive && serverSub.index == selectedIndex.toLong()
 
                 item {
                     TrackButton(
@@ -178,6 +181,7 @@ fun SubtitlePicker(
                             val shouldSyncFlutter = serverList.isNotEmpty() &&
                                 !(serverList.size == 1 && serverList[0].index == -1L)
                             if (isOffTrack) {
+                                VideoPlayerObject.sushiExternalSubtitleActive.value = false
                                 VideoPlayerObject.setSubtitleTrackIndex(-1, init = !shouldSyncFlutter)
                                 player.clearSubtitleTrack()
                             } else {
@@ -187,6 +191,7 @@ fun SubtitlePicker(
                                     internalSubTracks.elementAtOrNull(internalTrackIndex)
 
                                 if (internalSubTrack != null) {
+                                    VideoPlayerObject.sushiExternalSubtitleActive.value = false
                                     VideoPlayerObject.setSubtitleTrackIndex(
                                         serverSub.index.toInt(),
                                         init = !shouldSyncFlutter,
