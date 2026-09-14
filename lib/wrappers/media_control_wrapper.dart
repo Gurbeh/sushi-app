@@ -22,6 +22,7 @@ import 'package:fladder/models/playback/audio_url_resolver.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
+import 'package:fladder/sushi/sushi_env.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
@@ -711,7 +712,12 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     final newModel = await playbackModel?.setAudio(
         playbackModel.audioStreams?.firstWhere((element) => element.index == value), this);
     ref.read(playBackModel.notifier).update((state) => newModel);
-    if (newModel != null) {
+    // Sushi already switched the muxed track directly on the player (same file, same URL — no
+    // server-side renegotiation needed). shouldReload() re-fetches PlaybackInfo and rebuilds the
+    // model from whatever that endpoint reports, which for Sushi items is not the rich per-track
+    // catalog data sushiBuildMediaStreams already produced — it silently collapsed the audio/
+    // subtitle picker down to a single "Default" entry after every track switch.
+    if (newModel != null && !SushiEnv.isEnabled) {
       await ref.read(playbackModelHelper).shouldReload(newModel);
     }
   }
@@ -722,7 +728,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     final newModel = await playbackModel?.setSubtitle(
         playbackModel.subStreams?.firstWhere((element) => element.index == value), this);
     ref.read(playBackModel.notifier).update((state) => newModel);
-    if (newModel != null) {
+    // See swapAudioTrack above — same reasoning, Sushi already applied the switch natively.
+    if (newModel != null && !SushiEnv.isEnabled) {
       await ref.read(playbackModelHelper).shouldReload(newModel);
     }
   }
