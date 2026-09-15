@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/sushi/sushi_library_filters.dart';
 import 'package:fladder/sushi/sushi_views.dart';
 
@@ -29,10 +30,24 @@ void main() {
     expect(genres, contains('Action & Adventure'));
   });
 
-  test('years run newest-first from current year down to 1950', () {
+	test('years run newest-first from current year down to 1950', () {
     final years = sushiFilterYears(nowYear: 2026);
     expect(years.first, 2026);
     expect(years.last, 1950);
     expect(years, contains(1999));
+  });
+
+  test('movies and series default to release date descending', () {
+    expect(sushiDefaultSortingOption(sushiViewMovies), SortingOptions.releaseDate);
+    expect(sushiDefaultSortOrder(sushiViewMovies), SortingOrder.descending);
+    expect(sushiDefaultSortingOption(sushiViewSeries), SortingOptions.releaseDate);
+    expect(sushiDefaultSortOrder(sushiViewSeries), SortingOrder.descending);
+  });
+
+  test('boxsets playlists later keep A-Z', () {
+    expect(sushiDefaultSortingOption(sushiViewBoxsets), SortingOptions.sortName);
+    expect(sushiDefaultSortOrder(sushiViewBoxsets), SortingOrder.ascending);
+    expect(sushiDefaultSortingOption(sushiViewPlaylists), SortingOptions.sortName);
+    expect(sushiDefaultSortingOption(sushiViewLater), SortingOptions.sortName);
   });
 }

@@ -6,6 +6,7 @@ import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/library_filter_model.dart';
+import 'package:fladder/models/library_search/library_search_options.dart';
 
 extension CollectionTypeExtension on CollectionType? {
   IconData get iconOutlined {
@@ -111,6 +112,11 @@ extension CollectionTypeExtension on CollectionType? {
 
   LibraryFilterModel get defaultFilters => switch (this) {
         CollectionType.homevideos || CollectionType.photos => const LibraryFilterModel(recursive: false),
+        CollectionType.movies || CollectionType.tvshows => const LibraryFilterModel(
+            recursive: true,
+            sortingOption: SortingOptions.releaseDate,
+            sortOrder: SortingOrder.descending,
+          ),
         _ => const LibraryFilterModel(
             recursive: true,
           )

@@ -1,3 +1,4 @@
+import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/sushi/sushi_views.dart';
 
 /// TMDB movie genre names. Must match `detail.genreList` (docs/12) — jsonb `@>` is exact.
@@ -48,6 +49,16 @@ const sushiFilterYearStart = 1950;
 /// Genre/year SQL only exists on catalog movie/series `/list` (not flags, boxsets, playlists).
 bool sushiViewSupportsCatalogFilters(String viewId) =>
     viewId == sushiViewMovies || viewId == sushiViewSeries;
+
+/// Movies/Series default to premiere (series: newest episode), newest first. A-Z is a sort option.
+bool sushiViewDefaultsToReleaseDate(String? viewId) =>
+    viewId == sushiViewMovies || viewId == sushiViewSeries;
+
+SortingOptions sushiDefaultSortingOption(String? viewId) =>
+    sushiViewDefaultsToReleaseDate(viewId) ? SortingOptions.releaseDate : SortingOptions.sortName;
+
+SortingOrder sushiDefaultSortOrder(String? viewId) =>
+    sushiViewDefaultsToReleaseDate(viewId) ? SortingOrder.descending : SortingOrder.ascending;
 
 List<String> sushiFilterGenresForView(String viewId, {bool favourites = false}) {
   if (viewId == sushiViewMovies) return sushiMovieGenres;

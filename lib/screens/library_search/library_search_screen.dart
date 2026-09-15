@@ -8,6 +8,7 @@ import 'package:fladder/models/library_search/library_search_options.dart';
 import 'package:fladder/models/settings/client_settings_model.dart';
 import 'package:fladder/providers/library_search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
+import 'package:fladder/sushi/sushi_library_filters.dart';
 import 'package:fladder/screens/library_search/widgets/library_filter_chips.dart';
 import 'package:fladder/screens/library_search/widgets/library_play_options_.dart';
 import 'package:fladder/screens/library_search/widgets/library_saved_filters.dart';
@@ -251,8 +252,8 @@ class _LibrarySearchScreenState extends ConsumerState<LibrarySearchScreen> {
                         widget.viewModelId,
                         defaultFilter.copyWith(
                           favourites: widget.favourites,
-                          sortOrder: widget.sortOrder ?? defaultFilter.sortOrder,
-                          sortingOption: widget.sortingOptions ?? defaultFilter.sortingOption,
+                          sortOrder: widget.sortOrder ?? sushiDefaultSortOrder(widget.viewModelId),
+                          sortingOption: widget.sortingOptions ?? sushiDefaultSortingOption(widget.viewModelId),
                           types: widget.types ?? {},
                           genres: widget.genres ?? {},
                           recursive: widget.recursive,
