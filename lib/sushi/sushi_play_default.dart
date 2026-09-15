@@ -189,9 +189,16 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
     );
     fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
     final overlay = sushiUserDataFromFiles(files);
-    if (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played) {
-      item = item.copyWith(userData: overlay);
-    }
+    item = item.copyWith(
+      overview: sushiOverviewWithFileRunTime(
+        item.overview,
+        files.files,
+        lastFileId: files.lastFileId,
+      ),
+      userData: (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played)
+          ? overlay
+          : item.userData,
+    );
   }
 
   if (item is! MovieModel && item is! EpisodeModel) return null;

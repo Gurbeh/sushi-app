@@ -20,9 +20,10 @@ void sushiPatchDetailProvidersPlaybackProgress(
   required Duration position,
   required Duration runTime,
 }) {
-  final effectiveRunTime = runTime > Duration.zero
-      ? runTime
-      : (item.overview.runTime ?? Duration.zero);
+  final effectiveRunTime = sushiEffectiveRunTime(
+    player: runTime,
+    catalog: item.overview.runTime,
+  );
   final nextUserData = sushiDerivePlaybackUserData(
     current: item.userData,
     position: position,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -747,6 +748,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
   }
 
   void minimizePlayer(BuildContext context) {
+    log('[sushi-progress] minimizePlayer() tapped — this path does NOT save progress');
     clearOverlaySettings();
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(state: VideoPlayerState.minimized));
     Navigator.of(context).pop();
@@ -755,6 +757,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
   void resetTimer() => timer.reset();
 
   Future<void> closePlayer() async {
+    log('[sushi-progress] closePlayer() tapped');
     clearOverlaySettings();
     ref.read(videoPlayerProvider).stop();
     Navigator.of(context).pop();

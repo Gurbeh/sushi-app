@@ -17,7 +17,7 @@
 // every byte range, not about occasionally crossing into the JVM when data genuinely isn't ready
 // yet.
 //
-// Kotlin side: app/oxplayer/tdlibbridge/player/OxTelegramStreamBridge.kt — a registry keyed by
+// Kotlin side: app/sushi/tdlibbridge/player/OxTelegramStreamBridge.kt — a registry keyed by
 // the same int id embedded in the "gotdstream://{id}" uri, holding the live PlaybackSession.
 package main
 
@@ -143,7 +143,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	}
 	g_vm = vm;
 
-	jclass localClass = (*env)->FindClass(env, "app/oxplayer/tdlibbridge/player/OxTelegramStreamBridge");
+	jclass localClass = (*env)->FindClass(env, "app/sushi/tdlibbridge/player/OxTelegramStreamBridge");
 	if (localClass == NULL) {
 		return -1;
 	}

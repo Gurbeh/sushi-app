@@ -15,6 +15,7 @@ import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
+import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/util/bitrate_helper.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
 
@@ -67,13 +68,16 @@ class SushiPlaybackModel extends PlaybackModel {
 
   @override
   Future<PlaybackModel?> playbackStarted(Duration position, Ref ref) async {
-    _sendProg(position, item.overview.runTime ?? Duration.zero);
+    _sendProg(position, sushiEffectiveRunTime(player: Duration.zero, catalog: item.overview.runTime));
     return null;
   }
 
   @override
   Future<PlaybackModel?> playbackStopped(Duration position, Duration? totalDuration, Ref ref) async {
-    final duration = totalDuration ?? item.overview.runTime ?? Duration.zero;
+    final duration = sushiEffectiveRunTime(
+      player: totalDuration ?? Duration.zero,
+      catalog: item.overview.runTime,
+    );
     await sushiContinueRemember(item, position, duration, nextItem: nextVideo);
     _sendProg(position, duration, force: true);
     return null;
@@ -81,16 +85,25 @@ class SushiPlaybackModel extends PlaybackModel {
 
   @override
   Future<PlaybackModel?> updatePlaybackPosition(Duration position, bool isPlaying, Ref ref) async {
-    _sendProg(position, item.overview.runTime ?? Duration.zero);
+    final runTime = sushiEffectiveRunTime(player: Duration.zero, catalog: item.overview.runTime);
+    if (_sendProg(position, runTime)) {
+      // Piggyback local Continue Watching persistence on the same ~30s throttle as the server
+      // /ev ping, so progress survives a killed app or a native teardown that never reaches
+      // stop() (see media_control_wrapper.dart's onPlaybackClosed) — not just the final position
+      // saved at close.
+      unawaited(sushiContinueRemember(item, position, runTime, nextItem: nextVideo));
+    }
     return null;
   }
 
-  void _sendProg(Duration position, Duration duration, {bool force = false}) {
+  /// Returns true when the ping actually went out (i.e. wasn't throttled), so callers can
+  /// piggyback other periodic work on the same cadence instead of re-deriving it.
+  bool _sendProg(Duration position, Duration duration, {bool force = false}) {
     final ep = resolvedEpisodeId;
-    if (ep == null) return;
+    if (ep == null) return false;
     final now = DateTime.now();
     if (!force && _lastProgAt != null && now.difference(_lastProgAt!) < const Duration(seconds: 30)) {
-      return;
+      return false;
     }
     _lastProgAt = now;
     unawaited(sushiSendProgEvent(
@@ -99,6 +112,7 @@ class SushiPlaybackModel extends PlaybackModel {
       fileId: sushiFileIdFromVersionStreamId(mediaStreams?.currentVersionStream?.id) ?? 0,
       durationS: duration.inSeconds,
     ));
+    return true;
   }
 
   @override

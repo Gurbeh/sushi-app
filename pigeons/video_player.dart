@@ -413,6 +413,16 @@ abstract class VideoPlayerControlsCallback {
   void loadNextVideo();
   void loadPreviousVideo();
   void onStop();
+
+  /// Belt-and-suspenders final-position report for the native (ExoPlayer/Telegram) path.
+  ///
+  /// [onStop] crosses from the native VideoPlayerActivity back into Dart's long-lived
+  /// MainActivity engine via a Pigeon FlutterApi call issued from a Compose onDispose — a path
+  /// that has been observed to silently not land (no log, no crash, no progress saved) on at
+  /// least one real device. [clearSession] on the native side runs reliably regardless, so it
+  /// calls this with the last known position/duration right before wiping state, giving Dart a
+  /// second, independent chance to persist progress if [onStop] never arrived.
+  void onPlaybackClosed(int positionMs, int durationMs);
   void swapSubtitleTrack(int value);
   void swapAudioTrack(int value);
   void loadProgram(GuideChannel selection);

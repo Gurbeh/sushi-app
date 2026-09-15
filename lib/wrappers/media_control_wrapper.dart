@@ -147,6 +147,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   }
 
   Future<void> dispose() async {
+    log('[sushi-progress] MediaControlsWrapper.dispose() called — this path does NOT save progress '
+        'playBackModel=${ref.read(playBackModel)?.item.id}');
     _subtitleSettingsSubscription?.close();
     await _playerStateSubscription?.cancel();
     _player?.dispose();
@@ -520,6 +522,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   @override
   Future<void> stop() async {
     final playbackModel = ref.read(playBackModel);
+    log('[sushi-progress] stop() entered playbackModel=${playbackModel == null ? "NULL (early return, nothing will be saved)" : playbackModel.item.id}');
     if (playbackModel == null) return;
 
     // mpv/mdk path only: ExoPlayer's own Activity teardown closes its session natively
@@ -537,18 +540,29 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       unawaited(SushiTdlibBridgeController.instance().stopPlaybackSession(sessionUrl!));
     }
 
+    final media = ref.read(mediaPlaybackProvider);
+    var position = _player?.lastState.position ?? Duration.zero;
+    var totalDuration = _player?.lastState.duration ?? Duration.zero;
+    if (position <= Duration.zero && media.position > Duration.zero) {
+      position = media.position;
+    }
+    if (totalDuration <= Duration.zero && media.duration > Duration.zero) {
+      totalDuration = media.duration;
+    }
+
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(state: VideoPlayerState.disposed));
     WakelockPlus.disable();
     _player?.stop();
     ref.read(windowTitleProvider.notifier).setPlayTitle(null);
 
-    final position = _player?.lastState.position;
-    final totalDuration = _player?.lastState.duration;
+    log('[sushi-progress] stop() captured item=${playbackModel.item.id} '
+        'position=$position totalDuration=$totalDuration '
+        'mediaPlaybackProvider.position=${media.position}');
 
     // Small delay so we don't post right after playback/progress update
     await Future.delayed(const Duration(seconds: 1));
 
-    await playbackModel.playbackStopped(position ?? Duration.zero, totalDuration, ref);
+    await playbackModel.playbackStopped(position, totalDuration, ref);
     ref.read(playBackModel.notifier).update((_) => null);
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(position: Duration.zero));
 
@@ -705,6 +719,33 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
 
   @override
   void onStop() => stop();
+
+  /// Belt-and-suspenders fallback for the native (ExoPlayer/Telegram) player path. [onStop]
+  /// above crosses from the native VideoPlayerActivity back into this long-lived engine via a
+  /// Pigeon call from a Compose onDispose — observed on a real device to silently never arrive
+  /// (no log, no crash, no saved progress). The native side's clearSession() runs reliably on
+  /// every teardown regardless, and now calls this with the last known position/duration as a
+  /// second chance. If [onStop] already ran, playBackModel is already null and this is a no-op.
+  @override
+  void onPlaybackClosed(int positionMs, int durationMs) {
+    final playbackModel = ref.read(playBackModel);
+    log('[sushi-progress] onPlaybackClosed(positionMs=$positionMs, durationMs=$durationMs) '
+        'playBackModel=${playbackModel == null ? "already null — onStop() already handled this" : playbackModel.item.id}');
+    if (playbackModel == null) return;
+
+    log('[sushi-progress] onPlaybackClosed: onStop() did not run — saving progress from native-reported values now');
+    ref.read(mediaPlaybackProvider.notifier).update(
+          (state) => state.copyWith(
+            position: Duration(milliseconds: positionMs),
+            duration: durationMs > 0 ? Duration(milliseconds: durationMs) : state.duration,
+            state: VideoPlayerState.disposed,
+          ),
+        );
+    // Nulling playBackModel here is what SushiPlaybackDetailsRefresh listens for — it reads
+    // mediaPlaybackProvider (just updated above) and runs the same patch/persist/refresh
+    // pipeline that a normal stop() triggers, so this reuses that logic rather than duplicating it.
+    ref.read(playBackModel.notifier).update((_) => null);
+  }
 
   @override
   void swapAudioTrack(int value) async {

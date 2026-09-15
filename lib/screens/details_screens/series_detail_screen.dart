@@ -21,6 +21,7 @@ import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
+import 'package:fladder/sushi/sushi_season_availability.dart';
 import 'package:fladder/sushi/sushi_request_button.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
@@ -266,7 +267,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                         );
                       }),
                     ),
-                  if (_showSeriesEpisodeRail(details))
+                  if (sushiShowSeriesEpisodeRail(details))
                     Builder(builder: (context) {
                       return EpisodePosters(
                         contentPadding: padding,
@@ -337,14 +338,4 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
           : SushiDetailLoadingContent(item: widget.item, padding: padding),
     );
   }
-}
-
-bool _showSeriesEpisodeRail(SeriesModel details) {
-  final episodes = details.availableEpisodes;
-  if (episodes == null || episodes.isEmpty) return false;
-  final seasons = details.seasons;
-  if (seasons != null && seasons.isNotEmpty) {
-    return seasons.any((s) => s.episodes.length > 1);
-  }
-  return true;
 }

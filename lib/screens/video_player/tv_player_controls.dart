@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -647,6 +648,7 @@ class _TvPlayerControlsState extends ConsumerState<TvPlayerControls> {
   void resetTimer() => timer.reset();
 
   Future<void> closePlayer() async {
+    log('[sushi-progress] TvPlayerControls.closePlayer() tapped');
     clearOverlaySettings();
     ref.read(videoPlayerProvider).stop();
     Navigator.of(context).pop();

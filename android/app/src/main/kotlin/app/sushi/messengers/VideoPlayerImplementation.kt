@@ -172,13 +172,38 @@ class VideoPlayerImplementation(
      * UI. Logging `playbackData.value?.currentItem?.id` here names the victim immediately: if it is
      * the item that just STARTED rather than the one that ended, that is the bug.
      */
-    fun clearSession() {
+    fun clearSession(finalPositionMs: Long? = null, finalDurationMs: Long? = null) {
         // Use the id this player opened with, not whatever url playbackData holds now — see
         // [openedTelegramFileId]. Consuming it here also makes repeat teardowns (ExoPlayer dispose,
         // then MainActivity, then Dart's stop) no-ops rather than three attempts to release.
         val endedFileId = openedTelegramFileId
         openedTelegramFileId = null
         playbackData.value = null
+
+        // Belt-and-suspenders: this runs on every teardown path (Dart's stop(), MainActivity's
+        // activity-result hook, ExoPlayer's onDispose), unlike the onStop() Pigeon call from
+        // Compose's onDispose, which has been observed to silently not reach Dart on at least one
+        // real device (no crash, no log — just nothing). Prefer the position/duration this caller
+        // captured live from ExoPlayer; fall back to savedPositionMs (set on backgrounding) only
+        // when the caller had no live player reference left.
+        val reportPositionMs = finalPositionMs ?: savedPositionMs
+        val controls = VideoPlayerObject.videoPlayerControls
+        Log.d(
+            "SUSHI_PROGRESS",
+            "clearSession finalPositionMs=$finalPositionMs savedPositionMs=$savedPositionMs " +
+                "reportPositionMs=$reportPositionMs finalDurationMs=$finalDurationMs " +
+                "controlsIsNull=${controls == null}",
+        )
+        if (reportPositionMs > 0L) {
+            controls?.onPlaybackClosed(
+                reportPositionMs,
+                finalDurationMs ?: 0L,
+                callback = { result ->
+                    Log.d("SUSHI_PROGRESS", "onPlaybackClosed callback result=$result")
+                },
+            )
+        }
+
         savedPositionMs = 0L
         wasPlayingBeforeBackground = false
         pendingOpenUrl = null
@@ -492,9 +517,12 @@ class VideoPlayerImplementation(
     }
 
     override fun stop() {
-        player?.stop()
-        player?.clearMediaItems()
-        clearSession()
+        val exo = player
+        val finalPositionMs = exo?.currentPosition?.coerceAtLeast(0L)
+        val finalDurationMs = exo?.duration?.takeIf { it > 0L }
+        exo?.stop()
+        exo?.clearMediaItems()
+        clearSession(finalPositionMs, finalDurationMs)
     }
 
     fun init(exoPlayer: ExoPlayer?) {

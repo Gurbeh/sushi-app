@@ -99,13 +99,21 @@ class MainActivity : AudioServiceFragmentActivity(), NativeVideoActivity {
                 StartResult(resultValue = "Cancelled")
             }
 
-                VideoPlayerObject.implementation.player?.stop()
-                VideoPlayerObject.implementation.player?.release()
+                val exo = VideoPlayerObject.implementation.player
+                val finalPositionMs = exo?.currentPosition?.coerceAtLeast(0L)
+                val finalDurationMs = exo?.duration?.takeIf { it > 0L }
+                Log.d(
+                    "SUSHI_PROGRESS",
+                    "videoPlayerLauncher result resultCode=${result.resultCode} " +
+                        "finalPositionMs=$finalPositionMs finalDurationMs=$finalDurationMs",
+                )
+                exo?.stop()
+                exo?.release()
                 // Null-out the player before the Dart callback so that any subsequent
                 // Dart-side stop() call goes through VideoPlayerImplementation.stop()
                 // safely (player?.stop() becomes a null-safe no-op on a released player).
                 VideoPlayerObject.implementation.init(null)
-                VideoPlayerObject.implementation.clearSession()
+                VideoPlayerObject.implementation.clearSession(finalPositionMs, finalDurationMs)
                 VideoPlayerObject.tvGuide.value = null
                 callback?.invoke(Result.success(startResult))
         }

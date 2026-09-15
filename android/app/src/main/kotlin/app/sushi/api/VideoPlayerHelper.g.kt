@@ -1578,6 +1578,33 @@ class VideoPlayerControlsCallback(private val binaryMessenger: BinaryMessenger, 
       } 
     }
   }
+  /**
+   * Belt-and-suspenders final-position report for the native (ExoPlayer/Telegram) path.
+   *
+   * [onStop] crosses from the native VideoPlayerActivity back into Dart's long-lived
+   * MainActivity engine via a Pigeon FlutterApi call issued from a Compose onDispose — a path
+   * that has been observed to silently not land (no log, no crash, no progress saved) on at
+   * least one real device. [clearSession] on the native side runs reliably regardless, so it
+   * calls this with the last known position/duration right before wiping state, giving Dart a
+   * second, independent chance to persist progress if [onStop] never arrived.
+   */
+  fun onPlaybackClosed(positionMsArg: Long, durationMsArg: Long, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerControlsCallback.onPlaybackClosed$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(positionMsArg, durationMsArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
   fun swapSubtitleTrack(valueArg: Long, callback: (Result<Unit>) -> Unit)
 {
     val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""

@@ -1,5 +1,6 @@
 package app.sushi.composables.controls
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
@@ -123,12 +124,16 @@ fun CustomVideoControls(
         bottomControlFocusRequester.requestFocus()
     }
 
+    Log.d("SUSHI_PROGRESS", "VideoPlayerControls composed leanBackEnabled=${leanBackEnabled(LocalContext.current)} activity=$activity")
+
     BackHandler(
         enabled = true
     ) {
+        Log.d("SUSHI_PROGRESS", "BackHandler invoked showControls=$showControls")
         if (showControls) {
             hideControls()
         } else {
+            Log.d("SUSHI_PROGRESS", "BackHandler calling activity.finish()")
             activity?.finish()
         }
     }
@@ -307,7 +312,9 @@ fun CustomVideoControls(
                             if (!leanBackEnabled(LocalContext.current)) {
                                 IconButton(
                                     {
+                                        Log.d("SUSHI_PROGRESS", "X close button tapped, activity=$activity isFinishing=${activity?.isFinishing}")
                                         activity?.finish()
+                                        Log.d("SUSHI_PROGRESS", "activity.finish() returned, isFinishing=${activity?.isFinishing}")
                                     }
                                 ) {
                                     Icon(

@@ -65,8 +65,14 @@ class UserData with UserDataMappable {
 
   Duration get playBackPosition => Duration(milliseconds: playbackPositionTicks ~/ 10000);
 
-  // Returns null if unplayed with no progress
+  // Returns null if unplayed with no progress, false if in-progress, true if ≥90%.
+  // Unknown duration must never count as watched — Duration.zero * 0.90 is zero, so any
+  // position > 0 would otherwise return true. Matches server EpisodeWatched.
   static bool? isPlayed(Duration position, Duration totalDuration) {
+    if (totalDuration <= Duration.zero) {
+      return position <= Duration.zero ? null : false;
+    }
+
     Duration startBuffer = totalDuration * 0.05;
     Duration endBuffer = totalDuration * 0.90;
 

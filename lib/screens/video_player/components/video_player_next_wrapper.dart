@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -122,6 +124,7 @@ class _VideoPlayerNextWrapperState extends ConsumerState<VideoPlayerNextWrapper>
   }
 
   Future<void> closePlayer() async {
+    log('[sushi-progress] VideoPlayerNextWrapper.closePlayer() tapped');
     clearOverlaySettings();
     ref.read(videoPlayerProvider).stop();
     Navigator.of(context).pop();

@@ -16,6 +16,23 @@ import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
+/// File duration from `/files`, preferring [lastFileId]. Zero means unknown.
+Duration? sushiRunTimeFromFiles(List<SushiFile> files, {int lastFileId = 0}) {
+  final durationS = SushiFilesRes(files: files, lastFileId: lastFileId).resumeDurationS;
+  if (durationS <= 0) return null;
+  return Duration(seconds: durationS);
+}
+
+OverviewModel sushiOverviewWithFileRunTime(
+  OverviewModel overview,
+  List<SushiFile> files, {
+  int lastFileId = 0,
+}) {
+  final runTime = sushiRunTimeFromFiles(files, lastFileId: lastFileId);
+  if (runTime == null) return overview;
+  return overview.copyWith(runTime: runTime);
+}
+
 const _sushiFileIdPrefix = 'sushi_file_';
 const _sushiEpisodeIdPrefix = 'sushi_ep_';
 const _sushiSeasonIdPrefix = 'sushi_season_';
@@ -246,7 +263,7 @@ List<EpisodeModel> sushiEpisodesFromWire(SeriesModel series, List<SushiEpisode> 
         location: ItemLocation.filesystem,
         name: e.title.isEmpty ? 'Episode ${e.episodeNo}' : e.title,
         id: '$_sushiEpisodeIdPrefix${e.episodeId}',
-        overview: OverviewModel(summary: e.title),
+        overview: OverviewModel(summary: e.title, runTime: series.overview.runTime),
         parentId: series.id,
         playlistId: null,
         images: series.images,
@@ -347,28 +364,28 @@ SeriesModel sushiEnrichSeriesModel(SeriesModel base, SushiItemRes item) {
   final related = item.related.map(sushiRowToItemBaseModel).toList();
   sushiRememberCollection(base.id, item.collectionName, item.collection.map(sushiRowToItemBaseModel).toList());
   final images = sushiTitleImages(base.id, base.images, item);
-  final withImages = base.copyWith(images: images);
-  final episodes = sushiEpisodesFromItem(withImages, item);
+  final overview = base.overview.copyWith(
+    summary: item.overview,
+    yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
+    runTime: item.runtimeS > 0 ? Duration(seconds: item.runtimeS) : base.overview.runTime,
+    genres: genreNames.isEmpty ? base.overview.genres : genreNames,
+    genreItems: genreNames.isEmpty
+        ? base.overview.genreItems
+        : [
+            for (final name in genreNames) GenreItems(id: name, name: name),
+          ],
+    people: people.isEmpty ? base.overview.people : people,
+  );
+  final withMeta = base.copyWith(images: images, overview: overview);
+  final episodes = sushiEpisodesFromItem(withMeta, item);
   final seasons = item.seasons.isNotEmpty
-      ? sushiSeasonsFromIndex(withImages, item.seasons, episodes)
-      : sushiSeasonsFromEpisodes(withImages, episodes);
+      ? sushiSeasonsFromIndex(withMeta, item.seasons, episodes)
+      : sushiSeasonsFromEpisodes(withMeta, episodes);
   final episodeCount = item.seasons.isNotEmpty
       ? item.seasons.fold<int>(0, (n, s) => n + s.episodeCount)
       : episodes.length;
 
-  return withImages.copyWith(
-    overview: base.overview.copyWith(
-      summary: item.overview,
-      yearAired: base.overview.yearAired ?? (item.releasedOn > 0 ? _yearFromUnixSeconds(item.releasedOn) : null),
-      runTime: item.runtimeS > 0 ? Duration(seconds: item.runtimeS) : base.overview.runTime,
-      genres: genreNames.isEmpty ? base.overview.genres : genreNames,
-      genreItems: genreNames.isEmpty
-          ? base.overview.genreItems
-          : [
-              for (final name in genreNames) GenreItems(id: name, name: name),
-            ],
-      people: people.isEmpty ? base.overview.people : people,
-    ),
+  return withMeta.copyWith(
     related: related,
     availableEpisodes: episodes,
     seasons: seasons,
@@ -413,7 +430,16 @@ SeriesModel sushiApplySeriesFiles(
     canDownload: ready,
     availableEpisodes: [
       for (final episode in next.availableEpisodes ?? const <EpisodeModel>[])
-        episode.id == targetId ? episode.copyWith(mediaStreams: streams) : episode,
+        episode.id == targetId
+            ? episode.copyWith(
+                mediaStreams: streams,
+                overview: sushiOverviewWithFileRunTime(
+                  episode.overview,
+                  files,
+                  lastFileId: preferredFileId ?? 0,
+                ),
+              )
+            : episode,
     ],
   );
 }

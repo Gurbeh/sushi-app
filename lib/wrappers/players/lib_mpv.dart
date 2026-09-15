@@ -193,6 +193,18 @@ class LibMPV extends BasePlayer {
         state = state.update(position: state.position + _remuxTimelineBase);
       }
     }
+    if (state.position == Duration.zero &&
+        lastState.position > const Duration(seconds: 5) &&
+        state.position != lastState.position) {
+      log('[sushi-progress] mpv setState: position reset ${lastState.position} -> ${state.position} '
+          'playing=${state.playing} completed=${state.completed} buffering=${state.buffering} '
+          'duration=${state.duration}');
+    }
+    if (state.playing != lastState.playing || state.completed != lastState.completed) {
+      log('[sushi-progress] mpv setState: playing ${lastState.playing}->${state.playing} '
+          'completed ${lastState.completed}->${state.completed} position=${state.position} '
+          'duration=${state.duration}');
+    }
     lastState = state;
     _stateController.add(state);
   }

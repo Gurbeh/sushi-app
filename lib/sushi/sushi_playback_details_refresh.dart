@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,22 +44,28 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
         final media = ref.read(mediaPlaybackProvider);
         final position = media.position;
         final duration = media.duration;
+        log('[sushi-progress] playBackModel→null item=${item.id} '
+            'read position=$position duration=$duration');
 
+        final runTime = sushiEffectiveRunTime(
+          player: duration,
+          catalog: item.overview.runTime,
+        );
         sushiPatchDetailProvidersPlaybackProgress(
           ref,
           item: item,
           position: position,
-          runTime: duration,
+          runTime: runTime,
         );
 
-        final runTime = duration > Duration.zero
-            ? duration
-            : (item.overview.runTime ?? Duration.zero);
         final derived = sushiDerivePlaybackUserData(
           current: item.userData,
           position: position,
           runTime: runTime,
         );
+        log('[sushi-progress] derived userData item=${item.id} runTime=$runTime '
+            'progress=${derived.progress} played=${derived.played} '
+            'ticks=${derived.playbackPositionTicks}');
         if (derived.played) {
           unawaited(ref.read(sushiCatalogItemFlagsProvider.notifier).setPlayed(item.id, true));
           unawaited(ref.read(userProvider.notifier).markAsPlayed(true, item.id));
@@ -66,7 +73,7 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
 
         unawaited((() async {
           // Prefs must land before fetchDetails paints from the continue store.
-          await sushiContinueRemember(item, position, duration, nextItem: previous.nextVideo);
+          await sushiContinueRemember(item, position, runTime, nextItem: previous.nextVideo);
           if (!mounted) return;
           await Future<void>.delayed(const Duration(milliseconds: 200));
           if (!mounted) return;

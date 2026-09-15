@@ -1,5 +1,6 @@
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
+import 'package:fladder/models/items/series_model.dart';
 
 int sushiSeasonTotalEpisodeCount(SeasonModel season) {
   if (season.episodeCount > 0) return season.episodeCount;
@@ -41,4 +42,15 @@ String? sushiSeasonPosterCountText(SeasonModel season) {
   final unplayed = season.userData.unPlayedItemCount;
   if (unplayed != null && unplayed > 0) return unplayed.toString();
   return null;
+}
+
+/// ADR 0028: series home shows the season index, not a stub of the play-target
+/// (+ continue). A fat legacy `/item` with no season index still paints the
+/// episode rail from `availableEpisodes`.
+bool sushiShowSeriesEpisodeRail(SeriesModel details) {
+  final episodes = details.availableEpisodes;
+  if (episodes == null || episodes.isEmpty) return false;
+  final seasons = details.seasons;
+  if (seasons != null && seasons.isNotEmpty) return false;
+  return true;
 }

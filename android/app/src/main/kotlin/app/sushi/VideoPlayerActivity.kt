@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.util.Rational
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -52,6 +53,7 @@ class VideoPlayerActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        Log.d("SUSHI_PROGRESS", "VideoPlayerActivity.onPause isInPip=$isInPip isFinishing=$isFinishing")
         // Skip pausing playback when entering/already in PiP so the mini window
         // keeps playing while the user is in another app.
         if (!isInPip) {
@@ -106,6 +108,7 @@ class VideoPlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        Log.d("SUSHI_PROGRESS", "VideoPlayerActivity.onDestroy isFinishing=$isFinishing")
         super.onDestroy()
         if (VideoPlayerObject.currentActivity === this) {
             VideoPlayerObject.currentActivity = null

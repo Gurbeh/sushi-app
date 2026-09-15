@@ -98,6 +98,7 @@ void main() {
     ]);
     expect(ready.canDownload, isTrue);
     expect(sushiItemHasPlaybackActions(ready), isTrue);
+    expect(ready.availableEpisodes!.first.overview.runTime, const Duration(seconds: 1));
   });
 
   test('series enrich with no episodes hides Play/Sync', () {
@@ -282,5 +283,39 @@ void main() {
       preferredFileId: 2,
     );
     expect(streams.currentVersionStream?.id, 'sushi_file_2');
+  });
+
+  test('series enrich copies TMDB runtime onto episodes', () {
+    final base = sushiRowToItemBaseModel(
+      const SushiRow(
+        tmdbId: 97546,
+        kind: SushiKind.series,
+        title: 'Ted Lasso',
+        year: 2020,
+        rating: 80,
+        poster: 'tl',
+      ),
+    ) as SeriesModel;
+    final enriched = sushiEnrichSeriesModel(
+      base,
+      const SushiItemRes(
+        row: SushiRow(
+          tmdbId: 97546,
+          kind: SushiKind.series,
+          title: 'Ted Lasso',
+          year: 2020,
+          rating: 80,
+          poster: 'tl',
+        ),
+        overview: 'Football.',
+        releasedOn: 0,
+        runtimeS: 30 * 60,
+        episodes: [
+          SushiEpisode(episodeId: 1, seasonNo: 1, episodeNo: 1, title: 'Pilot'),
+        ],
+      ),
+    );
+    expect(enriched.overview.runTime, const Duration(minutes: 30));
+    expect(enriched.availableEpisodes!.first.overview.runTime, const Duration(minutes: 30));
   });
 }

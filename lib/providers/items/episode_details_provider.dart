@@ -72,6 +72,11 @@ class EpisodeDetailsProvider extends StateNotifier<EpisodeDetailModel> {
               preferredFileId: files.lastFileId,
               localPreference: localPreference,
             ),
+            overview: sushiOverviewWithFileRunTime(
+              item.overview,
+              files.files,
+              lastFileId: files.lastFileId,
+            ),
             userData: (item.userData.playbackPositionTicks == 0 && !item.userData.played && overlay != null)
                 ? overlay
                 : item.userData,

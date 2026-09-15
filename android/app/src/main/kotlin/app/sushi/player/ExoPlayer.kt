@@ -309,10 +309,17 @@ internal fun ExoPlayer(
         VideoPlayerObject.implementation.init(exoPlayer)
         onDispose {
             val finishing = activity?.isFinishing == true
+            Log.d("SUSHI_PROGRESS", "ExoPlayer onDispose finishing=$finishing")
             if (finishing) {
+                // Capture position/duration from the still-live ExoPlayer instance before
+                // releasePlayer() nulls out the implementation's reference to it — clearSession()
+                // reports these to Dart as a reliable fallback in case onStop() below doesn't land.
+                val finalPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                val finalDurationMs = exoPlayer.duration.takeIf { it > 0L }
+                Log.d("SUSHI_PROGRESS", "ExoPlayer onDispose captured finalPositionMs=$finalPositionMs finalDurationMs=$finalDurationMs")
                 videoHost.videoPlayerControls?.onStop(callback = {})
                 if (VideoPlayerObject.implementation.releasePlayer(exoPlayer)) {
-                    VideoPlayerObject.implementation.clearSession()
+                    VideoPlayerObject.implementation.clearSession(finalPositionMs, finalDurationMs)
                     VideoPlayerObject.tvGuide.value = null
                 }
             } else {

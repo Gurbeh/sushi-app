@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -211,7 +212,14 @@ Future<void> sushiContinueRemember(
   ItemBaseModel? nextItem,
 }) async {
   final entry = sushiContinueEntryFromItem(item, position: position, duration: duration);
-  if (entry == null) return;
+  if (entry == null) {
+    log('[sushi-progress] sushiContinueRemember item=${item.id} position=$position '
+        'duration=$duration entry=null (no tmdb identity — nothing to persist)');
+    return;
+  }
+  log('[sushi-progress] sushiContinueRemember item=${item.id} position=$position '
+      'duration=$duration title=${entry.title} progressPct=${entry.progressPct} '
+      'isStarted=${entry.isStarted} isFinished=${entry.isFinished}');
   final existing = await _readAll();
   SushiContinueEntry? previous;
   for (final e in existing) {
@@ -233,11 +241,20 @@ Future<void> sushiContinueRemember(
     existing: previous,
     nextEpisode: nextEntry,
   );
+  if (keep == null) {
+    log('[sushi-progress] sushiContinueRemember decision: DISCARDED — nothing persisted '
+        '(previous entry progressPct=${previous?.progressPct})');
+  } else {
+    log('[sushi-progress] sushiContinueRemember decision: keeping title=${keep.title} '
+        'progressPct=${keep.progressPct} episodeItemId=${keep.episodeItemId} '
+        '(previous entry progressPct=${previous?.progressPct})');
+  }
   final next = [
     if (keep != null) keep.copyWith(atMs: DateTime.now().millisecondsSinceEpoch),
     ...existing.where((e) => e.tmdbId != entry.tmdbId || e.kind != entry.kind),
   ];
   await _writeAll(next.take(_maxItems).toList());
+  log('[sushi-progress] sushiContinueRemember wrote ${next.length} entries to prefs');
 }
 
 /// Menu-driven "Add to Continue Watching" (poster overflow menu on the home rows). Unlike

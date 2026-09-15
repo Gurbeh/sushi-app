@@ -255,4 +255,25 @@ void main() {
     expect(keep?.episode, 2);
     expect(keep?.positionMs, incoming.positionMs);
   });
+
+  test('series mid-watch with unknown duration is not finished', () {
+    const incoming = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Ted Lasso',
+      year: 2020,
+      rating: 80,
+      poster: 'tl',
+      positionMs: 15 * 60 * 1000,
+      durationMs: 0,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_1',
+      season: 1,
+      episode: 1,
+    );
+    expect(incoming.isFinished, isFalse);
+    final keep = sushiContinueRememberDecision(incoming: incoming);
+    expect(keep?.episodeItemId, 'sushi_ep_1');
+    expect(keep?.positionMs, incoming.positionMs);
+  });
 }

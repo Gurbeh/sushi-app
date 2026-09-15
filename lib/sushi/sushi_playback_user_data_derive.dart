@@ -2,6 +2,17 @@ import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/util/duration_extensions.dart';
 
+/// Player duration wins when Exo/mpv reported one. Catalog/file runtime is the fallback when
+/// native teardown reports 0 (TIME_UNSET). Zero is unknown — never treat it as finished.
+Duration sushiEffectiveRunTime({
+  required Duration player,
+  Duration? catalog,
+}) {
+  if (player > Duration.zero) return player;
+  if (catalog != null && catalog > Duration.zero) return catalog;
+  return Duration.zero;
+}
+
 /// Matches server [DerivePlaybackPersistState] / Fladder [UserData.isPlayed].
 UserData sushiDerivePlaybackUserData({
   required UserData current,
