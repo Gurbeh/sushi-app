@@ -127,4 +127,132 @@ void main() {
     expect(e.isFinished, isTrue);
     expect(e.isStarted, isTrue);
   });
+
+  test('series bounce <5% keeps the in-progress episode', () {
+    const existing = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 20 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_2',
+      season: 1,
+      episode: 2,
+    );
+    const bounce = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 10 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 2,
+      episodeItemId: 'sushi_ep_1',
+      season: 1,
+      episode: 1,
+    );
+    final keep = sushiContinueRememberDecision(incoming: bounce, existing: existing);
+    expect(keep?.episode, 2);
+    expect(keep?.positionMs, existing.positionMs);
+  });
+
+  test('series finished with next episode stores next at 0%', () {
+    const finished = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 46 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_2',
+      season: 1,
+      episode: 2,
+    );
+    const next = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 0,
+      durationMs: 0,
+      atMs: 2,
+      episodeItemId: 'sushi_ep_3',
+      season: 1,
+      episode: 3,
+    );
+    final keep = sushiContinueRememberDecision(
+      incoming: finished,
+      existing: finished,
+      nextEpisode: next,
+    );
+    expect(keep?.episode, 3);
+    expect(keep?.positionMs, 0);
+  });
+
+  test('series finished with no next episode drops continue-watching', () {
+    const finished = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 46 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_last',
+      season: 5,
+      episode: 16,
+    );
+    expect(
+      sushiContinueRememberDecision(incoming: finished, existing: finished),
+      isNull,
+    );
+  });
+
+  test('movie bounce <5% still drops', () {
+    const bounce = SushiContinueEntry(
+      tmdbId: 1,
+      kind: SushiKind.movie,
+      title: 'X',
+      year: 2020,
+      rating: 80,
+      poster: 'p',
+      positionMs: 10 * 1000,
+      durationMs: 100 * 60 * 1000,
+      atMs: 1,
+    );
+    expect(sushiContinueRememberDecision(incoming: bounce), isNull);
+  });
+
+  test('series in-progress write keeps that episode', () {
+    const incoming = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 12 * 60 * 1000,
+      durationMs: 48 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_2',
+      season: 1,
+      episode: 2,
+    );
+    final keep = sushiContinueRememberDecision(incoming: incoming);
+    expect(keep?.episode, 2);
+    expect(keep?.positionMs, incoming.positionMs);
+  });
 }

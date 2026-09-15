@@ -8,6 +8,7 @@ import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_play_default.dart';
 
 /// Fladder [PlaybackModelHelper.loadNewVideo] reuses [oldModel.playbackQueue] without
@@ -25,9 +26,18 @@ class SushiPlaybackModelHelper extends PlaybackModelHelper {
   /// file through Sushi's own `/play` delivery. The series queue is re-anchored on the new
   /// episode so the player's next/previous buttons keep working without another catalog fetch.
   Future<PlaybackModel?> _loadNewSushiVideo(ItemBaseModel newItem) async {
+    final currentModel = ref.read(playBackModel);
+    final media = ref.read(mediaPlaybackProvider);
+    if (currentModel != null) {
+      await sushiContinueRemember(
+        currentModel.item,
+        media.position,
+        media.duration,
+        nextItem: currentModel.nextVideo,
+      );
+    }
     ref.read(videoPlayerProvider).pause();
     ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(buffering: true));
-    final currentModel = ref.read(playBackModel);
     final preferHttpBridge =
         ref.read(videoPlayerSettingsProvider).wantedPlayer != PlayerOptions.nativePlayer;
     final newModel = await sushiBuildPlaybackModel(
@@ -41,10 +51,16 @@ class SushiPlaybackModelHelper extends PlaybackModelHelper {
       ref.read(mediaPlaybackProvider.notifier).update((state) => state.copyWith(buffering: false));
       return null;
     }
-    final anchored = (currentModel != null && currentModel.playbackQueue.queue.length > 1)
-        ? newModel.updatePlaybackQueue(currentModel.playbackQueue.jumpToItem(newItem.id))
-        : newModel;
-    ref.read(videoPlayerProvider.notifier).loadPlaybackItem(anchored, Duration.zero);
+    final PlaybackModel anchored;
+    if (newModel.playbackQueue.queue.length > 1) {
+      anchored = newModel;
+    } else if (currentModel != null && currentModel.playbackQueue.queue.length > 1) {
+      anchored = newModel.updatePlaybackQueue(currentModel.playbackQueue.jumpToItem(newItem.id));
+    } else {
+      anchored = newModel;
+    }
+    final start = await anchored.resolvedStartPosition();
+    ref.read(videoPlayerProvider.notifier).loadPlaybackItem(anchored, start);
     return anchored;
   }
 }

@@ -65,6 +65,10 @@ Future<ItemBaseModel> sushiHydrateForPlay(ItemBaseModel item, SushiCatalogContro
 /// player's next/previous-episode buttons (they read [PlaybackModel.nextVideo] /
 /// [PlaybackModel.previousVideo], which walk the queue). Returns an empty list when the
 /// series page can't be resolved from the catalog.
+///
+/// `/item` only carries the play-target episode (ADR 0028), so the player queue always
+/// loads the current season via `/episodes`. At the first/last episode of a season it
+/// also loads the adjacent season so next/prev can cross season boundaries.
 Future<List<EpisodeModel>> sushiEpisodeQueueFor(
   EpisodeModel episode,
   SushiCatalogController catalog,
@@ -74,16 +78,41 @@ Future<List<EpisodeModel>> sushiEpisodeQueueFor(
   final tmdbId = sushiTmdbIdFromItemId(parentId);
   if (tmdbId == null) return const [];
   final parent = episode.parentBaseModel;
-  if (parent is! SeriesModel) return const [];
-  final wire = await catalog.openSeason(
-    tmdbId: tmdbId,
-    kind: SushiKind.series,
-    seasonNo: episode.season,
+
+  Future<List<EpisodeModel>> seasonQueue(int seasonNo) async {
+    if (seasonNo < 1) return const [];
+    final wire = await catalog.openSeason(
+      tmdbId: tmdbId,
+      kind: SushiKind.series,
+      seasonNo: seasonNo,
+    );
+    return [
+      for (final e in sushiEpisodesFromWire(parent, wire))
+        if (e.playAble) e,
+    ];
+  }
+
+  final current = await seasonQueue(episode.season);
+  if (current.isEmpty) return const [];
+  final adjacent = sushiEpisodeQueueAdjacentSeasons(currentSeason: current, playing: episode);
+  final previous = adjacent.previous ? await seasonQueue(episode.season - 1) : const <EpisodeModel>[];
+  final next = adjacent.next ? await seasonQueue(episode.season + 1) : const <EpisodeModel>[];
+  return [...previous, ...current, ...next];
+}
+
+/// Extra seasons the player queue must fetch so next/prev work at a season edge.
+({bool previous, bool next}) sushiEpisodeQueueAdjacentSeasons({
+  required List<EpisodeModel> currentSeason,
+  required EpisodeModel playing,
+}) {
+  var idx = currentSeason.indexWhere((e) => e.id == playing.id);
+  if (idx < 0) {
+    idx = currentSeason.indexWhere((e) => e.season == playing.season && e.episode == playing.episode);
+  }
+  return (
+    previous: idx <= 0 && playing.season > 1,
+    next: idx < 0 || idx >= currentSeason.length - 1,
   );
-  return [
-    for (final e in sushiEpisodesFromWire(parent, wire))
-      if (e.playAble) e,
-  ];
 }
 
 List<EpisodeModel> _playableEpisodes(Iterable<EpisodeModel>? episodes) => [
@@ -167,9 +196,18 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
 
   if (item is! MovieModel && item is! EpisodeModel) return null;
 
-  final playing = item;
-  if (playing is EpisodeModel && episodeQueue.isEmpty) {
-    episodeQueue = await sushiEpisodeQueueFor(playing, catalog);
+  var playing = item;
+  if (playing is EpisodeModel) {
+    final seasonQueue = await sushiEpisodeQueueFor(playing, catalog);
+    if (seasonQueue.isNotEmpty) {
+      episodeQueue = seasonQueue;
+    }
+    final parentTmdb = sushiTmdbIdFromItemId(playing.parentId ?? '');
+    if (parentTmdb != null) {
+      final resume = await sushiContinueFind(tmdbId: parentTmdb, kind: SushiKind.series);
+      playing = sushiOverlayResumeOnEpisode(playing, resume);
+      item = playing;
+    }
   }
   final List<ItemBaseModel> queue = playing is EpisodeModel &&
           episodeQueue.length > 1 &&

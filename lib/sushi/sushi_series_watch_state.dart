@@ -114,6 +114,21 @@ SeriesModel sushiAttachResumeEpisode(SeriesModel series, SushiContinueEntry? res
   );
 }
 
+/// Overlay local continue-watching resume onto a single episode so next/prev
+/// skip can restart at the saved position instead of 0.
+EpisodeModel sushiOverlayResumeOnEpisode(EpisodeModel episode, SushiContinueEntry? resume) {
+  if (resume == null || resume.isFinished || !_resumeMatches(episode, resume)) {
+    return episode;
+  }
+  return episode.copyWith(
+    userData: episode.userData.copyWith(
+      played: false,
+      progress: resume.progressPct,
+      playbackPositionTicks: resume.positionMs * 10000,
+    ),
+  );
+}
+
 bool _resumeMatches(EpisodeModel episode, SushiContinueEntry resume) {
   final episodeItemId = resume.episodeItemId;
   if (episodeItemId != null && episodeItemId.isNotEmpty) {

@@ -50,6 +50,30 @@ class SushiContinueEntry {
   bool get isFinished => progressPct >= 90;
   bool get isStarted => durationMs <= 0 || progressPct >= 5;
 
+  SushiContinueEntry copyWith({
+    int? positionMs,
+    int? durationMs,
+    int? atMs,
+    String? episodeItemId,
+    int? season,
+    int? episode,
+  }) {
+    return SushiContinueEntry(
+      tmdbId: tmdbId,
+      kind: kind,
+      title: title,
+      year: year,
+      rating: rating,
+      poster: poster,
+      positionMs: positionMs ?? this.positionMs,
+      durationMs: durationMs ?? this.durationMs,
+      atMs: atMs ?? this.atMs,
+      episodeItemId: episodeItemId ?? this.episodeItemId,
+      season: season ?? this.season,
+      episode: episode ?? this.episode,
+    );
+  }
+
   Map<String, Object?> toJson() => {
         'tmdbId': tmdbId,
         'kind': kind == SushiKind.series ? 2 : 1,
@@ -135,10 +159,14 @@ String sushiPosterKeyFromImageUrl(String path) {
   return file.replaceAll(RegExp(r'\.(jpg|jpeg|png|webp)$', caseSensitive: false), '');
 }
 
-Future<void> sushiContinueRemember(ItemBaseModel item, Duration position, Duration duration) async {
+SushiContinueEntry? sushiContinueEntryFromItem(
+  ItemBaseModel item, {
+  required Duration position,
+  required Duration duration,
+}) {
   final id = sushiContinueIdentity(item);
-  if (id == null) return;
-  final entry = SushiContinueEntry(
+  if (id == null) return null;
+  return SushiContinueEntry(
     tmdbId: id.tmdbId,
     kind: id.kind,
     title: id.title,
@@ -152,9 +180,61 @@ Future<void> sushiContinueRemember(ItemBaseModel item, Duration position, Durati
     season: item is EpisodeModel ? item.season : null,
     episode: item is EpisodeModel ? item.episode : null,
   );
+}
+
+/// Series stay in continue-watching until every episode is finished.
+/// A <5% bounce (next/prev skip, immediate Back) must not wipe an in-progress row.
+/// A finished episode with [nextEpisode] becomes that next episode at 0%.
+SushiContinueEntry? sushiContinueRememberDecision({
+  required SushiContinueEntry incoming,
+  SushiContinueEntry? existing,
+  SushiContinueEntry? nextEpisode,
+}) {
+  if (incoming.kind != SushiKind.series) {
+    if (!incoming.isFinished && incoming.isStarted) return incoming;
+    return null;
+  }
+  final durationKnown = incoming.durationMs > 0;
+  if (durationKnown && incoming.isFinished) {
+    return nextEpisode;
+  }
+  if (durationKnown && incoming.isStarted) {
+    return incoming;
+  }
+  return existing ?? incoming;
+}
+
+Future<void> sushiContinueRemember(
+  ItemBaseModel item,
+  Duration position,
+  Duration duration, {
+  ItemBaseModel? nextItem,
+}) async {
+  final entry = sushiContinueEntryFromItem(item, position: position, duration: duration);
+  if (entry == null) return;
   final existing = await _readAll();
+  SushiContinueEntry? previous;
+  for (final e in existing) {
+    if (e.tmdbId == entry.tmdbId && e.kind == entry.kind) {
+      previous = e;
+      break;
+    }
+  }
+  SushiContinueEntry? nextEntry;
+  if (nextItem is EpisodeModel && sushiContinueIdentity(nextItem) != null) {
+    nextEntry = sushiContinueEntryFromItem(
+      nextItem,
+      position: Duration.zero,
+      duration: Duration.zero,
+    );
+  }
+  final keep = sushiContinueRememberDecision(
+    incoming: entry,
+    existing: previous,
+    nextEpisode: nextEntry,
+  );
   final next = [
-    if (!entry.isFinished && entry.isStarted) entry,
+    if (keep != null) keep.copyWith(atMs: DateTime.now().millisecondsSinceEpoch),
     ...existing.where((e) => e.tmdbId != entry.tmdbId || e.kind != entry.kind),
   ];
   await _writeAll(next.take(_maxItems).toList());

@@ -74,7 +74,7 @@ class SushiPlaybackModel extends PlaybackModel {
   @override
   Future<PlaybackModel?> playbackStopped(Duration position, Duration? totalDuration, Ref ref) async {
     final duration = totalDuration ?? item.overview.runTime ?? Duration.zero;
-    await sushiContinueRemember(item, position, duration);
+    await sushiContinueRemember(item, position, duration, nextItem: nextVideo);
     _sendProg(position, duration, force: true);
     return null;
   }

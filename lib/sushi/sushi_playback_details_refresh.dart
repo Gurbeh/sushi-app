@@ -66,7 +66,7 @@ class _SushiPlaybackDetailsRefreshState extends ConsumerState<SushiPlaybackDetai
 
         unawaited((() async {
           // Prefs must land before fetchDetails paints from the continue store.
-          await sushiContinueRemember(item, position, duration);
+          await sushiContinueRemember(item, position, duration, nextItem: previous.nextVideo);
           if (!mounted) return;
           await Future<void>.delayed(const Duration(milliseconds: 200));
           if (!mounted) return;

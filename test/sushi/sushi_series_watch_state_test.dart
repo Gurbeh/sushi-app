@@ -122,4 +122,24 @@ void main() {
     expect(painted.availableEpisodes!.first.userData.progress, 0);
     expect(painted.nextUp?.id, 'sushi_ep_2');
   });
+
+  test('sushiOverlayResumeOnEpisode restores continue position', () {
+    const resume = SushiContinueEntry(
+      tmdbId: 1,
+      kind: SushiKind.series,
+      title: 'Show',
+      year: 2020,
+      rating: 80,
+      poster: 'p',
+      positionMs: 10 * 60 * 1000,
+      durationMs: 40 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_2',
+      season: 1,
+      episode: 2,
+    );
+    final painted = sushiOverlayResumeOnEpisode(_episode(id: 'sushi_ep_2', episode: 2), resume);
+    expect(painted.userData.progress, closeTo(25, 0.1));
+    expect(painted.userData.playbackPositionTicks, 10 * 60 * 1000 * 10000);
+  });
 }
