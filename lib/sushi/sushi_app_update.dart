@@ -39,13 +39,58 @@ void sushiBindUpdatePrompt(SharedPreferences prefs, String currentVersion) {
 }
 
 GlobalKey<NavigatorState>? _updateNavigatorKey;
+Listenable? _updateRouteListenable;
+String Function()? _updateCurrentRouteName;
+VoidCallback? _updateRouteListener;
+Future<void> Function()? _latestAppRefresher;
+
+/// Dashboard tab of HomeScreen. Favourites / details / player / settings are not "home"
+/// for the automatic prompt — TV users often resume onto a pushed route.
+const sushiUpdateHomeRouteName = 'DashboardRoute';
+
+/// TV Home (and Android recents) leaves the process alive. After this long in background,
+/// hit `/home` again so `latest_app` can change without a cold start.
+const sushiUpdateResumeRecheckAfter = Duration(minutes: 5);
+
+bool sushiIsUpdateHomeRoute(String? routeName) => routeName == sushiUpdateHomeRouteName;
+
+bool sushiShouldRecheckUpdateOnResume({
+  required DateTime? pausedAt,
+  required DateTime now,
+  Duration minBackground = sushiUpdateResumeRecheckAfter,
+}) {
+  if (pausedAt == null) return false;
+  return !now.difference(pausedAt).isNegative && now.difference(pausedAt) >= minBackground;
+}
 
 /// Registered from `MaterialApp.router` (the route Navigator's own key) so the automatic
 /// prompt can show over a context that actually sits below a Navigator. [SushiUpdatePromptHost]
 /// wraps `MaterialApp.router` from the outside, so its own `State.context` has no Navigator
 /// ancestor — `showDialog` with that context silently fails to find one and throws.
-void sushiRegisterUpdateNavigatorKey(GlobalKey<NavigatorState> key) {
+///
+/// [routeListenable] + [currentRouteName] defer the prompt until the user is on dashboard.
+void sushiRegisterUpdateNavigatorKey(
+  GlobalKey<NavigatorState> key, {
+  Listenable? routeListenable,
+  String Function()? currentRouteName,
+}) {
   _updateNavigatorKey = key;
+  _updateCurrentRouteName = currentRouteName;
+  if (identical(_updateRouteListenable, routeListenable)) return;
+  final listener = _updateRouteListener;
+  if (listener != null) {
+    _updateRouteListenable?.removeListener(listener);
+  }
+  _updateRouteListenable = routeListenable;
+  if (listener != null) {
+    _updateRouteListenable?.addListener(listener);
+  }
+}
+
+/// One `/home` round-trip that stamps [sushiLatestApp]. Bound from bootstrap so this
+/// library does not import the home transport (that file already imports us).
+void sushiBindLatestAppRefresher(Future<void> Function() refresh) {
+  _latestAppRefresher = refresh;
 }
 
 /// Called from the home transport whenever a HomeRes includes latest_app (ADR 0019).
@@ -376,7 +421,9 @@ class _SushiUpdateDialogState extends State<_SushiUpdateDialog> {
   }
 }
 
-/// Wraps the app so a newer HomeRes can prompt once past first frame.
+/// Wraps the app so a newer HomeRes can prompt on the dashboard — including after a
+/// TV Home resume, where the process never died and the first-frame `_shown` latch
+/// used to swallow the next shelf version.
 class SushiUpdatePromptHost extends StatefulWidget {
   const SushiUpdatePromptHost({required this.child, super.key});
 
@@ -386,48 +433,110 @@ class SushiUpdatePromptHost extends StatefulWidget {
   State<SushiUpdatePromptHost> createState() => _SushiUpdatePromptHostState();
 }
 
-class _SushiUpdatePromptHostState extends State<SushiUpdatePromptHost> {
-  bool _shown = false;
+class _SushiUpdatePromptHostState extends State<SushiUpdatePromptHost> with WidgetsBindingObserver {
+  String? _offeredVersion;
+  bool _dialogOpen = false;
+  bool _showing = false;
+  DateTime? _pausedAt;
 
   @override
   void initState() {
     super.initState();
-    sushiLatestApp.addListener(_maybeShow);
+    WidgetsBinding.instance.addObserver(this);
+    sushiLatestApp.addListener(_onLatestApp);
+    _updateRouteListener = _onRouteChanged;
+    _updateRouteListenable?.addListener(_onRouteChanged);
   }
 
   @override
   void dispose() {
-    sushiLatestApp.removeListener(_maybeShow);
+    WidgetsBinding.instance.removeObserver(this);
+    sushiLatestApp.removeListener(_onLatestApp);
+    final listener = _updateRouteListener;
+    if (listener != null) {
+      _updateRouteListenable?.removeListener(listener);
+      if (identical(_updateRouteListener, listener)) {
+        _updateRouteListener = null;
+      }
+    }
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _pausedAt ??= DateTime.now();
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_onResumed());
+    }
+  }
+
+  void _onLatestApp() => unawaited(_maybeShow());
+
+  void _onRouteChanged() => unawaited(_maybeShow());
+
+  String? _currentRouteName() {
+    try {
+      return _updateCurrentRouteName?.call();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _onResumed() async {
+    final pausedAt = _pausedAt;
+    _pausedAt = null;
+    final recheck = sushiShouldRecheckUpdateOnResume(pausedAt: pausedAt, now: DateTime.now());
+    if (recheck) {
+      // Later (not Skip) should re-appear after a long TV-home nap.
+      _offeredVersion = null;
+      unawaited(_maybeShow());
+      final refresh = _latestAppRefresher;
+      if (refresh != null) {
+        try {
+          await refresh();
+        } catch (e, st) {
+          debugPrint('[sushi] update recheck failed: $e\n$st');
+        }
+      }
+    }
+    if (!mounted) return;
+    await _maybeShow();
+  }
+
   Future<void> _maybeShow() async {
-    if (_shown || !mounted) return;
+    if (!mounted || _dialogOpen || _showing) return;
     final prefs = _updatePrefs;
     if (prefs == null || _updateCurrentVersion.isEmpty) return;
     if (!await sushiShouldOfferUpdate(currentVersion: _updateCurrentVersion, prefs: prefs)) {
       return;
     }
-    _shown = true;
-    _tryShow(prefs);
-  }
+    final latest = sushiLatestApp.value;
+    if (latest == null) return;
+    if (_offeredVersion == latest.version) return;
 
-  // This widget wraps `MaterialApp.router` from the outside, so `this.context` has no Navigator
-  // ancestor and can't host a dialog — use the route Navigator's own key instead (registered from
-  // `_FladderApp.build`). That key's context may not be mounted yet on the very first frame(s), so
-  // retry post-frame rather than dropping the prompt.
-  void _tryShow(SharedPreferences prefs) {
-    if (!mounted) return;
     final navContext = _updateNavigatorKey?.currentContext;
     if (navContext == null || !navContext.mounted || Navigator.maybeOf(navContext) == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryShow(prefs));
+      WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_maybeShow()));
       return;
     }
-    unawaited(sushiShowUpdateDialog(
-      context: navContext,
-      currentVersion: _updateCurrentVersion,
-      prefs: prefs,
-    ));
+    if (!sushiIsUpdateHomeRoute(_currentRouteName())) return;
+
+    _showing = true;
+    _offeredVersion = latest.version;
+    _dialogOpen = true;
+    try {
+      await sushiShowUpdateDialog(
+        context: navContext,
+        currentVersion: _updateCurrentVersion,
+        prefs: prefs,
+      );
+    } finally {
+      _dialogOpen = false;
+      _showing = false;
+    }
   }
 
   @override

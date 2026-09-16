@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:fladder/sushi/cache/sushi_catalog_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/sushi_home_transport.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_item_transport.dart';
@@ -106,7 +107,10 @@ class SushiCatalogController {
       List<SushiRow> rail(SushiHomeRes? res, SushiRailKind kind) => res?.rowsFor(kind) ?? const [];
       final ttlSeconds = movies?.ttlSeconds ?? series?.ttlSeconds ?? 0;
       final home = SushiCachedHome(
-        slider: [...rail(movies, SushiRailKind.slider), ...rail(series, SushiRailKind.slider)],
+        slider: sushiUniqueRows([
+          ...rail(movies, SushiRailKind.slider),
+          ...rail(series, SushiRailKind.slider),
+        ]),
         mostWatched: rail(movies, SushiRailKind.mostWatched),
         trending: rail(movies, SushiRailKind.trending),
         seriesMostWatched: rail(series, SushiRailKind.mostWatched),

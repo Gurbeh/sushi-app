@@ -8,6 +8,8 @@ import 'package:fladder/sushi/sushi_auth_file_service.dart';
 import 'package:fladder/sushi/sushi_desktop_deep_link.dart';
 import 'package:fladder/sushi/sushi_dotenv.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_home_transport.dart';
 import 'package:fladder/sushi/sushi_playback_details_refresh.dart';
 import 'package:fladder/sushi/sushi_share_deep_link.dart';
 import 'package:fladder/util/custom_cache_manager.dart';
@@ -37,6 +39,9 @@ abstract final class SushiBootstrap {
     if (kIsWeb) return;
     // ADR 0019: version arrives on HomeRes. No GitHub / Play checks.
     sushiBindUpdatePrompt(result.sharedPreferences, result.applicationInfo.version);
+    sushiBindLatestAppRefresher(() async {
+      await sushiFetchHome(tab: sushiHomeTabMovies);
+    });
   }
 
   /// Wraps the app root so deferred update prompts can obtain a [BuildContext].

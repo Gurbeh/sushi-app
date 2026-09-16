@@ -291,6 +291,26 @@ void main() {
     expect(store.home?.seq, 11);
   });
 
+  test('home slider concat uniques overlapping TMDB ids', () async {
+    final store = _MemStore();
+    final catalog = SushiCatalogController(
+      store,
+      fetchHome: ({required tab}) async {
+        if (tab == sushiHomeTabSeries) {
+          return _homeRes(seq: 3, slider: [_row(2), _row(3, kind: SushiKind.series)]);
+        }
+        return _homeRes(seq: 3, slider: [_row(1), _row(2)]);
+      },
+      clock: () => DateTime(2026, 1, 1),
+    );
+
+    final live = await catalog.refreshHome();
+    expect(
+      live?.slider.map((r) => '${r.tmdbId}:${sushiKindToWire(r.kind)}').toList(),
+      ['1:1', '2:1', '3:2'],
+    );
+  });
+
   test('prefetch plan: all slider then 2 per rail, deduped', () {
     final home = _cachedHome(
       slider: [_row(1), _row(2), _row(3), _row(4)],

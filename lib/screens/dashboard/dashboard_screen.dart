@@ -16,6 +16,8 @@ import 'package:fladder/sushi/sushi_dashboard_empty_help.dart';
 import 'package:fladder/sushi/sushi_dashboard_skeleton.dart';
 import 'package:fladder/sushi/sushi_dashboard_watchlist.dart';
 import 'package:fladder/sushi/sushi_home_detail_prefetch.dart';
+import 'package:fladder/sushi/sushi_home_unique.dart';
+import 'package:fladder/sushi/providers/sushi_foryou_dashboard.dart';
 import 'package:fladder/sushi/sushi_tv_ui_limits.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
@@ -106,11 +108,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final allResume = [...resumeVideo, ...resumeAudio, ...resumeBooks].toList();
 
-    final homeCarouselItems = switch (homeSettings.carouselSettings) {
-      HomeCarouselSettings.nextUp => dashboardData.nextUp,
-      HomeCarouselSettings.combined => [...allResume, ...dashboardData.nextUp],
-      HomeCarouselSettings.cont => allResume,
-    };
+    final homeCarouselItems = sushiAssembleHomeCarousel(
+      settings: homeSettings.carouselSettings,
+      nextUp: dashboardData.nextUp,
+      resume: allResume,
+    );
     final homeBannerPosters = SushiTvUiLimits.shouldCapHomeSlider(ref)
         ? SushiTvUiLimits.capHomeSliderItems(homeCarouselItems)
         : SushiHomeDetailPrefetch.capSliderItems(homeCarouselItems);
@@ -137,6 +139,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         (sliderCached || (dashboardData.loaded && !dashboardData.loading)) &&
         homeCarouselItems.isNotEmpty;
     final showListSkeleton = !sushiHasRails && (!dashboardData.loaded || dashboardData.loading);
+
+    // R-RAIL-1: item once on home. Banner → continue → For you (padded) → other rails.
+    final homeSeen = <String>{};
+    if (showBanner) {
+      sushiTakeUnseenHomeItems(homeBannerPosters, homeSeen);
+    }
+    final continueWatchingPosters = sushiTakeUnseenHomeItems(resumeVideo, homeSeen);
+    final continueListeningPosters = sushiTakeUnseenHomeItems(resumeAudio, homeSeen);
+    final continueReadingPosters = sushiTakeUnseenHomeItems(resumeBooks, homeSeen);
+
+    final forYouAsync = ref.watch(sushiForYouDashboardProvider);
+    final forYouLoading = forYouAsync.isLoading && !forYouAsync.hasValue;
+    final forYouPosters = forYouLoading
+        ? const <ItemBaseModel>[]
+        : sushiFillHomeRail(
+            base: forYouAsync.valueOrNull?.items ?? const [],
+            fillers: [
+              ...sushiRails.mostWatched,
+              ...sushiRails.seriesMostWatched,
+              ...sushiRails.trending,
+              ...sushiRails.seriesTrending,
+            ],
+            seen: homeSeen,
+            limit: sushiHomeForYouLimit,
+          );
+
+    final newPosters = sushiTakeUnseenHomeItems(sushiRails.slider, homeSeen);
+    final mostWatchedPosters = sushiTakeUnseenHomeItems(sushiRails.mostWatched, homeSeen);
+    final trendingPosters = sushiTakeUnseenHomeItems(sushiRails.trending, homeSeen);
+    final seriesMostWatchedPosters = sushiTakeUnseenHomeItems(sushiRails.seriesMostWatched, homeSeen);
+    final seriesTrendingPosters = sushiTakeUnseenHomeItems(sushiRails.seriesTrending, homeSeen);
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(
@@ -230,70 +263,80 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       },
                       posters: tvChannels,
                     ),
-                  if (resumeVideo.isNotEmpty &&
+                  if (continueWatchingPosters.isNotEmpty &&
                       (homeSettings.nextUp == HomeNextUp.cont || homeSettings.nextUp == HomeNextUp.separate))
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: context.localized.dashboardContinueWatching,
                       sushiContinueToggle: true,
-                      posters: resumeVideo,
+                      posters: continueWatchingPosters,
                     ),
-                  if (resumeAudio.isNotEmpty &&
+                  if (continueListeningPosters.isNotEmpty &&
                       (homeSettings.nextUp == HomeNextUp.cont || homeSettings.nextUp == HomeNextUp.separate))
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: context.localized.dashboardContinueListening,
-                      posters: resumeAudio,
+                      posters: continueListeningPosters,
                     ),
-                  if (resumeBooks.isNotEmpty &&
+                  if (continueReadingPosters.isNotEmpty &&
                       (homeSettings.nextUp == HomeNextUp.cont || homeSettings.nextUp == HomeNextUp.separate))
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: context.localized.dashboardContinueReading,
-                      posters: resumeBooks,
+                      posters: continueReadingPosters,
                     ),
-                  if (sushiRails.slider.isNotEmpty)
+                  if (forYouLoading)
+                    SushiPosterRowSkeleton(contentPadding: padding)
+                  else if (forYouPosters.isNotEmpty)
+                    PosterRow(
+                      tvMode: useTVExpandedLayout,
+                      contentPadding: padding,
+                      label: context.localized.sushiForYou,
+                      sushiContinueToggle: true,
+                      posters: forYouPosters,
+                    ),
+                  if (newPosters.isNotEmpty)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'New',
                       sushiContinueToggle: true,
-                      posters: sushiRails.slider,
+                      posters: newPosters,
                     ),
-                  if (sushiRails.mostWatched.isNotEmpty)
+                  if (mostWatchedPosters.isNotEmpty)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Most watched',
                       sushiContinueToggle: true,
-                      posters: sushiRails.mostWatched,
+                      posters: mostWatchedPosters,
                     ),
-                  if (sushiRails.trending.isNotEmpty)
+                  if (trendingPosters.isNotEmpty)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Trending',
                       sushiContinueToggle: true,
-                      posters: sushiRails.trending,
+                      posters: trendingPosters,
                     ),
-                  if (sushiRails.seriesMostWatched.isNotEmpty)
+                  if (seriesMostWatchedPosters.isNotEmpty)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Series · Most watched',
                       sushiContinueToggle: true,
-                      posters: sushiRails.seriesMostWatched,
+                      posters: seriesMostWatchedPosters,
                     ),
-                  if (sushiRails.seriesTrending.isNotEmpty)
+                  if (seriesTrendingPosters.isNotEmpty)
                     PosterRow(
                       tvMode: useTVExpandedLayout,
                       contentPadding: padding,
                       label: 'Series · Trending',
                       sushiContinueToggle: true,
-                      posters: sushiRails.seriesTrending,
+                      posters: seriesTrendingPosters,
                     ),
                   ...sushiDashboardRecentlyAddedRows(
                     context: context,

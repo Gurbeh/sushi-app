@@ -90,7 +90,14 @@ class _FladderApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // ADR 0019: the automatic update prompt needs a context below this Navigator, not
     // SushiUpdatePromptHost's own (which wraps MaterialApp.router from the outside).
-    if (!kIsWeb) sushiRegisterUpdateNavigatorKey(autoRouter.navigatorKey);
+    // topRoute is the nested leaf (dashboard vs details); resume-on-details must wait.
+    if (!kIsWeb) {
+      sushiRegisterUpdateNavigatorKey(
+        autoRouter.navigatorKey,
+        routeListenable: autoRouter,
+        currentRouteName: () => autoRouter.topRoute.name,
+      );
+    }
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
     final themeMode = ref.watch(clientSettingsProvider.select((value) => value.themeMode));
     final themeColor = ref.watch(clientSettingsProvider.select((value) => value.themeColor));

@@ -7,9 +7,9 @@ import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/sushi/sushi_library_item_ratings.dart';
+import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/sushi_series_details_loader.dart';
 import 'package:fladder/sushi/sushi_playback_prefetch.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
@@ -166,12 +166,13 @@ abstract final class SushiHomeDetailPrefetch {
 
   static List<ItemBaseModel> _sliderItems(Ref ref, HomeModel dashboard) {
     final settings = ref.read(homeSettingsProvider).carouselSettings;
-    final raw = switch (settings) {
-      HomeCarouselSettings.nextUp => dashboard.nextUp,
-      HomeCarouselSettings.combined => [...dashboard.resumeVideo, ...dashboard.nextUp],
-      HomeCarouselSettings.cont => dashboard.resumeVideo,
-    };
-    return capSliderItems(raw);
+    return capSliderItems(
+      sushiAssembleHomeCarousel(
+        settings: settings,
+        nextUp: dashboard.nextUp,
+        resume: dashboard.resumeVideo,
+      ),
+    );
   }
 }
 

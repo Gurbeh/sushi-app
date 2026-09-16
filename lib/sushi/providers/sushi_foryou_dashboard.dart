@@ -5,7 +5,7 @@ import 'package:fladder/sushi/sushi_list_pb.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
-const _dashboardForYouLimit = 16;
+const sushiHomeForYouLimit = 16;
 
 class SushiForYouDashboardData {
   const SushiForYouDashboardData({this.items = const []});
@@ -20,7 +20,7 @@ class SushiForYouDashboardData {
 /// cacheable home answer (docs/11 §2).
 final sushiForYouDashboardProvider = FutureProvider<SushiForYouDashboardData>((ref) async {
   final res = await sushiFetchList(scope: SushiListScope.forYou);
-  final items = res?.rows.take(_dashboardForYouLimit).map(sushiRowToItemBaseModel).toList() ??
+  final items = res?.rows.take(sushiHomeForYouLimit).map(sushiRowToItemBaseModel).toList() ??
       const <ItemBaseModel>[];
   if (items.isEmpty) return SushiForYouDashboardData.empty;
   return SushiForYouDashboardData(items: items);
