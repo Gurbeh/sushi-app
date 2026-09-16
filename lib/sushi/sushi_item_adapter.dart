@@ -413,19 +413,41 @@ SeriesModel sushiMergeSeasonEpisodes(SeriesModel series, int seasonNo, List<Epis
   );
 }
 
-/// Attaches the `/files` pick-list to the series play target. Pending-only / empty lists leave
-/// [ItemBaseModel.canDownload] false so Play/Sync stay hidden.
+/// Episode id whose `/files` pick-list should land on [series].
+///
+/// Header Play follows [SeriesModel.nextUp] (resume), not row focus — except when the user
+/// already picked [SeriesModel.selectedEpisode].
+int? sushiSeriesPlayFilesEpisodeId(SeriesModel series) {
+  final playTarget = series.selectedEpisode ?? series.nextUp;
+  if (playTarget == null) return null;
+  return sushiEpisodeIdFromItemId(playTarget.id);
+}
+
+/// Attaches the `/files` pick-list to the episode those files belong to.
+///
+/// `/item` only wires one play-target episode (ADR 0028, usually S01E01). Continue-watching
+/// then injects a resume stub so `nextUp` can be S01E13. Passing [filesEpisodeId] keeps E1's
+/// files on E1 instead of gluing them onto the E13 stub (Play would show S1 E13 and start E1).
+/// Pending-only / empty lists leave [ItemBaseModel.canDownload] false so Play/Sync stay hidden.
 SeriesModel sushiApplySeriesFiles(
   SeriesModel next,
   List<SushiFile> files, {
   int? preferredFileId,
   SushiMediaVariantPreference? localPreference,
+  int? filesEpisodeId,
 }) {
   final playTarget = next.selectedEpisode ?? next.nextUp;
   if (playTarget == null) return next.copyWith(canDownload: false);
+  var targetId = playTarget.id;
+  if (filesEpisodeId != null) {
+    final match = (next.availableEpisodes ?? const <EpisodeModel>[]).firstWhereOrNull(
+      (episode) => sushiEpisodeIdFromItemId(episode.id) == filesEpisodeId,
+    );
+    if (match == null) return next.copyWith(canDownload: false);
+    targetId = match.id;
+  }
   final streams = sushiBuildMediaStreams(files, preferredFileId: preferredFileId, localPreference: localPreference);
   final ready = streams.versionStreams.isNotEmpty;
-  final targetId = playTarget.id;
   return next.copyWith(
     canDownload: ready,
     availableEpisodes: [

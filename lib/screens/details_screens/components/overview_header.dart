@@ -7,15 +7,12 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/items/images_models.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
-import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/watched_state.dart';
 import 'package:fladder/sushi/sushi_adult_content.dart';
 import 'package:fladder/sushi/sushi_iran_content.dart';
 import 'package:fladder/sushi/sushi_media_streams.dart';
-import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 import 'package:fladder/sushi/widgets/sushi_iran_flag_icon.dart';
 import 'package:fladder/sushi/widgets/sushi_enum_box.dart';
-import 'package:fladder/sushi/widgets/sushi_labeled_iran_flag.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/shared/media/components/chip_button.dart';
 import 'package:fladder/screens/shared/media/components/media_header.dart';
@@ -27,7 +24,6 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/position_provider.dart';
 import 'package:fladder/util/string_extensions.dart';
 import 'package:fladder/widgets/shared/ensure_visible.dart';
-import 'package:fladder/widgets/shared/enum_selection.dart';
 import 'package:fladder/widgets/shared/focus_row.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 
@@ -156,91 +152,6 @@ class OverviewHeader extends ConsumerWidget {
                   itemBuilder: versionItemBuilder,
                 ),
         ),
-      if (mediaStreamHelper != null && mediaStreamHelper!.mediaStream.audioStreams.isNotEmpty)
-        SizedBox(
-          height: streamHeight,
-          child: EnumBox(
-            onFocusChanged: (focused) {
-              if (focused) {
-                context.ensureVisible(alignment: 1.0);
-              }
-            },
-            currentWidget: Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 8,
-              children: [
-                Icon(
-                  IconsaxPlusLinear.audio_square,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-                Text(
-                  mediaStreamHelper?.mediaStream.currentAudioStream?.shortTitle ?? "",
-                ),
-              ],
-            ),
-            itemBuilder: (context) => [AudioStreamModel.no(), ...mediaStreamHelper!.mediaStream.audioStreams]
-                .mapIndexed((index, e) => ItemActionButton(
-                      selected: mediaStreamHelper!.mediaStream.currentAudioStream == e,
-                      label: SushiLabeledIranFlag(
-                        label: e.displayTitle,
-                        showFlag: SushiPersianLanguage.isPersianLanguage(e.language) ||
-                            SushiPersianLanguage.isPersianLanguage(e.displayTitle),
-                      ),
-                      action: () {
-                        final newItem = mediaStreamHelper!.mediaStream.copyWith(
-                          defaultAudioStreamIndex: e.index,
-                        );
-                        mediaStreamHelper!.onItemChanged?.call(newItem);
-                      },
-                    ))
-                .toList(),
-          ),
-        ),
-      if (mediaStreamHelper != null && mediaStreamHelper!.mediaStream.subStreams.isNotEmpty)
-        SizedBox(
-        height: streamHeight,
-        child: EnumBox(
-          onFocusChanged: (focused) {
-            if (focused) {
-              context.ensureVisible(alignment: 1.0);
-            }
-          },
-          currentWidget: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 8,
-            children: [
-              Icon(
-                IconsaxPlusLinear.subtitle,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              SushiLabeledIranFlag(
-                label: (mediaStreamHelper?.mediaStream.currentSubStream?.shortTitle ?? context.localized.off)
-                    .toUpperCase(),
-                subtitleLanguage: mediaStreamHelper?.mediaStream.currentSubStream?.language,
-                mediaStreams: mediaStreams,
-                subtitleIndex: mediaStreamHelper?.mediaStream.currentSubStream?.index ?? -1,
-              ),
-            ],
-          ),
-          itemBuilder: (context) => [SubStreamModel.no(), ...mediaStreamHelper!.mediaStream.subStreams]
-              .mapIndexed((index, e) => ItemActionButton(
-                    selected: mediaStreamHelper!.mediaStream.currentSubStream == e,
-                    label: SushiLabeledIranFlag(
-                      label: e.displayTitle,
-                      subtitleLanguage: e.language,
-                      mediaStreams: mediaStreams,
-                      subtitleIndex: e.index,
-                    ),
-                    action: () {
-                      final newItem = mediaStreamHelper!.mediaStream.copyWith(
-                        defaultSubStreamIndex: e.index,
-                      );
-                      mediaStreamHelper!.onItemChanged?.call(newItem);
-                    },
-                  ))
-              .toList(),
-        ),
-      )
     ].withPositionProvider(context: context);
 
     return ConstrainedBox(

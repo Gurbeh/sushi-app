@@ -52,10 +52,11 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.series);
         if (cached?.page != null) {
           var painted = sushiEnrichSeriesModel(seriesModel, cached!.page!);
+          final cachedFilesEpisodeId = cached.page!.episodes.firstOrNull?.episodeId;
           painted = await _paintWatchState(
             painted,
             files: cached.filesRes,
-            filesEpisodeId: cached.page!.episodes.firstOrNull?.episodeId,
+            filesEpisodeId: cachedFilesEpisodeId,
           );
           if (cached.files.isNotEmpty) {
             painted = sushiApplySeriesFiles(
@@ -63,6 +64,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
               cached.files,
               preferredFileId: cached.lastFileId,
               localPreference: await sushiReadVariantPreference('series:$tmdbId'),
+              filesEpisodeId: cachedFilesEpisodeId,
             );
             sushiPlayWarmup.scheduleFromStreams(
               (painted.selectedEpisode ?? painted.nextUp)?.mediaStreams,
@@ -97,8 +99,10 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         return;
       }
       var next = sushiEnrichSeriesModel(seriesModel, snap.page!);
-      final playTarget = next.selectedEpisode ?? next.nextUp;
-      final playEpisodeId = playTarget == null ? null : sushiEpisodeIdFromItemId(playTarget.id);
+      // Resume stub (E13) must land before we pick whose `/files` to fetch. `/item` only
+      // wires the first episode (ADR 0028); nextUp before paint is always that row.
+      next = await _paintWatchState(next);
+      final playEpisodeId = sushiSeriesPlayFilesEpisodeId(next);
       final firstEpisodeId = snap.page!.episodes.firstOrNull?.episodeId;
       var files = snap.filesRes;
       if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
@@ -115,6 +119,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         files.files,
         preferredFileId: files.lastFileId,
         localPreference: await sushiReadVariantPreference('series:$tmdbId'),
+        filesEpisodeId: playEpisodeId,
       );
       sushiPlayWarmup.scheduleFromStreams(
         (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,

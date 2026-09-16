@@ -176,29 +176,34 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   MediaStreamsModel? streams = item.streamModel;
   var fileId = sushiFileIdFromVersionStreamId(streams?.currentVersionStream?.id);
 
-  if (fileId == null && item is EpisodeModel) {
+  if (item is EpisodeModel) {
     final episodeId = sushiEpisodeIdFromItemId(item.id);
-    if (episodeId == null) return null;
-    final files = await catalog.openFiles(episodeId: episodeId);
-    final preferenceKey = sushiVariantPreferenceKeyFor(item);
-    final localPreference = preferenceKey == null ? null : await sushiReadVariantPreference(preferenceKey);
-    streams = sushiBuildMediaStreams(
-      files.files,
-      preferredFileId: files.lastFileId,
-      localPreference: localPreference,
-    );
-    fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
-    final overlay = sushiUserDataFromFiles(files);
-    item = item.copyWith(
-      overview: sushiOverviewWithFileRunTime(
-        item.overview,
+    if (episodeId == null) {
+      if (fileId == null) return null;
+    } else {
+      // Always bind `/files` to this episode id. Series detail used to copy `/item`'s first
+      // episode pick-list onto a resume stub (S1 E13 label, E1 video).
+      final files = await catalog.openFiles(episodeId: episodeId);
+      final preferenceKey = sushiVariantPreferenceKeyFor(item);
+      final localPreference = preferenceKey == null ? null : await sushiReadVariantPreference(preferenceKey);
+      streams = sushiBuildMediaStreams(
         files.files,
-        lastFileId: files.lastFileId,
-      ),
-      userData: (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played)
-          ? overlay
-          : item.userData,
-    );
+        preferredFileId: fileId ?? files.lastFileId,
+        localPreference: localPreference,
+      );
+      fileId = sushiFileIdFromVersionStreamId(streams.currentVersionStream?.id);
+      final overlay = sushiUserDataFromFiles(files);
+      item = item.copyWith(
+        overview: sushiOverviewWithFileRunTime(
+          item.overview,
+          files.files,
+          lastFileId: files.lastFileId,
+        ),
+        userData: (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played)
+            ? overlay
+            : item.userData,
+      );
+    }
   }
 
   if (item is! MovieModel && item is! EpisodeModel) return null;

@@ -1,12 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/sushi_series_watch_state.dart';
 
 void main() {
   test('series enrich maps season index and play-target only', () {
@@ -99,6 +101,97 @@ void main() {
     expect(ready.canDownload, isTrue);
     expect(sushiItemHasPlaybackActions(ready), isTrue);
     expect(ready.availableEpisodes!.first.overview.runTime, const Duration(seconds: 1));
+  });
+
+  test('series files stay on wired episode when resume nextUp is a later stub', () {
+    final base = sushiRowToItemBaseModel(
+      const SushiRow(
+        tmdbId: 1396,
+        kind: SushiKind.series,
+        title: 'Breaking Bad',
+        year: 2008,
+        rating: 90,
+        poster: 'bb',
+      ),
+    ) as SeriesModel;
+    final enriched = sushiEnrichSeriesModel(
+      base,
+      const SushiItemRes(
+        row: SushiRow(
+          tmdbId: 1396,
+          kind: SushiKind.series,
+          title: 'Breaking Bad',
+          year: 2008,
+          rating: 90,
+          poster: 'bb',
+        ),
+        overview: 'A teacher cooks.',
+        releasedOn: 0,
+        episodes: [
+          SushiEpisode(episodeId: 10, seasonNo: 1, episodeNo: 1, title: 'Pilot'),
+        ],
+        seasons: [
+          SushiSeason(seasonNo: 1, episodeCount: 13),
+        ],
+      ),
+    );
+    expect(sushiSeriesPlayFilesEpisodeId(enriched), 10);
+
+    const resume = SushiContinueEntry(
+      tmdbId: 1396,
+      kind: SushiKind.series,
+      title: 'Breaking Bad',
+      year: 2008,
+      rating: 90,
+      poster: 'bb',
+      positionMs: 10 * 60 * 1000,
+      durationMs: 40 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_99',
+      season: 1,
+      episode: 13,
+    );
+    final painted = sushiPaintSeriesWatchState(enriched, resume: resume);
+    expect(painted.nextUp?.id, 'sushi_ep_99');
+    expect(painted.nextUp?.episode, 13);
+    expect(sushiSeriesPlayFilesEpisodeId(painted), 99);
+
+    const e1Files = [
+      SushiFile(
+        fileId: 9,
+        qualityLabel: '1080p',
+        height: 1080,
+        audioLangs: 'en',
+        subLangs: '',
+        sizeBytes: 1,
+        durationS: 1,
+        state: SushiFileState.ready,
+      ),
+    ];
+    final glued = sushiApplySeriesFiles(painted, e1Files, filesEpisodeId: 10);
+    expect(glued.nextUp?.id, 'sushi_ep_99');
+    expect(glued.nextUp?.mediaStreams.versionStreams, isEmpty);
+    expect(glued.availableEpisodes!.first.mediaStreams.versionStreams, isNotEmpty);
+    expect(sushiEpisodeIdFromItemId(glued.availableEpisodes!.first.id), 10);
+
+    const e13Files = [
+      SushiFile(
+        fileId: 42,
+        qualityLabel: '1080p',
+        height: 1080,
+        audioLangs: 'en',
+        subLangs: '',
+        sizeBytes: 1,
+        durationS: 50,
+        state: SushiFileState.ready,
+      ),
+    ];
+    final resumeFiles = sushiApplySeriesFiles(painted, e13Files, filesEpisodeId: 99);
+    expect(resumeFiles.nextUp?.mediaStreams.versionStreams, isNotEmpty);
+    expect(
+      sushiFileIdFromVersionStreamId(resumeFiles.nextUp!.mediaStreams.currentVersionStream?.id),
+      42,
+    );
   });
 
   test('series enrich with no episodes hides Play/Sync', () {
