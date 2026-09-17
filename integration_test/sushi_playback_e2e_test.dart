@@ -222,13 +222,15 @@ void main() {
       final subStreams = model?.subStreams ?? const <SubStreamModel>[];
       final persianIndex = sushiPreferredSubtitleStreamIndex(subStreams);
       final autoSelected = model?.mediaStreams?.defaultSubStreamIndex;
-      final persianOk = persianIndex == null || autoSelected == persianIndex;
+      // Start is Off until Automatic (online) → AI → muxed Farsi finishes. Immediate Persian
+      // mux pick is no longer the default.
+      final startOk = autoSelected == null || autoSelected == -1 || autoSelected == persianIndex;
       record(
         'persian_subtitle_autoselect[$_show1Title]',
-        persianOk,
+        startOk,
         persianIndex == null
             ? 'no Persian track in subStreams — skipped'
-            : 'expectedIndex=$persianIndex actualIndex=$autoSelected',
+            : 'startIndex=$autoSelected persianIndex=$persianIndex (chain runs after play)',
       );
 
       final realSub = subStreams.firstWhereOrNullIndexNot(-1);

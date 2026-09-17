@@ -87,6 +87,10 @@ bool sushiHasPersianSoftSub(List<SubStreamModel>? subStreams) {
 /// What to apply at playback start. Previous title's AI / Automatic pick must not carry over.
 enum SushiStartSubtitle { persianSoft, automaticOnline, off }
 
+/// Ordered start pipeline for a non-hard-sub item. Hard-sub is empty (Off) except English-audio
+/// hardsub, which still runs Automatic only — burn-in must not get AI or muxed Farsi stacked on top.
+enum SushiStartSubtitleStep { automaticOnline, aiTranslate, persianSoft }
+
 /// True when a track's language/title codes read as English ('en', 'eng', 'en-*', or a title
 /// that says so). Same rule [sushiPreferredSubtitleStreamIndex] uses to spot an English track.
 bool sushiIsEnglishLanguage(String? language) {
@@ -94,17 +98,40 @@ bool sushiIsEnglishLanguage(String? language) {
   return lang == 'en' || lang == 'eng' || lang.startsWith('en-');
 }
 
-/// Hardsub sources default to Off (stacking soft Persian on top of burn-in duplicates the
-/// subtitle on Android ExoPlayer) — except an English hardsub print, which still has no Persian
-/// on screen, so Automatic (online) still runs.
+/// Default: Automatic (online). If that finds nothing and the user has a Gemini key, AI translate.
+/// Muxed Farsi soft is last. Hard-sub skips the chain (Off) unless the audio is English.
+List<SushiStartSubtitleStep> sushiStartSubtitleSteps({
+  required bool hardSub,
+  required bool hasPersianSoft,
+  required bool aiSet,
+  bool isEnglishAudio = false,
+}) {
+  if (hardSub) {
+    return isEnglishAudio ? const [SushiStartSubtitleStep.automaticOnline] : const [];
+  }
+  return [
+    SushiStartSubtitleStep.automaticOnline,
+    if (aiSet) SushiStartSubtitleStep.aiTranslate,
+    if (hasPersianSoft) SushiStartSubtitleStep.persianSoft,
+  ];
+}
+
+/// First step of [sushiStartSubtitleSteps]. Hardsub sources default to Off (stacking soft Persian
+/// on top of burn-in duplicates the subtitle on Android ExoPlayer) — except an English hardsub
+/// print, which still has no Persian on screen, so Automatic (online) still runs.
 SushiStartSubtitle sushiStartSubtitleChoice({
   required bool hardSub,
   required bool hasPersianSoft,
   bool subtitleOff = false,
   bool isEnglishAudio = false,
 }) {
-  if (hardSub) return isEnglishAudio ? SushiStartSubtitle.automaticOnline : SushiStartSubtitle.off;
-  if (hasPersianSoft && !subtitleOff) return SushiStartSubtitle.persianSoft;
+  final steps = sushiStartSubtitleSteps(
+    hardSub: hardSub,
+    hasPersianSoft: hasPersianSoft,
+    aiSet: false,
+    isEnglishAudio: isEnglishAudio,
+  );
+  if (steps.isEmpty) return SushiStartSubtitle.off;
   return SushiStartSubtitle.automaticOnline;
 }
 

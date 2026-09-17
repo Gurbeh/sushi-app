@@ -132,10 +132,26 @@ void main() {
     );
   });
 
-  test('Farsi softsub wins; hardsub stays Off; no softsub runs Automatic', () {
+  test('non-hard-sub always starts Automatic; Farsi soft is last fallback', () {
     expect(
       sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true),
-      SushiStartSubtitle.persianSoft,
+      SushiStartSubtitle.automaticOnline,
+    );
+    expect(
+      sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: true, aiSet: false),
+      [SushiStartSubtitleStep.automaticOnline, SushiStartSubtitleStep.persianSoft],
+    );
+    expect(
+      sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: true, aiSet: true),
+      [
+        SushiStartSubtitleStep.automaticOnline,
+        SushiStartSubtitleStep.aiTranslate,
+        SushiStartSubtitleStep.persianSoft,
+      ],
+    );
+    expect(
+      sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: false, aiSet: true),
+      [SushiStartSubtitleStep.automaticOnline, SushiStartSubtitleStep.aiTranslate],
     );
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false),
@@ -144,6 +160,10 @@ void main() {
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: true),
       SushiStartSubtitle.off,
+    );
+    expect(
+      sushiStartSubtitleSteps(hardSub: true, hasPersianSoft: true, aiSet: true),
+      isEmpty,
     );
     expect(sushiHasPersianSoftSub([_sub(index: 3, language: 'fa', displayTitle: 'Persian')]), isTrue);
     expect(sushiHasPersianSoftSub([SubStreamModel.no()]), isFalse);
@@ -170,6 +190,14 @@ void main() {
       ),
       SushiStartSubtitle.automaticOnline,
     );
+    expect(
+      sushiStartSubtitleSteps(
+        hardSub: false,
+        hasPersianSoft: sushiHasPersianSoftSub([SubStreamModel.no(), stub]),
+        aiSet: false,
+      ),
+      [SushiStartSubtitleStep.automaticOnline],
+    );
   });
 
   test('Off selection still runs Automatic even if a Farsi track exists', () {
@@ -183,10 +211,19 @@ void main() {
     );
   });
 
-  test('English hardsub still runs Automatic; non-English hardsub stays Off', () {
+  test('English hardsub still runs Automatic only; no AI or soft stack', () {
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: true),
       SushiStartSubtitle.automaticOnline,
+    );
+    expect(
+      sushiStartSubtitleSteps(
+        hardSub: true,
+        hasPersianSoft: true,
+        aiSet: true,
+        isEnglishAudio: true,
+      ),
+      [SushiStartSubtitleStep.automaticOnline],
     );
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: false),

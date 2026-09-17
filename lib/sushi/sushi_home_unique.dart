@@ -3,6 +3,12 @@ import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 
+/// Matches backend [rails.Policy.MinRailSize]. Continue watching has no floor.
+const sushiHomeMinRailSize = 8;
+
+/// Personalized For You cap. Floor is still [sushiHomeMinRailSize].
+const sushiHomeForYouLimit = 16;
+
 /// Home identity for R-RAIL-1. TMDB+kind, not [ItemBaseModel.id] — that id drops kind, so
 /// movie 550 and series 550 would collapse.
 String sushiHomeItemKey(ItemBaseModel item) {
@@ -35,10 +41,13 @@ List<ItemBaseModel> sushiFillHomeRail({
   required Iterable<ItemBaseModel> fillers,
   required Set<String> seen,
   required int limit,
+  bool Function(ItemBaseModel item)? skip,
 }) {
-  final out = sushiTakeUnseenHomeItems(base, seen, limit: limit);
+  final native = skip == null ? base : base.where((item) => !skip(item));
+  final out = sushiTakeUnseenHomeItems(native, seen, limit: limit);
   if (out.length >= limit) return out;
-  out.addAll(sushiTakeUnseenHomeItems(fillers, seen, limit: limit - out.length));
+  final extra = skip == null ? fillers : fillers.where((item) => !skip(item));
+  out.addAll(sushiTakeUnseenHomeItems(extra, seen, limit: limit - out.length));
   return out;
 }
 
@@ -68,4 +77,131 @@ List<ItemBaseModel> sushiAssembleHomeCarousel({
     HomeCarouselSettings.cont => resume,
   };
   return sushiUniqueHomeItems(raw);
+}
+
+/// Catalog home rows after banner + continue watching. Unique (R-RAIL-1). Every row except
+/// continue watching is filled to [minRailSize] from other rails' surplus. For You never
+/// includes movies this viewer already watched.
+class SushiHomeCatalogRails {
+  const SushiHomeCatalogRails({
+    required this.forYou,
+    required this.newest,
+    required this.mostWatched,
+    required this.trending,
+    required this.seriesMostWatched,
+    required this.seriesTrending,
+  });
+
+  final List<ItemBaseModel> forYou;
+  final List<ItemBaseModel> newest;
+  final List<ItemBaseModel> mostWatched;
+  final List<ItemBaseModel> trending;
+  final List<ItemBaseModel> seriesMostWatched;
+  final List<ItemBaseModel> seriesTrending;
+}
+
+bool sushiHomeIsWatchedMovie(ItemBaseModel item, Set<String> playedIds) {
+  if (item.type != FladderItemType.movie) return false;
+  return item.userData.played || playedIds.contains(item.id);
+}
+
+SushiHomeCatalogRails sushiAssembleHomeCatalogRails({
+  required Set<String> seen,
+  required Iterable<ItemBaseModel> forYouBase,
+  required Iterable<ItemBaseModel> slider,
+  required Iterable<ItemBaseModel> mostWatched,
+  required Iterable<ItemBaseModel> trending,
+  required Iterable<ItemBaseModel> seriesMostWatched,
+  required Iterable<ItemBaseModel> seriesTrending,
+  Set<String> playedIds = const {},
+  int minRailSize = sushiHomeMinRailSize,
+  int forYouLimit = sushiHomeForYouLimit,
+  bool fillForYou = true,
+}) {
+  bool skipWatchedMovie(ItemBaseModel item) => sushiHomeIsWatchedMovie(item, playedIds);
+
+  final forYou = sushiTakeUnseenHomeItems(
+    forYouBase.where((item) => !skipWatchedMovie(item)),
+    seen,
+    limit: forYouLimit,
+  );
+  final newest = sushiTakeUnseenHomeItems(slider, seen);
+  final most = sushiTakeUnseenHomeItems(mostWatched, seen);
+  final trend = sushiTakeUnseenHomeItems(trending, seen);
+  final seriesMost = sushiTakeUnseenHomeItems(seriesMostWatched, seen);
+  final seriesTrend = sushiTakeUnseenHomeItems(seriesTrending, seen);
+
+  // Steal extras from later catalog rails first so New / Most watched keep native cards.
+  // For You never donates — followed series stay on For You. Movie rows do not take series
+  // cards, and series rows do not take movies.
+  final catalogSteal = [seriesTrend, seriesMost, trend, most, newest];
+  sushiStealHomeRailToMin(dest: newest, donors: catalogSteal, min: minRailSize);
+  sushiStealHomeRailToMin(
+    dest: most,
+    donors: catalogSteal,
+    min: minRailSize,
+    skip: (item) => item.type == FladderItemType.series,
+  );
+  sushiStealHomeRailToMin(
+    dest: trend,
+    donors: catalogSteal,
+    min: minRailSize,
+    skip: (item) => item.type == FladderItemType.series,
+  );
+  sushiStealHomeRailToMin(
+    dest: seriesMost,
+    donors: catalogSteal,
+    min: minRailSize,
+    skip: (item) => item.type == FladderItemType.movie,
+  );
+  sushiStealHomeRailToMin(
+    dest: seriesTrend,
+    donors: catalogSteal,
+    min: minRailSize,
+    skip: (item) => item.type == FladderItemType.movie,
+  );
+  if (fillForYou) {
+    sushiStealHomeRailToMin(
+      dest: forYou,
+      donors: catalogSteal,
+      min: minRailSize,
+      skip: skipWatchedMovie,
+    );
+  }
+
+  return SushiHomeCatalogRails(
+    forYou: forYou,
+    newest: newest,
+    mostWatched: most,
+    trending: trend,
+    seriesMostWatched: seriesMost,
+    seriesTrending: seriesTrend,
+  );
+}
+
+/// Move cards past [min] on [donors] onto [dest] until [dest] reaches [min]. Never drains a
+/// donor below [min]. Mutates the lists.
+void sushiStealHomeRailToMin({
+  required List<ItemBaseModel> dest,
+  required List<List<ItemBaseModel>> donors,
+  required int min,
+  bool Function(ItemBaseModel item)? skip,
+}) {
+  while (dest.length < min) {
+    var moved = false;
+    for (final donor in donors) {
+      if (identical(donor, dest)) continue;
+      if (donor.length <= min) continue;
+      for (var i = donor.length - 1; i >= min; i--) {
+        final item = donor[i];
+        if (skip != null && skip(item)) continue;
+        donor.removeAt(i);
+        dest.add(item);
+        moved = true;
+        break;
+      }
+      if (moved) break;
+    }
+    if (!moved) return;
+  }
 }

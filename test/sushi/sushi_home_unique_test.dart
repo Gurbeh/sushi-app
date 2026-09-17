@@ -81,6 +81,19 @@ void main() {
     expect(filled.map(sushiHomeItemKey).toList(), ['2:1', '3:1']);
   });
 
+  test('fill skips watched movies when asked', () {
+    final seen = <String>{};
+    final watched = _item(20);
+    final filled = sushiFillHomeRail(
+      base: [_item(10), watched],
+      fillers: [watched, _item(21)],
+      seen: seen,
+      limit: 4,
+      skip: (item) => sushiHomeItemKey(item) == '20:1',
+    );
+    expect(filled.map(sushiHomeItemKey).toList(), ['10:1', '21:1']);
+  });
+
   test('fill does not consume leftover fillers into seen', () {
     final seen = <String>{};
     final fillers = [_item(1), _item(2), _item(3), _item(4), _item(5)];
@@ -103,5 +116,51 @@ void main() {
       _row(3, kind: SushiKind.series),
     ]);
     expect(rows.map(sushiHomeRowKey).toList(), ['1:1', '2:1', '2:2', '3:2']);
+  });
+
+  List<ItemBaseModel> nItems(int start, int count) =>
+      List.generate(count, (i) => _item(start + i));
+
+  test('catalog rails keep a min floor instead of emptying into for you', () {
+    final assembled = sushiAssembleHomeCatalogRails(
+      seen: <String>{},
+      forYouBase: [_item(1)],
+      slider: nItems(10, 2),
+      mostWatched: nItems(20, 18),
+      trending: nItems(40, 18),
+      seriesMostWatched: nItems(60, 18),
+      seriesTrending: nItems(80, 18),
+      minRailSize: 8,
+    );
+    expect(assembled.newest.length, 8);
+    expect(assembled.mostWatched.length, greaterThanOrEqualTo(8));
+    expect(assembled.trending.length, greaterThanOrEqualTo(8));
+    expect(assembled.forYou.length, greaterThanOrEqualTo(8));
+    final keys = [
+      ...assembled.forYou,
+      ...assembled.newest,
+      ...assembled.mostWatched,
+      ...assembled.trending,
+      ...assembled.seriesMostWatched,
+      ...assembled.seriesTrending,
+    ].map(sushiHomeItemKey);
+    expect(keys.length, keys.toSet().length);
+  });
+
+  test('for you drops watched movies even when they are the only fillers', () {
+    final watched = _item(99);
+    final assembled = sushiAssembleHomeCatalogRails(
+      seen: <String>{},
+      forYouBase: [watched, _item(1)],
+      slider: nItems(10, 8),
+      mostWatched: [watched, ...nItems(20, 10)],
+      trending: nItems(40, 8),
+      seriesMostWatched: const [],
+      seriesTrending: const [],
+      playedIds: {watched.id},
+      minRailSize: 8,
+    );
+    expect(assembled.forYou.map(sushiHomeItemKey), isNot(contains('99:1')));
+    expect(assembled.forYou.map(sushiHomeItemKey), contains('1:1'));
   });
 }

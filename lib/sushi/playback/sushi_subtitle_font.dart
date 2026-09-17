@@ -6,7 +6,6 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
-import 'package:fladder/wrappers/players/base_player.dart';
 
 /// Bundled Persian subtitle font (Vazirmatn v33.003, OFL).
 abstract final class SushiSubtitleFont {
@@ -74,24 +73,46 @@ abstract final class SushiSubtitleFont {
     );
   }
 
-  /// Sushi default subtitle appearance (white fill + thin black outline).
+  /// Bump when a new default should land on installs that never customized appearance.
+  static const settingsSchema = 2;
+
+  /// Default boxed caption: black fill, readable on busy video, user can turn down to 0.
+  static const defaultBackground = Color.fromRGBO(0, 0, 0, 0.55);
+
+  /// Sushi default subtitle appearance (white fill + thin black outline + boxed background).
   static const defaultSettings = SubtitleSettingsModel(
     color: Colors.white,
     outlineColor: Color.fromRGBO(0, 0, 0, 0.85),
     outlineSize: 1,
+    backGroundColor: defaultBackground,
   );
+
+  /// Old local JSON has no `schema` and a fully transparent box (the previous default).
+  /// Apply the new background once; a user who later sets opacity 0 is stamped schema 2 and kept.
+  static SubtitleSettingsModel migrateLoadedSettings(
+    SubtitleSettingsModel model, {
+    required int schema,
+  }) {
+    if (schema >= settingsSchema) return model;
+    if (model.backGroundColor.a > 0.01) return model;
+    return model.copyWith(backGroundColor: defaultBackground);
+  }
 
   /// libass `sub-ass-force-style` string from user subtitle settings.
   static String assForceStyle(
     SubtitleSettingsModel settings, {
     String? language,
   }) {
+    final boxed = settings.backGroundColor.a > 0.01;
     final parts = <String>[
       'PrimaryColour=${_assColor(settings.color)}',
-      'OutlineColour=${_assColor(settings.outlineColor)}',
+      'OutlineColour=${_assColor(boxed ? settings.backGroundColor : settings.outlineColor)}',
       'Outline=${settings.outlineSize.clamp(1, 25).round()}',
-      'BorderStyle=1',
+      'BorderStyle=${boxed ? 3 : 1}',
     ];
+    if (boxed) {
+      parts.add('BackColour=${_assColor(settings.backGroundColor)}');
+    }
     if (shouldUsePersianFont(language: language, text: '')) {
       parts.insert(0, 'FontName=$family');
     }

@@ -257,7 +257,14 @@ class SharedHelper {
 
   SubtitleSettingsModel get subtitleSettings {
     try {
-      return SubtitleSettingsModel.fromJson(sharedPreferences.getString(SharedKeys._subtitleSettingsKey) ?? "");
+      final raw = sharedPreferences.getString(SharedKeys._subtitleSettingsKey) ?? '';
+      if (raw.isEmpty) return SushiSubtitleFont.defaultSettings;
+      final map = json.decode(raw) as Map<String, dynamic>;
+      final schema = (map['schema'] as num?)?.toInt() ?? 1;
+      return SushiSubtitleFont.migrateLoadedSettings(
+        SubtitleSettingsModel.fromMap(map),
+        schema: schema,
+      );
     } catch (e) {
       log(e.toString());
       return SushiSubtitleFont.defaultSettings;

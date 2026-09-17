@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
@@ -230,6 +231,9 @@ Future<SushiSubtitleOpResult> sushiDownloadOnlinePack({
   }
 }
 
+bool sushiSubtitleOpShouldFallback(SushiSubtitleOpResult r) =>
+    !r.ok && r.errorCode != 'busy' && r.errorCode != 'stale';
+
 Future<SushiSubtitleOpResult> sushiRunAutoLoad(Object src, {MediaControlsWrapper? player}) async {
   if (_subtitleJobBusy) {
     _log('auto_busy');
@@ -253,6 +257,55 @@ Future<SushiSubtitleOpResult> sushiRunAutoLoad(Object src, {MediaControlsWrapper
   } finally {
     _subtitleJobBusy = false;
   }
+}
+
+/// Playback-start chain: Automatic (online) → AI (if Gemini key) → muxed Farsi soft.
+/// Hard-sub callers pass [allowAiFallback] false and [hasPersianSoft] false so only Automatic runs.
+Future<SushiSubtitleOpResult> sushiRunStartSubtitlePipeline(
+  Object src, {
+  MediaControlsWrapper? player,
+  required bool hasPersianSoft,
+  bool allowAiFallback = true,
+  PlaybackModel? model,
+}) async {
+  final auto = await sushiRunAutoLoad(src, player: player);
+  if (!sushiSubtitleOpShouldFallback(auto)) return auto;
+
+  if (allowAiFallback && await sushiHasGeminiApiKey()) {
+    final ai = await sushiRunTranslateToPersian(src, forceKeyRefresh: false, player: player);
+    _log('start_ai_fallback', {'ok': ai.ok, 'error': ai.errorCode});
+    if (!sushiSubtitleOpShouldFallback(ai)) return ai;
+  }
+
+  if (hasPersianSoft) {
+    final applied = await sushiApplyPersianSoftFallback(src, player: player, model: model);
+    if (applied) {
+      _log('start_soft_fallback');
+      return const SushiSubtitleOpResult(ok: true, label: 'Soft sub');
+    }
+  }
+  return auto;
+}
+
+Future<bool> sushiApplyPersianSoftFallback(
+  Object src, {
+  MediaControlsWrapper? player,
+  PlaybackModel? model,
+}) async {
+  final p = sushiPlayer(src, player: player);
+  final playback = model ?? sushiRead(src, playBackModel);
+  if (playback == null) return false;
+  final index = sushiPreferredPersianStreamIndex(playback.subStreams);
+  if (index == null) return false;
+  final track = playback.subStreams?.firstWhereOrNull((s) => s.index == index);
+  if (track == null || !sushiSubtitleTrackIsPlayable(track)) return false;
+  final newModel = await playback.setSubtitle(track, p);
+  if (newModel == null) return false;
+  sushiRead(src, playBackModel.notifier).update((_) => newModel);
+  try {
+    sushiRead(src, sushiActiveSubtitleProvider.notifier).state = null;
+  } catch (_) {}
+  return true;
 }
 
 Future<SushiSubtitleOpResult> sushiRunTranslateToPersian(

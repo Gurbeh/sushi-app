@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/media_playback_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
@@ -266,7 +267,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       final resolvedAudio = sushiResolvePlaybackAudioStream(model);
       await state.setAudioTrack(resolvedAudio, model);
-      final resolvedSubIndex = preserveSelection
+      var resolvedSubIndex = preserveSelection
           ? model.mediaStreams?.defaultSubStreamIndex
           : sushiResolveSubtitleStreamIndex(
               selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
@@ -274,7 +275,21 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
               subStreams: model.subStreams,
               mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
             );
-      final resolvedSub = model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
+      // Sushi start: Automatic (online) first — keep muxed Farsi Off until auto/AI miss.
+      if (SushiEnv.isEnabled && !preserveSelection) {
+        final sourceName = model.mediaStreams?.currentVersionStream?.name;
+        final startChoice = sushiStartSubtitleChoice(
+          hardSub: sushiMediaSourceLooksHardSub(sourceName),
+          hasPersianSoft: sushiHasPersianSoftSub(model.subStreams),
+          isEnglishAudio: sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language),
+        );
+        if (startChoice == SushiStartSubtitle.automaticOnline) {
+          resolvedSubIndex = -1;
+        }
+      }
+      final resolvedSub = resolvedSubIndex == -1
+          ? (model.subStreams?.firstWhereOrNull((s) => s.index == -1) ?? SubStreamModel.no())
+          : model.subStreams?.firstWhereOrNull((s) => s.index == resolvedSubIndex);
       // Route through PlaybackModel.setSubtitle (not state.setSubtitleTrack directly) so
       // mediaStreams.defaultSubStreamIndex reflects what auto-selection (e.g. preferred Persian
       // track) actually applied to the player — otherwise the subtitle picker UI keeps showing

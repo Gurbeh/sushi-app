@@ -91,6 +91,7 @@ class SubtitleSettingsModel {
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
+      'schema': SushiSubtitleFont.settingsSchema,
       'fontSize': fontSize,
       'fontWeight': fontWeight.value,
       'verticalOffset': verticalOffset,

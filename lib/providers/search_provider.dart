@@ -66,6 +66,18 @@ class SearchNotifier extends StateNotifier<SearchModel> {
     state = state.copyWith(searchQuery: searchQuery);
   }
 
+  /// Names for Fladder TV slide-in keyboard suggestions. Catalog + missing, cap [limit].
+  Future<List<String>> fetchSuggestionNames(String query, {int limit = 3}) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+    final res = await sushiFetchSearch(query: trimmed);
+    if (res == null) return [];
+    return [
+      ...res.rows.map(sushiRowToItemBaseModel),
+      ...res.missing.map(sushiRowToItemBaseModel),
+    ].map((e) => e.name).where((name) => name.isNotEmpty).take(limit).toList();
+  }
+
   void clear() {
     state = SearchModel();
   }

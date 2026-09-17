@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
+import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/sushi_list_pb.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
-const sushiHomeForYouLimit = 16;
+export 'package:fladder/sushi/sushi_home_unique.dart' show sushiHomeForYouLimit;
 
 class SushiForYouDashboardData {
   const SushiForYouDashboardData({this.items = const []});

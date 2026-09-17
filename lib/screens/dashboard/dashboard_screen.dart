@@ -18,6 +18,7 @@ import 'package:fladder/sushi/sushi_dashboard_watchlist.dart';
 import 'package:fladder/sushi/sushi_home_detail_prefetch.dart';
 import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/providers/sushi_foryou_dashboard.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_tv_ui_limits.dart';
 import 'package:fladder/providers/dashboard_mode_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
@@ -140,7 +141,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         homeCarouselItems.isNotEmpty;
     final showListSkeleton = !sushiHasRails && (!dashboardData.loaded || dashboardData.loading);
 
-    // R-RAIL-1: item once on home. Banner → continue → For you (padded) → other rails.
+    // R-RAIL-1: item once on home. Banner → continue (no min) → catalog rails (min floor).
     final homeSeen = <String>{};
     if (showBanner) {
       sushiTakeUnseenHomeItems(homeBannerPosters, homeSeen);
@@ -151,25 +152,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final forYouAsync = ref.watch(sushiForYouDashboardProvider);
     final forYouLoading = forYouAsync.isLoading && !forYouAsync.hasValue;
-    final forYouPosters = forYouLoading
-        ? const <ItemBaseModel>[]
-        : sushiFillHomeRail(
-            base: forYouAsync.valueOrNull?.items ?? const [],
-            fillers: [
-              ...sushiRails.mostWatched,
-              ...sushiRails.seriesMostWatched,
-              ...sushiRails.trending,
-              ...sushiRails.seriesTrending,
-            ],
-            seen: homeSeen,
-            limit: sushiHomeForYouLimit,
-          );
-
-    final newPosters = sushiTakeUnseenHomeItems(sushiRails.slider, homeSeen);
-    final mostWatchedPosters = sushiTakeUnseenHomeItems(sushiRails.mostWatched, homeSeen);
-    final trendingPosters = sushiTakeUnseenHomeItems(sushiRails.trending, homeSeen);
-    final seriesMostWatchedPosters = sushiTakeUnseenHomeItems(sushiRails.seriesMostWatched, homeSeen);
-    final seriesTrendingPosters = sushiTakeUnseenHomeItems(sushiRails.seriesTrending, homeSeen);
+    final playedIds = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.playedIds));
+    final catalogRails = sushiAssembleHomeCatalogRails(
+      seen: homeSeen,
+      forYouBase: forYouLoading ? const [] : forYouAsync.valueOrNull?.items ?? const [],
+      slider: sushiRails.slider,
+      mostWatched: sushiRails.mostWatched,
+      trending: sushiRails.trending,
+      seriesMostWatched: sushiRails.seriesMostWatched,
+      seriesTrending: sushiRails.seriesTrending,
+      playedIds: playedIds,
+      fillForYou: !forYouLoading,
+    );
+    final forYouPosters = catalogRails.forYou;
+    final newPosters = catalogRails.newest;
+    final mostWatchedPosters = catalogRails.mostWatched;
+    final trendingPosters = catalogRails.trending;
+    final seriesMostWatchedPosters = catalogRails.seriesMostWatched;
+    final seriesTrendingPosters = catalogRails.seriesTrending;
 
     return NestedScaffold(
       background: ValueListenableBuilder<ItemBaseModel?>(

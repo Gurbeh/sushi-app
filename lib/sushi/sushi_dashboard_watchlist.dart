@@ -43,7 +43,7 @@ Iterable<Widget> sushiDashboardRecentlyAddedRows({
     if (excludes.contains(id)) continue;
 
     if (id == SushiHomeDashboardOrder.forYouId) {
-      // Dashboard places For you under continue watching and pads from most watched / trending.
+      // Dashboard places For you under continue watching; assembly fills it without emptying other rails.
       continue;
     }
     if (id == SushiHomeDashboardOrder.watchLaterId) {

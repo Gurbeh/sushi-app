@@ -854,10 +854,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     sushiBeginPlaybackSubtitleSession(ref, sessionKey);
   }
 
-  /// Playable Farsi already on → keep it. Hardsub → Off, unless the audio is English (an
-  /// English hardsub print has no Persian burned in, so Automatic still runs). Else Automatic
-  /// (online). Catalog-only `sub_langs=fa` stubs are not playable; those still auto-load.
-  /// AI translate never starts on its own.
+  /// Non-hard-sub: Automatic (online) → AI if Gemini key set → muxed Farsi soft last.
+  /// Hardsub → Off, unless the audio is English (no Persian burned in, so Automatic still runs —
+  /// no AI / soft stack on burn-in). Catalog-only `sub_langs=fa` stubs are not playable.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
     final hardSub = sushiMediaSourceLooksHardSub(sourceName);
@@ -869,11 +868,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       subStreams: model.subStreams,
       mediaSourceName: sourceName,
     );
-    final subtitleOff = resolved == null || resolved == -1;
     final choice = sushiStartSubtitleChoice(
       hardSub: hardSub,
       hasPersianSoft: hasPersianSoft,
-      subtitleOff: subtitleOff,
       isEnglishAudio: isEnglishAudio,
     );
     log(
@@ -882,8 +879,14 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       name: 'sushi.subs',
     );
     if (choice != SushiStartSubtitle.automaticOnline) return;
-    final r = await sushiRunAutoLoad(ref, player: this);
-    log('sushi_sub_auto_result ok=${r.ok} error=${r.errorCode}', name: 'sushi.subs');
+    final r = await sushiRunStartSubtitlePipeline(
+      ref,
+      player: this,
+      hasPersianSoft: hardSub ? false : hasPersianSoft,
+      allowAiFallback: !hardSub,
+      model: model,
+    );
+    log('sushi_sub_auto_result ok=${r.ok} error=${r.errorCode} label=${r.label}', name: 'sushi.subs');
   }
 
   @override
