@@ -7,13 +7,14 @@ VersionStreamModel _stream({
   required String name,
   int height = 1080,
   bool hasSubs = false,
+  List<SubStreamModel> subStreams = const [],
 }) {
   return VersionStreamModel(
     name: name,
     index: index,
     id: 'ms_$index',
     defaultAudioStreamIndex: 1,
-    defaultSubStreamIndex: hasSubs ? 2 : -1,
+    defaultSubStreamIndex: hasSubs || subStreams.isNotEmpty ? 2 : -1,
     videoStreams: [
       VideoStreamModel(
         name: '',
@@ -30,7 +31,7 @@ VersionStreamModel _stream({
       ),
     ],
     audioStreams: const [],
-    subStreams: const [],
+    subStreams: subStreams,
   );
 }
 
@@ -111,6 +112,47 @@ void main() {
       final meta = sushiClassifyVersionStream(_stream(index: 0, name: '1080p Dub Persian'));
       expect(meta.delivery, SushiStreamDelivery.dubbed);
       expect(meta.qualityHeight, 1080);
+    });
+
+    test('detects duble scene token as dubbed', () {
+      final meta = sushiClassifyVersionStream(_stream(
+        index: 0,
+        name: 'Spider.Man.Brand.New.Day.2026.720p.Hdrip.Duble.MyMoviz.mp4',
+        height: 720,
+      ));
+      expect(meta.delivery, SushiStreamDelivery.dubbed);
+      expect(meta.qualityHeight, 720);
+    });
+
+    test('چسبیده without a muxed track is not hardsub on the picker', () {
+      final meta = sushiClassifyVersionStream(_stream(
+        index: 0,
+        name: '720p HDTS زیرنویس_فارسی_چسبیده',
+        height: 720,
+      ));
+      expect(meta.delivery, isNot(SushiStreamDelivery.hardSub));
+    });
+
+    test('catalog sub_langs make چسبیده a soft sub', () {
+      final meta = sushiClassifyVersionStream(_stream(
+        index: 0,
+        name: '720p HDTS',
+        height: 720,
+        subStreams: [
+          SubStreamModel(
+            name: 'FA',
+            id: 'sub0',
+            title: 'FA',
+            displayTitle: 'FA',
+            language: 'fa',
+            codec: '',
+            isDefault: true,
+            isExternal: false,
+            index: 0,
+          ),
+        ],
+      ));
+      expect(meta.delivery, SushiStreamDelivery.softSub);
     });
 
     test('extracts resolution from an underscore-delimited raw filename', () {

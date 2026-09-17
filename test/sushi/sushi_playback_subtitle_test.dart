@@ -25,7 +25,6 @@ void main() {
   test('hardsub media source defaults subtitle Off', () {
     final streams = [
       SubStreamModel.no(),
-      _sub(index: 2, language: 'fa', displayTitle: 'Persian'),
     ];
     expect(
       sushiResolveSubtitleStreamIndex(
@@ -35,6 +34,30 @@ void main() {
         mediaSourceName: '1080p - hard sub (Persian)',
       ),
       -1,
+    );
+  });
+
+  test('چسبیده without muxed srt is treated as hardsub at playback', () {
+    expect(
+      sushiMediaSourceLooksHardSub('720p HDTS زیرنویس_فارسی_چسبیده', subStreams: [SubStreamModel.no()]),
+      isTrue,
+    );
+  });
+
+  test('چسبیده with a muxed srt is not hardsub', () {
+    final streams = [
+      SubStreamModel.no(),
+      _sub(index: 2, language: 'fa', displayTitle: 'Persian'),
+    ];
+    expect(sushiMediaSourceLooksHardSub('زیرنویس_فارسی_چسبیده', subStreams: streams), isFalse);
+    expect(
+      sushiResolveSubtitleStreamIndex(
+        selectedIndex: null,
+        serverDefaultIndex: 2,
+        subStreams: streams,
+        mediaSourceName: '720p HDTS زیرنویس_فارسی_چسبیده',
+      ),
+      2,
     );
   });
 

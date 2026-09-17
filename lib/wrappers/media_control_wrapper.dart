@@ -859,7 +859,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// no AI / soft stack on burn-in). Catalog-only `sub_langs=fa` stubs are not playable.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
-    final hardSub = sushiMediaSourceLooksHardSub(sourceName);
+    final hardSub = sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams);
     final hasPersianSoft = sushiHasPersianSoftSub(model.subStreams);
     final isEnglishAudio = sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language);
     final resolved = sushiResolveSubtitleStreamIndex(

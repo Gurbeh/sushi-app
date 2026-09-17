@@ -279,7 +279,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
       if (SushiEnv.isEnabled && !preserveSelection) {
         final sourceName = model.mediaStreams?.currentVersionStream?.name;
         final startChoice = sushiStartSubtitleChoice(
-          hardSub: sushiMediaSourceLooksHardSub(sourceName),
+          hardSub: sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams),
           hasPersianSoft: sushiHasPersianSoftSub(model.subStreams),
           isEnglishAudio: sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language),
         );

@@ -4,13 +4,28 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 
 /// True when MediaSource / version label indicates burned-in (hard) subtitles.
-bool sushiMediaSourceLooksHardSub(String? mediaSourceName) {
+///
+/// `زیرنویس چسبیده` is only a claim. The container decides: a playable srt/ass track means
+/// softsub; no playable track plus that claim means hardsub.
+bool sushiMediaSourceLooksHardSub(String? mediaSourceName, {List<SubStreamModel>? subStreams}) {
+  if (sushiHasPlayableSub(subStreams)) {
+    return false;
+  }
   final blob = (mediaSourceName ?? '').toLowerCase().trim();
   if (blob.isEmpty) return false;
-  return RegExp(r'hard[\s_-]*sub').hasMatch(blob) ||
+  final explicit = RegExp(r'hard[\s_-]*sub').hasMatch(blob) ||
       blob.contains('hardsub') ||
       blob.contains('burned') ||
-      blob.contains('زیرنویس چسبیده');
+      blob.contains('هاردساب') ||
+      blob.contains('هارد ساب');
+  if (explicit) return true;
+  final claimed = blob.contains('چسبیده') || blob.contains('زیرنویس') || blob.contains('سافت');
+  return claimed && !sushiHasPlayableSub(subStreams);
+}
+
+bool sushiHasPlayableSub(List<SubStreamModel>? subStreams) {
+  if (subStreams == null || subStreams.isEmpty) return false;
+  return subStreams.any(sushiSubtitleTrackIsPlayable);
 }
 
 /// Resolves subtitle index when Fladder remembered Off / null but the server
@@ -45,7 +60,7 @@ int? sushiResolveSubtitleStreamIndex({
     return selectedIndex;
   }
 
-  if (sushiMediaSourceLooksHardSub(mediaSourceName)) {
+  if (sushiMediaSourceLooksHardSub(mediaSourceName, subStreams: subStreams)) {
     return -1;
   }
 

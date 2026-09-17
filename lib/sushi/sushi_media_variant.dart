@@ -69,13 +69,24 @@ SushiVersionStreamMeta sushiClassifyVersionStream(VersionStreamModel stream) {
 }
 
 SushiStreamDelivery _deliveryFromLabel(String blob, VersionStreamModel stream) {
-  if (RegExp(r'soft[\s_-]*sub').hasMatch(blob) || blob.contains('softsub')) {
+  // Catalog sub_langs become stub subStreams — that is the file-inspection signal.
+  final hasCatalogSubs = stream.subStreams.any((s) => s.index != -1);
+  if (hasCatalogSubs) {
     return SushiStreamDelivery.softSub;
   }
-  if (RegExp(r'hard[\s_-]*sub').hasMatch(blob) || blob.contains('hardsub')) {
+  if (RegExp(r'soft[\s_-]*sub').hasMatch(blob) || blob.contains('softsub') || blob.contains('سافت')) {
+    return SushiStreamDelivery.softSub;
+  }
+  if (RegExp(r'hard[\s_-]*sub').hasMatch(blob) ||
+      blob.contains('hardsub') ||
+      blob.contains('هاردساب') ||
+      blob.contains('هارد ساب') ||
+      blob.contains('burned')) {
     return SushiStreamDelivery.hardSub;
   }
-  if (RegExp(r'\bdub(?:bed)?\b').hasMatch(blob) || blob.contains('دوبله') || blob.contains('🎙')) {
+  if (RegExp(r'(?:^|[^a-z0-9])(?:dub(?:bed)?|duble)(?:$|[^a-z0-9])').hasMatch(blob) ||
+      blob.contains('دوبله') ||
+      blob.contains('🎙')) {
     return SushiStreamDelivery.dubbed;
   }
   if (RegExp(r'soft\s+sub').hasMatch(blob)) {
@@ -83,9 +94,6 @@ SushiStreamDelivery _deliveryFromLabel(String blob, VersionStreamModel stream) {
   }
   if (RegExp(r'hard\s+sub').hasMatch(blob)) {
     return SushiStreamDelivery.hardSub;
-  }
-  if (stream.subStreams.isNotEmpty) {
-    return SushiStreamDelivery.softSub;
   }
   if (blob.contains('original')) {
     return SushiStreamDelivery.original;
