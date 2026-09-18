@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fladder/sushi/sushi_bot_login_code.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_http.dart';
+import 'package:fladder/sushi/sushi_login_channel.dart';
 import 'package:fladder/sushi/sushi_login_seal.dart';
 
 void main() {
@@ -37,6 +38,32 @@ void main() {
       blob,
       's2.IiIiIiIiIiIiIiIic7rSDpwEKm0TXggheiOCuucA8xMDFo17Clw5k9I9tFnFkZmcrV5ZWVDpSEfDTmWonEu1xgKR3y1YqKCDd9k',
     );
+  });
+
+  test('search tag is deterministic and hex', () async {
+    final nonce = Uint8List.fromList(List<int>.filled(16, 0x11));
+    final tagA = await sushiLoginSearchTag(nonce);
+    expect(tagA, hasLength(10));
+    expect(RegExp(r'^[0-9a-f]{10}$').hasMatch(tagA), isTrue);
+    expect(await sushiLoginSearchTag(nonce), tagA, reason: 'must be deterministic');
+
+    final other = Uint8List.fromList(List<int>.filled(16, 0x22));
+    expect(await sushiLoginSearchTag(other), isNot(tagA));
+  });
+
+  test('search tag golden matches Go botlogin.SearchTag', () async {
+    final nonce = Uint8List.fromList(List<int>.filled(16, 0x11));
+    // Keep in sync with TestSearchTagMatchesDart in botlogin_test.go.
+    expect(await sushiLoginSearchTag(nonce), '0eb1feafa2');
+  });
+
+  test('search uri is the login channel path with a #tag query, hashtag-encoded', () {
+    final uri = sushiLoginChannelSearchUri('0eb1feafa2');
+    expect(uri.host, 't.me');
+    expect(uri.path, '/s/${SushiConfig.loginChannelUsername}');
+    expect(uri.query, 'q=%230eb1feafa2');
+    expect(sushiHttpUriAllowed(uri), isTrue,
+        reason: 'query string must not fall off the path allowlist');
   });
 
   test('extract blobs from t.me/s html', () async {

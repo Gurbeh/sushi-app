@@ -14,9 +14,18 @@ class FladderSnack {
   FladderSnack._internal();
 
   static BuildContext? _storedContext;
+  static GlobalKey<NavigatorState>? _navigatorKey;
 
   static void setContext(BuildContext context) {
     _storedContext = context;
+  }
+
+  /// Root Navigator's key (see main.dart's `_FladderApp`) — fallback for when [_storedContext]
+  /// has no Overlay ancestor (it's a Navigator's own context, which sits above the Overlay that
+  /// Navigator manages rather than below it, so looking upward from it can't find it). Call once
+  /// from the app root; [NavigatorState.overlay] always resolves as long as the app is running.
+  static void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
   }
 
   final Queue<_NotificationEntry> _notifications = Queue();
@@ -57,7 +66,7 @@ class FladderSnack {
     // show() — e.g. a "your bot isn't connected, run /connectbot" playback error never reached
     // the user and the screen was left stuck loading, with nothing in the logs pointing at this
     // being the cause until traced through here.
-    final overlay = Overlay.maybeOf(effectiveContext);
+    final overlay = Overlay.maybeOf(effectiveContext) ?? _navigatorKey?.currentState?.overlay;
     if (overlay == null) {
       debugPrint('FladderNotificationManager: no Overlay ancestor for the current context — dropping "$message"');
       return;

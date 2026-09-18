@@ -21,6 +21,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/settings/subtitle_settings_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_playback_repair.dart';
 import 'package:fladder/sushi/sushi_playback_telemetry.dart';
 import 'package:fladder/sushi/sushi_playback_audio.dart';
 import 'package:fladder/sushi/sushi_stream_mpv.dart';
@@ -30,6 +31,7 @@ import 'package:fladder/sushi/sushi_audio_log.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
+import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
 import 'package:fladder/screens/video_player/video_player.dart' as video_screen;
 import 'package:fladder/util/subtitle_position_calculator.dart';
@@ -73,6 +75,12 @@ class LibMPV extends BasePlayer {
   int _mpvLogCountInWindow = 0;
   int _mpvLogDroppedInWindow = 0;
   static const _mpvLogMaxPerSecond = 20;
+  // dxva2-egl (Windows hwdec render backend) can fail to create its EGL surface on some
+  // GPU/driver combinations — mpv logs the error but keeps "playing" with no visible frame and
+  // no exception Dart ever sees. One-shot per instance: the recovery below rebuilds the whole
+  // player with hardwareAccel forced off, so a second failure on the fresh instance would mean
+  // this isn't the cause and retrying again would just loop.
+  bool _hwAccelEglFallbackTriggered = false;
   // Keyed by DeliveryUrl (path only). Server-side extraction is a fresh ffmpeg pass every
   // request (Cache-Control: no-store, no server cache) taking 30-90s, so toggling a subtitle
   // track off/on repeatedly without this looks broken/unresponsive rather than merely slow.
@@ -229,6 +237,40 @@ class LibMPV extends BasePlayer {
       'prefix': log.prefix,
       'text': log.text,
     });
+
+    if (!_hwAccelEglFallbackTriggered &&
+        SushiEnv.isEnabled &&
+        _settings.hardwareAccel &&
+        log.prefix.contains('dxva2-egl') &&
+        log.text.contains('Failed to create EGL surface')) {
+      _hwAccelEglFallbackTriggered = true;
+      unawaited(_recoverFromEglSurfaceFailure());
+    }
+  }
+
+  /// One-shot recovery for the dxva2-egl "Failed to create EGL surface" failure (Windows
+  /// hardware-accelerated render path): mpv logs the error and carries on with no frame ever
+  /// reaching the texture, so the user sees a black/frozen player with no error dialog. Forces
+  /// hardwareAccel off (persisted, so future sessions don't hit it again) and rebuilds the whole
+  /// player via the same force-repair reload used for TV-standby recovery, resuming at the
+  /// current position.
+  Future<void> _recoverFromEglSurfaceFailure() async {
+    final ref = SushiStreamRepairBridge.ref;
+    final model = SushiStreamRepairBridge.model;
+    if (ref == null || model == null) return;
+
+    final resumeAt = _player?.state.position ?? Duration.zero;
+    SushiStreamLog.event('hwdec_egl_surface_fallback', fields: {
+      'position': SushiStreamLog.formatDuration(resumeAt),
+    });
+    unawaited(SushiPlaybackTelemetry.reportFailure(
+      stage: 'player_render',
+      reason: 'dxva2_egl_surface_failed',
+      itemId: model.item.id,
+    ));
+
+    ref.read(videoPlayerSettingsProvider.notifier).setHardwareAccel(false);
+    await ref.read(videoPlayerProvider.notifier).loadPlaybackItem(model, resumeAt, preserveSelection: true);
   }
 
   void _cancelPlayerStreams() {

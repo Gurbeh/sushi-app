@@ -14,6 +14,11 @@ const kSushiLoginNonceSize = 16;
 const kSushiGcmNonceSize = 12;
 const kSushiGcmTagSize = 16;
 
+/// Domain-separated from [kSushiLoginInfo] (ADR 0029): the search tag hash must not help derive
+/// the AES key hash, so publishing the tag on the channel is safe.
+const kSushiSearchTagInfo = 'sushi-bot-login-searchtag-v1';
+const kSushiSearchTagSize = 10; // hex chars (5 bytes) — must match Go botlogin.SearchTagSize
+
 Uint8List sushiNewLoginNonce() {
   final r = Random.secure();
   return Uint8List.fromList(List<int>.generate(kSushiLoginNonceSize, (_) => r.nextInt(256)));
@@ -85,6 +90,19 @@ Future<String?> sushiOpenLoginBlob(String blob, List<int> nonce) async {
   } catch (_) {
     return null;
   }
+}
+
+/// Derives the public `#<tag>` hashtag (ADR 0029) the app searches for with
+/// `t.me/s/<channel>?q=%23<tag>`, instead of relying on the blob still being in the visible
+/// ~20-message tail. Same nonce as [sushiSealLoginToken]/`botlogin.Seal`, different context string,
+/// so the tag never helps derive the decryption key.
+Future<String> sushiLoginSearchTag(List<int> nonce) async {
+  if (nonce.length != kSushiLoginNonceSize) {
+    throw ArgumentError('login nonce must be $kSushiLoginNonceSize bytes');
+  }
+  final hash = await Sha256().hash([...utf8.encode(kSushiSearchTagInfo), ...nonce]);
+  final bytes = hash.bytes.sublist(0, kSushiSearchTagSize ~/ 2);
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
 /// Finds `s2.` payloads in a t.me/s HTML page.

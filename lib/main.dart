@@ -24,6 +24,7 @@ import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/routes/auto_router.dart';
+import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/theme.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/application_info.dart';
@@ -98,6 +99,7 @@ class _FladderApp extends ConsumerWidget {
         currentRouteName: () => autoRouter.topRoute.name,
       );
     }
+    FladderSnack.setNavigatorKey(autoRouter.navigatorKey);
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
     final themeMode = ref.watch(clientSettingsProvider.select((value) => value.themeMode));
     final themeColor = ref.watch(clientSettingsProvider.select((value) => value.themeColor));
