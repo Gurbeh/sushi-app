@@ -28,6 +28,7 @@ final class SushiTelegramNative {
             lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ox_submit_password'),
         requestQr = lib.lookupFunction<Int32 Function(), int Function()>('ox_request_qr'),
         logout = lib.lookupFunction<Int32 Function(), int Function()>('ox_logout'),
+        isBotMode = lib.lookupFunction<Int32 Function(), int Function()>('ox_is_bot_mode'),
         startPlayback = lib.lookupFunction<Pointer<Utf8> Function(Int64, Int64, Pointer<Utf8>),
             Pointer<Utf8> Function(int, int, Pointer<Utf8>)>('ox_start_playback'),
         stopPlayback =
@@ -81,6 +82,11 @@ final class SushiTelegramNative {
   final int Function(Pointer<Utf8>) submitPassword;
   final int Function() requestQr;
   final int Function() logout;
+
+  /// Ground truth for whether the current session logged in as a bot — accurate even for a
+  /// session restored from disk without a fresh submitBotToken this run. See ox_is_bot_mode's
+  /// doc comment in cshared/main.go.
+  final int Function() isBotMode;
   /// (providerBotId, messageId, locator) — both ids are 0 on a cold play, where the locator alone
   /// identifies the delivery still in flight.
   final Pointer<Utf8> Function(int, int, Pointer<Utf8>) startPlayback;

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +16,11 @@ import (
 )
 
 func (c *Client) dispatchTextSend(ctx context.Context, peer *tg.InputPeerUser, username, text string) error {
+	if c.Auth != nil {
+		log.Printf("oxtelegram: DEBUG dispatchTextSend @%s isBotMode=%v botTokenLen=%d", username, c.Auth.IsBotMode(), len(c.Auth.BotToken()))
+	} else {
+		log.Printf("oxtelegram: DEBUG dispatchTextSend @%s c.Auth=nil", username)
+	}
 	if c.Auth != nil && c.Auth.IsBotMode() && c.Auth.BotToken() != "" {
 		return c.sendViaBotAPI(ctx, username, text)
 	}

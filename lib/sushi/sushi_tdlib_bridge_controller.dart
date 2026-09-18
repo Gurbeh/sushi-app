@@ -703,7 +703,9 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// reconfigure, so the app got permanently stuck reporting "bot isn't connected" despite a
   /// perfectly valid cached token, on every single playback attempt, with no retry path at all.
   Future<void> ensureBotSessionFromCacheIfNeeded() async {
-    if (_state.kind == SushiTdlibAuthStateKind.ready && !await isNativeSessionActuallyBot()) {
+    final isActuallyBot = await isNativeSessionActuallyBot();
+    _log('ensureBotSessionFromCacheIfNeeded: DEBUG state=${_state.kind.name} isActuallyBot=$isActuallyBot');
+    if (_state.kind == SushiTdlibAuthStateKind.ready && !isActuallyBot) {
       return;
     }
     if (_state.kind != SushiTdlibAuthStateKind.ready &&
@@ -713,6 +715,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     }
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_kSushiBotTokenPrefsKey);
+    _log('ensureBotSessionFromCacheIfNeeded: DEBUG cachedLen=${cached?.length ?? -1}');
     if (cached == null || cached.isEmpty) return;
     _log('ensureBotSessionFromCacheIfNeeded: re-applying cached bot token');
     try {

@@ -112,11 +112,13 @@ class SushiTelegramWindowsBridge {
     }
   }
 
-  /// Always false on Windows: the cshared FFI boundary doesn't expose gotd's AuthController.IsBotMode
-  /// (unlike the Android gomobile/Pigeon path — see mobile.Client.IsBotMode's doc). Desktop's
-  /// reader-sync mismatch detection still falls back to the caller-tracked bot-token flag, same as
-  /// before this fix; only Android had the confirmed silent-hang bug from a warm-restored bot session.
-  bool isNativeSessionBot() => false;
+  /// Ground truth from gotd's AuthController.IsBotMode via ox_is_bot_mode, accurate even for a
+  /// session restored from disk without a fresh submitBotToken this run — matching the Android
+  /// gomobile/Pigeon path. Previously hardcoded to false here because this export didn't exist,
+  /// which made ensureBotSessionFromCacheIfNeeded think a warm-restored bot session was a user
+  /// session and skip re-hydrating the in-memory bot token, leaving every bot-to-bot send
+  /// (playback resolve) fail with USER_IS_BOT.
+  bool isNativeSessionBot() => _native.isBotMode() != 0;
 
   SushiTdlibAuthState currentAuthState() {
     final kind = _native.readCString(_native.currentAuthKind());

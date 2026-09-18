@@ -239,6 +239,25 @@ func ox_request_qr() C.int {
 	})
 }
 
+// ox_is_bot_mode reports whether the current session logged in as a bot — ground truth from
+// AuthController.IsBotMode, accurate even for a session restored from disk without a fresh
+// SubmitBotToken this run (checkInitialStatus sets this on restore). The Windows Dart bridge
+// previously hardcoded isNativeSessionBot() to false because this export didn't exist, which
+// skipped ensureBotSessionFromCacheIfNeeded's cached-token re-hydration on every warm start and
+// left AuthController.botToken empty — dispatchTextSend then had no token for the Bot API
+// fallback and every bot-to-bot send failed with USER_IS_BOT.
+//
+//export ox_is_bot_mode
+func ox_is_bot_mode() C.int {
+	mu.Lock()
+	c := client
+	mu.Unlock()
+	if c == nil || c.Auth == nil || !c.Auth.IsBotMode() {
+		return 0
+	}
+	return 1
+}
+
 func closePlaybackLocked() {
 	if playbackFileID != 0 && bridge != nil {
 		bridge.Unregister(playbackFileID)

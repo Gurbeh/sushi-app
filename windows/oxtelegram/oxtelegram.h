@@ -145,6 +145,16 @@ extern __declspec(dllexport) int ox_submit_bot_token(char* token);
 extern __declspec(dllexport) int ox_submit_code(char* code);
 extern __declspec(dllexport) int ox_submit_password(char* password);
 extern __declspec(dllexport) int ox_request_qr(void);
+
+// ox_is_bot_mode reports whether the current session logged in as a bot — ground truth from
+// AuthController.IsBotMode, accurate even for a session restored from disk without a fresh
+// SubmitBotToken this run (checkInitialStatus sets this on restore). The Windows Dart bridge
+// previously hardcoded isNativeSessionBot() to false because this export didn't exist, which
+// skipped ensureBotSessionFromCacheIfNeeded's cached-token re-hydration on every warm start and
+// left AuthController.botToken empty — dispatchTextSend then had no token for the Bot API
+// fallback and every bot-to-bot send failed with USER_IS_BOT.
+//
+extern __declspec(dllexport) int ox_is_bot_mode(void);
 extern __declspec(dllexport) int ox_logout(void);
 
 // providerBotID/messageID come from the PlaybackInfo Path (oxplayer-tg://{botId}/{msgId}); both are
@@ -203,6 +213,7 @@ extern __declspec(dllexport) char* ox_fetch_webapp_init_data(char* bot, char* sh
 // timeoutMs <= 0 defaults to 30000. Caller must ox_free the returned string.
 //
 extern __declspec(dllexport) char* ox_send_text_and_wait_reply(char* username, char* text, int timeoutMs);
+extern __declspec(dllexport) int ox_ensure_main_bot_onboarded(char* username, int timeoutMs);
 
 // ox_stream_open_fn matches mpv_stream_cb_open_ro_fn's signature exactly
 // (int (*)(void *user_data, char *uri, mpv_stream_cb_info *info)). Pass the address of this
