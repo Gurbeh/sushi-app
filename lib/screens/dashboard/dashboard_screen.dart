@@ -84,12 +84,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.dispose();
   }
 
-  /// Sushi's catalog rails (New/Most watched/Trending/…) aren't backed by a real Jellyfin
-  /// folder, so "show more" opens the closest synthetic library view (Movies or Series,
-  /// picked by whichever kind dominates the row) instead of a rail-specific listing.
+  /// Sushi's catalog rails (New/For You) aren't backed by a real Jellyfin folder, so "show more"
+  /// opens the closest synthetic library view (Movies or Series, picked by whichever kind
+  /// dominates the row) instead of a rail-specific listing.
   LibrarySearchRoute _catalogRailRoute(List<ItemBaseModel> posters) {
     return LibrarySearchRoute(
       viewModelId: posters.getMostCommonType == FladderItemType.series ? sushiViewSeries : sushiViewMovies,
+      recursive: true,
+    );
+  }
+
+  /// Trending / Most watched rails now have a real backend ordering (LIST_SORT_TRENDING /
+  /// LIST_SORT_MOST_WATCHED): rails-materialised items first in rail rank order, newest-first
+  /// after that (docs/12 §2, the `rails` table is a capped top-N, not a full ranking).
+  LibrarySearchRoute _rankedRailRoute(String viewModelId, SortingOptions sort) {
+    return LibrarySearchRoute(
+      viewModelId: viewModelId,
+      sortingOptions: sort,
+      sortOrder: SortingOrder.descending,
       recursive: true,
     );
   }
@@ -327,7 +339,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Most watched',
                       sushiContinueToggle: true,
                       posters: mostWatchedPosters,
-                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewMovies, recursive: true)),
+                      onLabelClick: () =>
+                          context.router.push(_rankedRailRoute(sushiViewMovies, SortingOptions.mostWatched)),
                     ),
                   if (trendingPosters.isNotEmpty)
                     PosterRow(
@@ -336,7 +349,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Trending',
                       sushiContinueToggle: true,
                       posters: trendingPosters,
-                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewMovies, recursive: true)),
+                      onLabelClick: () =>
+                          context.router.push(_rankedRailRoute(sushiViewMovies, SortingOptions.trending)),
                     ),
                   if (seriesMostWatchedPosters.isNotEmpty)
                     PosterRow(
@@ -345,7 +359,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Series · Most watched',
                       sushiContinueToggle: true,
                       posters: seriesMostWatchedPosters,
-                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewSeries, recursive: true)),
+                      onLabelClick: () =>
+                          context.router.push(_rankedRailRoute(sushiViewSeries, SortingOptions.mostWatched)),
                     ),
                   if (seriesTrendingPosters.isNotEmpty)
                     PosterRow(
@@ -354,7 +369,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Series · Trending',
                       sushiContinueToggle: true,
                       posters: seriesTrendingPosters,
-                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewSeries, recursive: true)),
+                      onLabelClick: () =>
+                          context.router.push(_rankedRailRoute(sushiViewSeries, SortingOptions.trending)),
                     ),
                   ...sushiDashboardRecentlyAddedRows(
                     context: context,

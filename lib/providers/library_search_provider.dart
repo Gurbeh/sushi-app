@@ -427,6 +427,8 @@ class LibrarySearchNotifier extends StateNotifier<LibrarySearchModel> {
       SortingOptions.communityRating => SushiListSort.rating,
       SortingOptions.releaseDate => SushiListSort.year,
       SortingOptions.dateAdded || SortingOptions.dateLastContentAdded => SushiListSort.added,
+      SortingOptions.trending => SushiListSort.trending,
+      SortingOptions.mostWatched => SushiListSort.mostWatched,
       _ => SushiListSort.name,
     };
     final genre = state.filters.genres.included.firstOrNull ?? '';

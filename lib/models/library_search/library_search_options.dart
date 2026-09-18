@@ -17,7 +17,11 @@ enum SortingOptions {
   playCount([ItemSortBy.playcount]),
   releaseDate([ItemSortBy.productionyear, ItemSortBy.premieredate]),
   runTime([ItemSortBy.runtime]),
-  random([ItemSortBy.random]);
+  random([ItemSortBy.random]),
+  // Sushi-only (docs/12 §2): server-ranked rails-first ordering. No Jellyfin equivalent — these
+  // values are only ever consumed by sushiFetchList, never by a real Jellyfin sortBy call.
+  trending([ItemSortBy.random]),
+  mostWatched([ItemSortBy.playcount]);
 
   const SortingOptions(this.value);
   final List<ItemSortBy> value;
@@ -37,6 +41,8 @@ enum SortingOptions {
         releaseDate => context.localized.releaseDate,
         runTime => context.localized.runTime,
         random => context.localized.random,
+        trending => 'Trending',
+        mostWatched => 'Most watched',
       };
 }
 

@@ -19,7 +19,7 @@ enum SushiListScope {
   boxset,
 }
 
-enum SushiListSort { unspecified, name, year, rating, added }
+enum SushiListSort { unspecified, name, year, rating, added, trending, mostWatched }
 
 int _scopeWire(SushiListScope s) => switch (s) {
       SushiListScope.movies => 1,
@@ -52,6 +52,8 @@ int _sortWire(SushiListSort s) => switch (s) {
       SushiListSort.year => 2,
       SushiListSort.rating => 3,
       SushiListSort.added => 4,
+      SushiListSort.trending => 5,
+      SushiListSort.mostWatched => 6,
       _ => 0,
     };
 
