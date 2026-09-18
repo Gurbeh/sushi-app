@@ -384,9 +384,7 @@ class _HorizontalListState extends ConsumerState<HorizontalList> with TickerProv
                         child: widget.itemBuilder(context, index),
                       ),
                 separatorBuilder: (context, index) => SizedBox(width: contentPadding),
-                itemCount: widget.onLabelClick != null && AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad
-                    ? widget.items.length + 1
-                    : widget.items.length,
+                itemCount: widget.onLabelClick != null ? widget.items.length + 1 : widget.items.length,
               ),
             ),
           ),

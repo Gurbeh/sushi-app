@@ -34,8 +34,10 @@ import 'package:fladder/screens/shared/nested_scaffold.dart';
 import 'package:fladder/screens/shared/nested_sliver_appbar.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
+import 'package:fladder/sushi/sushi_views.dart';
 import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/focus_provider.dart';
+import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/list_padding.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/sliver_list_padding.dart';
@@ -80,6 +82,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// Sushi's catalog rails (New/Most watched/Trending/…) aren't backed by a real Jellyfin
+  /// folder, so "show more" opens the closest synthetic library view (Movies or Series,
+  /// picked by whichever kind dominates the row) instead of a rail-specific listing.
+  LibrarySearchRoute _catalogRailRoute(List<ItemBaseModel> posters) {
+    return LibrarySearchRoute(
+      viewModelId: posters.getMostCommonType == FladderItemType.series ? sushiViewSeries : sushiViewMovies,
+      recursive: true,
+    );
   }
 
   Future<void> _refreshHome() async {
@@ -297,6 +309,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: context.localized.sushiForYou,
                       sushiContinueToggle: true,
                       posters: forYouPosters,
+                      onLabelClick: () => context.router.push(_catalogRailRoute(forYouPosters)),
                     ),
                   if (newPosters.isNotEmpty)
                     PosterRow(
@@ -305,6 +318,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'New',
                       sushiContinueToggle: true,
                       posters: newPosters,
+                      onLabelClick: () => context.router.push(_catalogRailRoute(newPosters)),
                     ),
                   if (mostWatchedPosters.isNotEmpty)
                     PosterRow(
@@ -313,6 +327,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Most watched',
                       sushiContinueToggle: true,
                       posters: mostWatchedPosters,
+                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewMovies, recursive: true)),
                     ),
                   if (trendingPosters.isNotEmpty)
                     PosterRow(
@@ -321,6 +336,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Trending',
                       sushiContinueToggle: true,
                       posters: trendingPosters,
+                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewMovies, recursive: true)),
                     ),
                   if (seriesMostWatchedPosters.isNotEmpty)
                     PosterRow(
@@ -329,6 +345,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Series · Most watched',
                       sushiContinueToggle: true,
                       posters: seriesMostWatchedPosters,
+                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewSeries, recursive: true)),
                     ),
                   if (seriesTrendingPosters.isNotEmpty)
                     PosterRow(
@@ -337,6 +354,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Series · Trending',
                       sushiContinueToggle: true,
                       posters: seriesTrendingPosters,
+                      onLabelClick: () => context.router.push(LibrarySearchRoute(viewModelId: sushiViewSeries, recursive: true)),
                     ),
                   ...sushiDashboardRecentlyAddedRows(
                     context: context,
