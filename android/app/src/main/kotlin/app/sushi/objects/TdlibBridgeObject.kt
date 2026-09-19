@@ -370,11 +370,11 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
      */
     override fun deliveryRefForLocator(locator: String): SushiTdlibDeliveryRef? {
         val oxClient = client ?: return null
-        val messageId = oxClient.deliveryMessageIDForLocator(locator)
+        val (messageId, providerBotId) = oxClient.deliveryRef(locator)
         if (messageId <= 0L) return null
         return SushiTdlibDeliveryRef(
             messageId = messageId,
-            providerBotId = oxClient.deliveryProviderBotIDForLocator(locator),
+            providerBotId = providerBotId,
         )
     }
 
@@ -544,6 +544,36 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
                 },
                 onFailure = { error ->
                     Log.e("OXPLAY_TDLIB", "sendTextAndWaitReply FAILED", error)
+                    replyOnMain(callback, Result.failure(error))
+                },
+            )
+        }
+    }
+
+    override fun fetchSmallDocument(
+        botId: Long,
+        messageId: Long,
+        locator: String,
+        timeoutMs: Long,
+        callback: (Result<String>) -> Unit,
+    ) {
+        scope.launch {
+            runCatching {
+                awaitPlaybackTeardown()
+                val oxClient = client ?: notConfigured()
+                oxClient.fetchSmallDocument(
+                    botId,
+                    messageId,
+                    locator,
+                    timeoutMs.toInt(),
+                    appContext.cacheDir.absolutePath,
+                )
+            }.fold(
+                onSuccess = { text ->
+                    replyOnMain(callback, Result.success(text))
+                },
+                onFailure = { error ->
+                    Log.e("OXPLAY_TDLIB", "fetchSmallDocument FAILED", error)
                     replyOnMain(callback, Result.failure(error))
                 },
             )

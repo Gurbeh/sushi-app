@@ -40,10 +40,13 @@ const authCallTimeout = 90 * time.Second
 const providerBotsSetupTimeout = 90 * time.Second
 
 // SessionStorage is implemented by the host platform (Android EncryptedSharedPreferences,
-// Windows DPAPI-protected file) to persist one opaque session blob.
+// Windows DPAPI-protected file) to persist one opaque session blob plus the BotFather token
+// needed for bot-to-bot Bot API sendMessage after a warm restore.
 type SessionStorage interface {
 	Load() ([]byte, error)
 	Store(data []byte) error
+	LoadBotToken() (string, error)
+	StoreBotToken(token string) error
 }
 
 // AuthEventSink is implemented by the host platform to receive auth state push notifications —
@@ -56,6 +59,11 @@ type storageAdapter struct{ s SessionStorage }
 
 func (a storageAdapter) Load() ([]byte, error)   { return a.s.Load() }
 func (a storageAdapter) Store(data []byte) error { return a.s.Store(data) }
+
+func (a storageAdapter) LoadBotToken() (string, error) { return a.s.LoadBotToken() }
+func (a storageAdapter) StoreBotToken(token string) error {
+	return a.s.StoreBotToken(token)
+}
 
 // ConnectionSink is implemented by the host platform to receive connection-health transitions —
 // values match oxtelegram.ConnectionHealth ("uninitialized"/"connecting"/"ready"/"degraded") and
@@ -124,9 +132,6 @@ func (c *Client) ConnectionHealth() string {
 // so this exists for the moments where waiting is better than failing — resuming the app, and
 // immediately before starting a playback download.
 func (c *Client) EnsureConnected(sink AuthEventSink) error {
-	if c.inner.Health() == oxtelegram.HealthReady {
-		return nil
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
 	defer cancel()
 	return c.inner.Configure(ctx, sinkAdapter{sink})
@@ -159,7 +164,9 @@ func (c *Client) SubmitPhoneNumber(phone string) error {
 func (c *Client) SubmitBotToken(token string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), authCallTimeout)
 	defer cancel()
-	return c.inner.Auth.SubmitBotToken(ctx, token)
+	err := c.inner.Auth.SubmitBotToken(ctx, token)
+	c.inner.MarkEngineDead(err)
+	return err
 }
 
 func (c *Client) SubmitCode(code string) error {
@@ -298,6 +305,19 @@ func (c *Client) SendTextAndWaitReply(username, text string, timeoutMs int) (str
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return c.inner.SendTextAndWaitReply(ctx, username, text)
+}
+
+// FetchSmallDocument downloads a subtitle document copied into this session's chat (doc 15 §7).
+// timeoutMs caps the live-push wait + download (default 30000 when <= 0). cacheDir is the host
+// temp dir for the progressive download file, same as StartPlaybackSession.
+func (c *Client) FetchSmallDocument(botID, messageID int64, locator string, timeoutMs int, cacheDir string) (string, error) {
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return c.inner.FetchSmallDocument(ctx, botID, messageID, locator, cacheDir)
 }
 
 // sendTextFireAndForgetTimeout bounds the send itself (peer resolve + startBot-if-needed +

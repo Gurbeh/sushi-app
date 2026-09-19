@@ -56,9 +56,29 @@ class OxTelegramSessionStorage(context: Context) : SessionStorage {
         }
     }
 
+    override fun loadBotToken(): String {
+        return try {
+            prefs.getString(KEY_BOT_TOKEN, null)?.trim().orEmpty()
+        } catch (t: Throwable) {
+            Log.w(TAG, "encrypted bot token prefs unreadable", t)
+            ""
+        }
+    }
+
+    override fun storeBotToken(token: String) {
+        val trimmed = token.trim()
+        runCatching {
+            val editor = prefs.edit()
+            if (trimmed.isEmpty()) editor.remove(KEY_BOT_TOKEN) else editor.putString(KEY_BOT_TOKEN, trimmed)
+            editor.apply()
+        }.onFailure { err ->
+            Log.w(TAG, "encrypted bot token prefs write failed", err)
+        }
+    }
+
     /** Deletes the persisted session — call after LogOut, mirroring TdlibSessionConfig's wipe. */
     fun clear() {
-        runCatching { prefs.edit().remove(KEY_SESSION).apply() }
+        runCatching { prefs.edit().remove(KEY_SESSION).remove(KEY_BOT_TOKEN).apply() }
         runCatching { if (backupFile.exists()) backupFile.delete() }
     }
 
@@ -86,6 +106,7 @@ class OxTelegramSessionStorage(context: Context) : SessionStorage {
         private const val TAG = "OXPLAY_TDLIB"
         private const val PREFS_FILE_NAME = "ox_telegram_session"
         private const val KEY_SESSION = "session_blob"
+        private const val KEY_BOT_TOKEN = "bot_token"
         private const val BACKUP_FILE_NAME = "ox_telegram_session.bin"
     }
 }

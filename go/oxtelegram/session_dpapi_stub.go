@@ -22,3 +22,11 @@ func (d *DPAPISessionStorage) Store(data []byte) error {
 func (d *DPAPISessionStorage) Clear() error {
 	return fmt.Errorf("DPAPISessionStorage is Windows-only")
 }
+
+func (d *DPAPISessionStorage) LoadBotToken() (string, error) {
+	return "", fmt.Errorf("DPAPISessionStorage is Windows-only")
+}
+
+func (d *DPAPISessionStorage) StoreBotToken(token string) error {
+	return fmt.Errorf("DPAPISessionStorage is Windows-only")
+}

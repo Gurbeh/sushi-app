@@ -257,6 +257,13 @@ abstract class SushiTdlibBridgeApi {
   @async
   String sendTextAndWaitReply(String username, String text, int timeoutMs);
 
+  /// Downloads a whole small document (subtitle file, doc 15 §7) copied into this session's
+  /// own chat. Waits for the live push whose caption is [locator] — [messageId] is the Bot API
+  /// sender counter, not this session's MTProto id, so it cannot be looked up directly.
+  /// [timeoutMs] ≤ 0 → 30000.
+  @async
+  String fetchSmallDocument(int botId, int messageId, String locator, int timeoutMs);
+
   /// DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
   /// wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
   /// best-effort watch-progress report). Returns once the message is sent; unlike

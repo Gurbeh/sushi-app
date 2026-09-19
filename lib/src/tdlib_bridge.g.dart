@@ -940,6 +940,38 @@ class SushiTdlibBridgeApi {
     }
   }
 
+  /// Downloads a whole small document (subtitle file, doc 15 §7) copied into this session's
+  /// own chat. Waits for the live push whose caption is [locator] — [messageId] is the Bot API
+  /// sender counter, not this session's MTProto id, so it cannot be looked up directly.
+  /// [timeoutMs] ≤ 0 → 30000.
+  Future<String> fetchSmallDocument(int botId, int messageId, String locator, int timeoutMs) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.fetchSmallDocument$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[botId, messageId, locator, timeoutMs]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else if (pigeonVar_replyList[0] == null) {
+      throw PlatformException(
+        code: 'null-error',
+        message: 'Host platform returned null value for non-null return value.',
+      );
+    } else {
+      return (pigeonVar_replyList[0] as String?)!;
+    }
+  }
+
   /// DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
   /// wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
   /// best-effort watch-progress report). Returns once the message is sent; unlike

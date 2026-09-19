@@ -14,6 +14,7 @@ import 'package:fladder/sushi/sushi_provider_read.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
+import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
@@ -186,7 +187,7 @@ abstract final class SushiPlaybackPrefetch {
     try {
       // Arm before resolving: on a miss the backend already sent the copy while PlaybackInfo was
       // in flight, so the push can land before anything is waiting for it.
-      await controller.armDeliveryWaiter(parsed.locator);
+      await sushiArmDeliveryWaiter(parsed.locator);
       // Prefer the live-push ref over a competing 0/0 warmDelivery — that shared waiter
       // made play timeout while prefetch held the channel.
       final landed = await waitForTdlibDeliveryRef(

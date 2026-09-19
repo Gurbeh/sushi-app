@@ -106,7 +106,7 @@ Future<String> sushiSendTextAndWaitReply({
     // wiped a good assignment and left home empty.
     if (msg.contains('USER_IS_BOT')) {
       debugPrint(
-          '[sushi] send failed USER_IS_BOT — session is a bot; need phone/QR user login');
+          '[sushi] send failed USER_IS_BOT — bot session used MTProto sendMessage; Bot API token missing');
       rethrow;
     }
     _consecutiveSendFailures++;

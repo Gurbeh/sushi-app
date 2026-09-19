@@ -15,7 +15,12 @@ import (
 )
 
 func (c *Client) dispatchTextSend(ctx context.Context, peer *tg.InputPeerUser, username, text string) error {
-	if c.Auth != nil && c.Auth.IsBotMode() && c.Auth.BotToken() != "" {
+	// Bot-to-bot is Bot API HTTP only. MTProto messages.sendMessage always returns USER_IS_BOT,
+	// even when BotFather "Bot to bot communication mode" is on (that flag is for api.telegram.org).
+	if c.Auth != nil && c.Auth.IsBotMode() {
+		if c.Auth.BotToken() == "" {
+			return fmt.Errorf("bot api send: restored bot session has no token")
+		}
 		return c.sendViaBotAPI(ctx, username, text)
 	}
 

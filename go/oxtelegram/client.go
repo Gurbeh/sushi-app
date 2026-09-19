@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -336,6 +337,31 @@ func (c *Client) Health() ConnectionHealth {
 	return c.health
 }
 
+func isEngineClosedErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "engine was closed")
+}
+
+// markEngineDead cancels the current Run loop so watchRun / Configure rebuild instead of
+// serving RPCs to a corpse. Auth FAILED + HealthReady was the Pixel 10 Pro playback loop
+// (2026-09-19): gotd closed the RPC engine while Run still sat on innerCtx.Done().
+func (c *Client) markEngineDead(err error) {
+	if !isEngineClosedErr(err) {
+		return
+	}
+	log.Printf("oxtelegram: rpc engine closed — cancelling run loop so Configure rebuilds")
+	c.mu.Lock()
+	if c.cancel != nil {
+		c.cancel()
+	}
+	c.mu.Unlock()
+	c.setHealth(HealthDegraded)
+}
+
+// MarkEngineDead is the exported form of markEngineDead for the gomobile bind package.
+func (c *Client) MarkEngineDead(err error) {
+	c.markEngineDead(err)
+}
+
 // setHealth records the state and notifies the sink outside the lock (the host implementation
 // crosses a JNI boundary and must never run while holding c.mu).
 func (c *Client) setHealth(next ConnectionHealth) {
@@ -413,14 +439,20 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.closed = false
 	c.sink = sink
 	if c.tg != nil {
-		if c.runDone != nil && !isClosed(c.runDone) {
-			c.mu.Unlock()
-			return nil
+		alive := c.runDone != nil && !isClosed(c.runDone)
+		tg := c.tg
+		c.mu.Unlock()
+		if alive {
+			_, err := tg.Auth().Status(ctx)
+			if !isEngineClosedErr(err) {
+				if err != nil {
+					return err
+				}
+				return nil
+			}
 		}
-		// The run loop exited. gotd does not resurrect it, and c.tg keeps answering as if
-		// healthy, so every later UploadGetFile fails with "waitSession: connection dead"
-		// while ensureConfigured still reports "already configured" — a hang with no error
-		// path, only recoverable by killing the app. Drop the corpse and rebuild below.
+		c.mu.Lock()
+		// Run loop gone, or RPC engine closed while Run still sat on innerCtx.Done().
 		if c.cancel != nil {
 			c.cancel()
 		}
@@ -510,7 +542,7 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	c.tg = tgClient
 	c.cancel = cancel
 	c.runDone = runDone
-	c.Auth = newAuthController(tgClient, c.apiID, c.apiHash, sink, dispatcher)
+	c.Auth = newAuthController(tgClient, c.apiID, c.apiHash, sink, dispatcher, c.storage)
 	c.runGen++
 	gen := c.runGen
 	c.mu.Unlock()

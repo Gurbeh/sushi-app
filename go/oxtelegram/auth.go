@@ -54,6 +54,7 @@ type AuthController struct {
 	apiHash    string
 	sink       AuthEventSink
 	dispatcher tg.UpdateDispatcher
+	storage    SessionStorage
 
 	mu       sync.Mutex
 	phone    string
@@ -93,6 +94,7 @@ func newAuthController(
 	apiHash string,
 	sink AuthEventSink,
 	dispatcher tg.UpdateDispatcher,
+	storage SessionStorage,
 ) *AuthController {
 	a := &AuthController{
 		tg:         tgClient,
@@ -100,6 +102,7 @@ func newAuthController(
 		apiHash:    apiHash,
 		sink:       sink,
 		dispatcher: dispatcher,
+		storage:    storage,
 	}
 	// Buffered so UpdateLoginToken is not dropped if it arrives between show() and select.
 	ch := make(chan struct{}, 1)
@@ -132,11 +135,22 @@ func (a *AuthController) checkInitialStatus(ctx context.Context) {
 	}
 	if status.Authorized {
 		if self, err := a.tg.Self(ctx); err == nil && self != nil {
+			token := ""
+			if self.Bot {
+				token = a.loadPersistedBotToken()
+			}
 			a.mu.Lock()
 			a.botMode = self.Bot
+			if self.Bot {
+				a.botToken = token
+			}
 			a.mu.Unlock()
 			if self.Bot {
-				log.Printf("oxtelegram: restored BOT session id=%d @%s — getHistory/search are invalid; 0/0 play needs live push into this bot", self.ID, self.Username)
+				if token != "" {
+					log.Printf("oxtelegram: restored BOT session id=%d @%s — bot-api token loaded", self.ID, self.Username)
+				} else {
+					log.Printf("oxtelegram: restored BOT session id=%d @%s — bot-api token missing; hydrate via SubmitBotToken (MTProto sendMessage is USER_IS_BOT)", self.ID, self.Username)
+				}
 			} else {
 				log.Printf("oxtelegram: restored USER session id=%d", self.ID)
 			}
@@ -172,12 +186,14 @@ func (a *AuthController) SubmitBotToken(ctx context.Context, token string) error
 	a.botMode = true
 	a.botToken = token
 	a.mu.Unlock()
+	a.persistBotToken(token)
 	a.emit(AuthReady, "", "", "")
 	return nil
 }
 
 // hydrateBotTokenIfAuthorized stores the BotFather token on an already-restored bot session
-// so Bot API sendMessage works. Auth().Bot on a live bot session is unnecessary and can fail.
+// so Bot API sendMessage works. Auth().Bot on a live bot session is unnecessary and can fail
+// (`rpcDoRequest: engine was closed`).
 func (a *AuthController) hydrateBotTokenIfAuthorized(ctx context.Context, token string) bool {
 	status, err := a.tg.Auth().Status(ctx)
 	if err != nil || !status.Authorized {
@@ -191,8 +207,30 @@ func (a *AuthController) hydrateBotTokenIfAuthorized(ctx context.Context, token 
 	a.botMode = true
 	a.botToken = token
 	a.mu.Unlock()
+	a.persistBotToken(token)
 	a.emit(AuthReady, "", "", "")
 	return true
+}
+
+func (a *AuthController) persistBotToken(token string) {
+	if a.storage == nil {
+		return
+	}
+	if err := a.storage.StoreBotToken(token); err != nil {
+		log.Printf("oxtelegram: persist bot token: %v", err)
+	}
+}
+
+func (a *AuthController) loadPersistedBotToken() string {
+	if a.storage == nil {
+		return ""
+	}
+	tok, err := a.storage.LoadBotToken()
+	if err != nil {
+		log.Printf("oxtelegram: load bot token: %v", err)
+		return ""
+	}
+	return strings.TrimSpace(tok)
 }
 
 // SubmitPhoneNumber starts the phone/code flow (step 1 of 2-3).
@@ -490,6 +528,7 @@ func (a *AuthController) LogOut(ctx context.Context) error {
 	a.botToken = ""
 	a.botMode = false
 	a.mu.Unlock()
+	a.persistBotToken("")
 	a.emit(AuthLoggingOut, "", "", "")
 	_, err := a.tg.API().AuthLogOut(ctx)
 	a.emit(AuthClosed, "", "", "")

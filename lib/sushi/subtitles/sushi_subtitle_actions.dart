@@ -19,6 +19,7 @@ import 'package:fladder/sushi/sushi_prefs_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_subtitle_transport.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
+import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/subtitles/sushi_gemini.dart';
 import 'package:fladder/sushi/subtitles/sushi_opensubtitles.dart';
 import 'package:fladder/sushi/subtitles/sushi_srt.dart';
@@ -244,10 +245,10 @@ Future<SushiSubtitleOpResult> sushiRunAutoLoad(Object src, {MediaControlsWrapper
   _subtitleJobBusy = true;
   try {
     final p = sushiPlayer(src, player: player);
-    // sub-plus.ir has no SLA (doc 15 §6); subdl is the second provider (doc 15 §7) tried when it
-    // comes back empty or erroring, before giving up.
-    var pick = await _fetchSubplusFile(src, lang: 'persian');
-    pick ??= await _fetchSubdlFile(src, lang: 'persian');
+    // subdl is the production path (doc 15 §7). sub-plus.ir is a prototype with no SLA (doc 15
+    // §6) and has been returning HTTP 500 — try it only after subdl misses.
+    var pick = await _fetchSubdlFile(src, lang: 'persian');
+    pick ??= await _fetchSubplusFile(src, lang: 'persian');
     if (pick == null) {
       _log('auto_no_results');
       return SushiSubtitleOpResult.noResults;
@@ -637,7 +638,7 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
     // for video, so the live push can never land before something is listening for it.
     final locator = 'sub_${tmdbId}_${kind}_${seasonNo}_${episodeNo}_$subdlLang';
     final controller = SushiTdlibBridgeController.instance();
-    await controller.armDeliveryWaiter(locator);
+    await sushiArmDeliveryWaiter(locator);
     final fileRes = await sushiFetchSubtitleFile(tag: rawTag);
     if (fileRes == null) {
       _log('subdl_fetch_error', {'lang': lang, 'reason': 'no_delivery_ref'});

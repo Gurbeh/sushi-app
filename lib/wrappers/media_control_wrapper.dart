@@ -23,6 +23,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/subtitles/sushi_srt.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
@@ -655,6 +656,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// players have no failure signal to report, so they're assumed to have succeeded
   /// once the underlying call returns.
   Future<bool> setSubtitleFromText(String data, {String? title, String? language}) async {
+    data = sushiNormalizeSubtitleText(data);
     if (nativeActivityStarted) {
       if (_player is NativePlayer) {
         await _player?.setSubtitleFromText(data, title: title, language: language);

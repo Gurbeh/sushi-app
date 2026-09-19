@@ -501,6 +501,13 @@ interface SushiTdlibBridgeApi {
    */
   fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Long, callback: (Result<String>) -> Unit)
   /**
+   * Downloads a whole small document (subtitle file, doc 15 §7) copied into this session's
+   * own chat. Waits for the live push whose caption is [locator] — [messageId] is the Bot API
+   * sender counter, not this session's MTProto id, so it cannot be looked up directly.
+   * [timeoutMs] ≤ 0 → 30000.
+   */
+  fun fetchSmallDocument(botId: Long, messageId: Long, locator: String, timeoutMs: Long, callback: (Result<String>) -> Unit)
+  /**
    * DMs [username] with [text] without waiting for a reply — the fire-and-forget half of the
    * wire protocol, for a Sushi command whose reply the client does not read (`/ack`; a future
    * best-effort watch-progress report). Returns once the message is sent; unlike
@@ -878,6 +885,29 @@ interface SushiTdlibBridgeApi {
             val textArg = args[1] as String
             val timeoutMsArg = args[2] as Long
             api.sendTextAndWaitReply(usernameArg, textArg, timeoutMsArg) { result: Result<String> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(TdlibBridgePigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(TdlibBridgePigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.tdlib_bridge.SushiTdlibBridgeApi.fetchSmallDocument$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val botIdArg = args[0] as Long
+            val messageIdArg = args[1] as Long
+            val locatorArg = args[2] as String
+            val timeoutMsArg = args[3] as Long
+            api.fetchSmallDocument(botIdArg, messageIdArg, locatorArg, timeoutMsArg) { result: Result<String> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(TdlibBridgePigeonUtils.wrapError(error))

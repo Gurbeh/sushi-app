@@ -41,6 +41,7 @@ func (c *Client) SendTextAndWaitReply(ctx context.Context, username, text string
 
 	peer, userID, err := c.resolveInputPeerUser(ctx, username)
 	if err != nil {
+		c.markEngineDead(err)
 		return "", err
 	}
 
@@ -52,6 +53,7 @@ func (c *Client) SendTextAndWaitReply(ctx context.Context, username, text string
 	defer c.unregisterTextWaiter(userID, corr, waitCh)
 
 	if err := c.dispatchTextSend(ctx, peer, username, text); err != nil {
+		c.markEngineDead(err)
 		return "", err
 	}
 

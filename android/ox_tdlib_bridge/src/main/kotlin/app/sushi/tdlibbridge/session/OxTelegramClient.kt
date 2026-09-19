@@ -15,9 +15,8 @@ import mobile.SessionStorage
  *
  * [GomobileCallGate] serializes every method that actually crosses into gomobile's generated JNI
  * bridge against [app.sushi.tdlibbridge.media.OxTelegramFileFetcher] and
- * [app.sushi.tdlibbridge.player.OxTelegramStreamBridge] — see GomobileCallGate's doc. Cheap
- * in-memory reads (connectionHealth, isBotMode, armDeliveryWaiter, locator lookups) stay off the
- * gate so a 30s protocol call cannot stall a sync Pigeon poll.
+ * [app.sushi.tdlibbridge.player.OxTelegramStreamBridge] — see GomobileCallGate's doc. Sync Pigeon
+ * polls (deliveryRef, isBotMode, armDeliveryWaiter) used to skip the gate; they do not anymore.
  */
 class OxTelegramClient(
     apiId: Long,
@@ -25,6 +24,10 @@ class OxTelegramClient(
     storage: SessionStorage,
 ) {
     val native: Client = Client(apiId, apiHash, storage)
+
+    @Volatile private var cachedBotMode: Boolean = false
+    @Volatile private var cachedHealth: String = "uninitialized"
+    private val deliveryRefCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
 
     suspend fun configure(sink: AuthEventSink) =
         GomobileCallGate.enter { native.configure(sink) }
@@ -37,20 +40,27 @@ class OxTelegramClient(
         GomobileCallGate.enter { native.ensureConnected(sink) }
 
     /** Registers the connection-health listener. Reconnection happens with or without one. */
-    fun setConnectionSink(sink: ConnectionSink?) = native.setConnectionSink(sink)
+    fun setConnectionSink(sink: ConnectionSink?) {
+        runBlocking { GomobileCallGate.enter { native.setConnectionSink(sink) } }
+    }
 
     /**
-     * "uninitialized" / "connecting" / "ready" / "degraded" — an in-memory read on the Go side, so
-     * it stays off Dispatchers.IO and can answer a synchronous Pigeon call.
+     * "uninitialized" / "connecting" / "ready" / "degraded" — TdlibBridgeObject answers Pigeon
+     * from lastConnectionHealth; this native read is only for callers that still go through JNI.
      */
-    fun connectionHealth(): String = native.connectionHealth()
+    fun connectionHealth(): String =
+        GomobileCallGate.tryEnterBlocking(ifBusy = { cachedHealth }) {
+            native.connectionHealth().also { cachedHealth = it }
+        }
 
     /**
      * Whether the CURRENT session is a bot, including one restored from disk at configure() —
-     * accurate on a cold app start unlike Dart's own submitBotToken-tracked flag. In-memory read
-     * on the Go side, so it stays off Dispatchers.IO and can answer a synchronous Pigeon call.
+     * accurate on a cold app start unlike Dart's own submitBotToken-tracked flag.
      */
-    fun isBotMode(): Boolean = native.isBotMode()
+    fun isBotMode(): Boolean =
+        GomobileCallGate.tryEnterBlocking(ifBusy = { cachedBotMode }) {
+            native.isBotMode().also { cachedBotMode = it }
+        }
 
     suspend fun submitPhoneNumber(phone: String) =
         GomobileCallGate.enter { native.submitPhoneNumber(phone) }
@@ -95,20 +105,30 @@ class OxTelegramClient(
         GomobileCallGate.enter { native.ensureProviderBotsReady(botsJson) }
 
     /**
-     * Registers interest in [locator] before the delivery is requested. Touches an in-memory map on
-     * the Go side — no MTProto round-trip, so it stays off Dispatchers.IO.
+     * Registers interest in [locator] before the delivery is requested. Enqueued on the gate —
+     * returning before the JNI runs is safe: Go already buffers an early push (pushArrived).
      */
-    fun armDeliveryWaiter(locator: String) = native.armDeliveryWaiter(locator)
+    fun armDeliveryWaiter(locator: String) {
+        GomobileCallGate.enqueue { native.armDeliveryWaiter(locator) }
+    }
+
+    /** Message id + sending bot this session read for [locator], or zeros. */
+    fun deliveryRef(locator: String): Pair<Long, Long> =
+        GomobileCallGate.tryEnterBlocking(
+            ifBusy = { deliveryRefCache[locator] ?: (0L to 0L) },
+        ) {
+            val id = native.deliveryMessageIDForLocator(locator)
+            val bot = native.deliveryProviderBotIDForLocator(locator)
+            (id to bot).also { deliveryRefCache[locator] = it }
+        }
 
     /**
-     * The DM message id this session read for [locator], or 0. Reads an in-memory map on the Go
-     * side — no MTProto round-trip, so it stays off Dispatchers.IO and can answer a synchronous
-     * Pigeon call.
+     * The DM message id this session read for [locator], or 0.
      */
-    fun deliveryMessageIDForLocator(locator: String): Long = native.deliveryMessageIDForLocator(locator)
+    fun deliveryMessageIDForLocator(locator: String): Long = deliveryRef(locator).first
 
-    /** The delivery bot whose DM held [locator], or 0. Same in-memory read as above. */
-    fun deliveryProviderBotIDForLocator(locator: String): Long = native.deliveryProviderBotIDForLocator(locator)
+    /** The delivery bot whose DM held [locator], or 0. */
+    fun deliveryProviderBotIDForLocator(locator: String): Long = deliveryRef(locator).second
 
     suspend fun fetchWebAppInitData(
         botUsername: String,
@@ -122,6 +142,17 @@ class OxTelegramClient(
     /** DMs [username] with [text]; returns next '!' framed reply (Sushi /initbot). */
     suspend fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Int): String =
         GomobileCallGate.enter { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
+
+    /** Whole subtitle document from this session's chat (doc 15 §7 live-push resolve). */
+    suspend fun fetchSmallDocument(
+        botId: Long,
+        messageId: Long,
+        locator: String,
+        timeoutMs: Int,
+        cacheDir: String,
+    ): String = GomobileCallGate.enter {
+        native.fetchSmallDocument(botId, messageId, locator, timeoutMs.toLong(), cacheDir)
+    }
 
     /** DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress
      *  reports) — see mobile.Client.SendTextFireAndForget. */

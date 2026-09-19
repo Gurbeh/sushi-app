@@ -275,14 +275,22 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     // Windows drives its own connection lifecycle through SushiTelegramWindowsBridge and exposes no
     // health signal; there is nothing to revive from here.
     if (_useWindows) return _state.kind == SushiTdlibAuthStateKind.ready;
-    if (_state.kind != SushiTdlibAuthStateKind.ready) return false;
-    if (_health == SushiTdlibConnectionHealth.ready) return true;
+    if (_state.kind != SushiTdlibAuthStateKind.ready &&
+        _state.kind != SushiTdlibAuthStateKind.failed) {
+      return false;
+    }
+    if (_health == SushiTdlibConnectionHealth.ready &&
+        _state.kind == SushiTdlibAuthStateKind.ready) {
+      return true;
+    }
     try {
       await _api.reconnect();
       _health = await _api.connectionHealth();
-      _log('ensureConnected → ${_health.name}');
+      _state = await _api.currentAuthState();
+      _log('ensureConnected → health=${_health.name} auth=${_state.kind.name}');
       notifyListeners();
-      return _health != SushiTdlibConnectionHealth.degraded;
+      return _state.kind == SushiTdlibAuthStateKind.ready &&
+          _health != SushiTdlibConnectionHealth.degraded;
     } catch (e) {
       _log('ensureConnected failed: $e');
       return false;
@@ -333,6 +341,17 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
         await waitUntilReadyForAuthInput(timeout: readyTimeout);
         await _restoreBotSessionIfNeededLocked();
         return;
+      }
+      // `failed` after a live session is usually a dropped MTProto engine, not missing
+      // credentials. reconnect() rebuilds gotd; re-submitBotToken on that corpse is what
+      // looped `engine was closed` on Pixel 10 Pro (2026-09-19).
+      if (polled.kind == SushiTdlibAuthStateKind.failed && !_useWindows) {
+        _log('ensureConfigured: native failed — reconnect before bot-token restore');
+        _state = polled;
+        if (await ensureConnected() &&
+            _state.kind == SushiTdlibAuthStateKind.ready) {
+          return;
+        }
       }
       // `failed` is treated exactly like `uninitialized`, not like a configured state. It is what
       // native lands in when a cold-start RPC fails, and it used to be cached the same way `ready`
@@ -657,6 +676,16 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kSushiBotTokenPrefsKey, trimmed);
+
+    // Restored bot session is already ready. Hydrate the in-memory Bot API token; do not
+    // logOut + Auth().Bot (that closed gotd's engine on Pixel 10 Pro, 2026-09-19).
+    if (_state.kind == SushiTdlibAuthStateKind.ready &&
+        await isNativeSessionActuallyBot()) {
+      _log('ensureBotTokenSession: hydrate ready bot session');
+      await submitBotToken(trimmed);
+      return;
+    }
+
     _log('ensureBotTokenSession: switching to personal bot from kind=${_state.kind.name}');
 
     Future<void> tearDownNativeSession() async {
@@ -691,37 +720,41 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     await submitBotToken(trimmed);
   }
 
-  /// Lazily re-applies a previously-connected bot token when this device's native session isn't
-  /// authenticated yet — the gap that caused a real bug: a returning bot-mode user whose native
-  /// bridge was configured on a fresh login (see SushiMainBotLoginPanel) but never again on
-  /// subsequent app starts, so playback hit AUTH_KEY_UNREGISTERED via the session-mode resolve
-  /// path instead of ever reaching bot-mode at all. No-op if already ready, or nothing cached
-  /// (i.e. this really is a session-mode/TDLib user, or a bot-mode user who hasn't connected a
-  /// bot yet at all — callers distinguish those via the thrown exception, not this method).
+  /// Re-applies a cached BotFather token so Bot API sendMessage works.
   ///
-  /// Retries from `failed` too, not just `waitingForPhoneNumber`: confirmed on-device that a
-  /// transient cold-start RPC hiccup (checkInitialStatus's Auth().Status call in auth.go) lands
-  /// native in `failed`, and once there this method used to return immediately every time —
-  /// _ensureConfiguredLocked treats non-uninitialized state as "already configured" and skips
-  /// reconfigure, so the app got permanently stuck reporting "bot isn't connected" despite a
-  /// perfectly valid cached token, on every single playback attempt, with no retry path at all.
+  /// A disk-restored bot session is already `ready` with [IsBotMode] true, but
+  /// [AuthController.BotToken] is empty until this runs (or native sidecar persist loads it).
+  /// Skipping that hydrate (2026-09-19) sent `/initbot` over MTProto and Telegram answered
+  /// `USER_IS_BOT` — Bot-to-Bot mode is HTTP Bot API only, not `messages.sendMessage`.
+  ///
+  /// Hydrate is `SubmitBotToken` without `Auth().Bot`: native `hydrateBotTokenIfAuthorized`
+  /// stores the token in memory. Calling `Auth().Bot` on a live session closed the RPC engine.
+  ///
+  /// Also retries from `failed`: a transient cold-start RPC hiccup (checkInitialStatus's
+  /// Auth().Status) lands native in `failed`, and _ensureConfiguredLocked used to skip
+  /// reconfigure — the app then reported "bot isn't connected" on every play.
   Future<void> ensureBotSessionFromCacheIfNeeded() async {
-    if (_state.kind == SushiTdlibAuthStateKind.ready && !await isNativeSessionActuallyBot()) {
-      return;
-    }
-    if (_state.kind != SushiTdlibAuthStateKind.ready &&
-        _state.kind != SushiTdlibAuthStateKind.waitingForPhoneNumber &&
-        _state.kind != SushiTdlibAuthStateKind.failed) {
-      return;
-    }
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_kSushiBotTokenPrefsKey);
     if (cached == null || cached.isEmpty) return;
+
+    if (_state.kind == SushiTdlibAuthStateKind.ready) {
+      if (_activeBotToken == cached) return;
+      if (!await isNativeSessionActuallyBot()) return;
+      try {
+        await submitBotToken(cached);
+      } catch (e) {
+        _log('ensureBotSessionFromCacheIfNeeded: hydrate failed: $e');
+      }
+      return;
+    }
+    if (_state.kind != SushiTdlibAuthStateKind.waitingForPhoneNumber &&
+        _state.kind != SushiTdlibAuthStateKind.failed) {
+      return;
+    }
     try {
       await submitBotToken(cached);
     } catch (e) {
-      // Token was revoked/bot deleted since it was cached — surface nothing here, let the
-      // caller's own ready-check after this call produce the real "reconnect your bot" error.
       _log('ensureBotSessionFromCacheIfNeeded: cached token no longer works: $e');
     }
   }
@@ -1048,9 +1081,8 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   }
 
   /// Downloads a whole small document (a subtitle file, doc 15 §7) from this session's own chat
-  /// with [botId] at [messageId], verified against [locator]. Windows only for now — the
-  /// Android/mobile Pigeon bridge does not export this yet (mirrors sendTextFireAndForget's
-  /// opposite-direction gap above).
+  /// with [botId] at [messageId], verified against [locator]. The native side waits for the live
+  /// push (Bot API messageId is the sender's counter, not this session's MTProto id).
   Future<String> fetchSmallDocument({
     required int botId,
     required int messageId,
@@ -1061,10 +1093,10 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     if (_state.kind != SushiTdlibAuthStateKind.ready) {
       throw SushiTdlibBridgeException('Telegram session not ready for fetchSmallDocument');
     }
-    if (!_useWindows) {
-      throw SushiTdlibBridgeException('fetchSmallDocument not implemented on this platform yet');
+    if (_useWindows) {
+      return _windows!.fetchSmallDocument(botId, messageId, locator, timeoutMs);
     }
-    return _windows!.fetchSmallDocument(botId, messageId, locator, timeoutMs);
+    return _api.fetchSmallDocument(botId, messageId, locator, timeoutMs);
   }
 
   /// DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress

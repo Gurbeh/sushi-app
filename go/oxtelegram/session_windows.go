@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -52,11 +53,58 @@ func (d *DPAPISessionStorage) Store(data []byte) error {
 
 // Clear deletes the on-disk session (logout wipe).
 func (d *DPAPISessionStorage) Clear() error {
+	_ = d.StoreBotToken("")
 	err := os.Remove(d.path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
+}
+
+func (d *DPAPISessionStorage) tokenPath() string {
+	return d.path + ".bottoken"
+}
+
+func (d *DPAPISessionStorage) LoadBotToken() (string, error) {
+	raw, err := os.ReadFile(d.tokenPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if len(raw) == 0 {
+		return "", nil
+	}
+	plain, err := dpapiUnprotect(raw)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(plain)), nil
+}
+
+func (d *DPAPISessionStorage) StoreBotToken(token string) error {
+	token = strings.TrimSpace(token)
+	path := d.tokenPath()
+	if token == "" {
+		err := os.Remove(path)
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	sealed, err := dpapiProtect([]byte(token))
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, sealed, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func newBlob(d []byte) *windows.DataBlob {
