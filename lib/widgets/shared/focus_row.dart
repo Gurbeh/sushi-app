@@ -5,6 +5,50 @@ import 'package:fladder/widgets/navigation_scaffold/components/navigation_body.d
 import 'package:fladder/widgets/navigation_scaffold/components/side_navigation_bar.dart';
 import 'package:fladder/widgets/shared/ensure_visible.dart';
 
+/// Currently-mounted [FocusRow] group nodes, used to resolve vertical d-pad navigation between
+/// independent rows stacked in a scrollable column (e.g. the dashboard's slider -> list -> list
+/// layout). Flutter's built-in directional focus search operates on individual leaf nodes across
+/// the whole [FocusScope] and picks by rect overlap/distance; since each row (e.g. a
+/// [HorizontalList]) scrolls independently, a focused item deep in one row often has no
+/// horizontal overlap with the row directly above/below it, so that search can skip over the
+/// adjacent row entirely and land somewhere further away (e.g. jumping straight to a top banner).
+/// Up/down at a row's edge is resolved by stepping to the nearest *registered* row purely by
+/// vertical position first, instead of falling straight through to that generic search.
+final Set<FocusNode> _activeRowGroups = <FocusNode>{};
+
+/// The nearest other registered row group strictly above/below [current] in [direction], scoped
+/// to the same [FocusScopeNode] (so rows on a different, offstage page are never candidates), or
+/// null if there isn't one (or [direction] isn't vertical).
+FocusNode? adjacentRowGroup(FocusNode current, TraversalDirection direction) {
+  if (direction != TraversalDirection.up && direction != TraversalDirection.down) return null;
+  if (current.context?.mounted != true) return null;
+  final currentTop = current.rect.top;
+  final scope = current.nearestScope;
+
+  FocusNode? best;
+  double? bestTop;
+  for (final candidate in _activeRowGroups) {
+    if (identical(candidate, current)) continue;
+    if (candidate.context?.mounted != true) continue;
+    if (candidate.nearestScope != scope) continue;
+    final top = candidate.rect.top;
+    if (direction == TraversalDirection.up) {
+      if (top >= currentTop) continue;
+      if (bestTop == null || top > bestTop) {
+        best = candidate;
+        bestTop = top;
+      }
+    } else {
+      if (top <= currentTop) continue;
+      if (bestTop == null || top < bestTop) {
+        best = candidate;
+        bestTop = top;
+      }
+    }
+  }
+  return best;
+}
+
 class FocusRow extends StatefulWidget {
   final Widget child;
   final double ensureVisibleAlignment;
@@ -43,6 +87,7 @@ class _FocusRowState extends State<FocusRow> {
   void initState() {
     super.initState();
     _groupNode = widget.focusNode ?? FocusNode();
+    _activeRowGroups.add(_groupNode);
 
     _focusManagerListener = _handleFocusManagerChange;
     FocusManager.instance.addListener(_focusManagerListener);
@@ -50,6 +95,7 @@ class _FocusRowState extends State<FocusRow> {
 
   @override
   void dispose() {
+    _activeRowGroups.remove(_groupNode);
     FocusManager.instance.removeListener(_focusManagerListener);
     if (_ownsNode) _groupNode.dispose();
     super.dispose();
@@ -233,12 +279,19 @@ class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
       case TraversalDirection.up:
       case TraversalDirection.down:
         onVertical?.call();
-        // Stay inside a Wrap's next/previous visual row first. Escape via
-        // [super.inDirection] from the *current* button rect — never by
+        // Stay inside a Wrap's next/previous visual row first, then step to the nearest
+        // registered sibling row (e.g. the next FocusRow up/down the page). Escape via
+        // [super.inDirection] from the *current* button rect only as a last resort — never by
         // focusing the parent FocusScope (full-screen rect has nothing below).
         final inGroup = _nodeOnAdjacentRow(groupNode, currentNode, direction);
         if (inGroup != null) {
           inGroup.requestFocus();
+          return true;
+        }
+        final adjacentGroup = adjacentRowGroup(groupNode, direction);
+        if (adjacentGroup != null) {
+          final cb = FocusTraversalPolicy.defaultTraversalRequestFocusCallback;
+          cb(adjacentGroup);
           return true;
         }
         return super.inDirection(currentNode, direction);
