@@ -1,0 +1,1 @@
+Windows auto-subs, seek reset, SubDL API
