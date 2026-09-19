@@ -52,8 +52,8 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
   final _controller = SushiTdlibBridgeController.instance();
   final _passwordController = TextEditingController();
   final _phoneOptionFocus = FocusNode();
-  bool _oxExchangeStarted = false;
-  bool _exchangingWithOxApi = false;
+  bool _sushiExchangeStarted = false;
+  bool _exchangingWithSushiApi = false;
   bool _passwordBusy = false;
   bool _passwordVisible = false;
   bool _twoFactorHandedOff = false;
@@ -102,7 +102,7 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
 
   void _log(String message) {
     if (kDebugMode) {
-      debugPrint('[ox-tdlib-auth] qr-panel: $message');
+      debugPrint('[sushi-tdlib-auth] qr-panel: $message');
     }
   }
 
@@ -226,11 +226,11 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
       widget.onNeedTwoFactorPassword!();
       return;
     }
-    if (state.kind == SushiTdlibAuthStateKind.ready && !_oxExchangeStarted) {
+    if (state.kind == SushiTdlibAuthStateKind.ready && !_sushiExchangeStarted) {
       _expiryTimer?.cancel();
       _countdownTicker?.cancel();
       _confirmWatchdog?.cancel();
-      unawaited(_maybeStartOxExchange());
+      unawaited(_maybeStartSushiExchange());
     }
     if (state.kind == SushiTdlibAuthStateKind.failed) {
       final raw = state.errorMessage ?? 'Telegram auth failed';
@@ -279,22 +279,22 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
 
   /// Guards the ready-triggered initbot against a restored *bot* session — see the phone-login
   /// panel's identical guard (sushi_tdlib_login_panel.dart) for the full explanation.
-  Future<void> _maybeStartOxExchange() async {
-    if (_oxExchangeStarted) return;
+  Future<void> _maybeStartSushiExchange() async {
+    if (_sushiExchangeStarted) return;
     if (await _controller.isNativeSessionActuallyBot()) {
       _log('ready state is a bot session, skipping exchange');
       return;
     }
-    if (!mounted || _controller.state.kind != SushiTdlibAuthStateKind.ready || _oxExchangeStarted) {
+    if (!mounted || _controller.state.kind != SushiTdlibAuthStateKind.ready || _sushiExchangeStarted) {
       return;
     }
-    _oxExchangeStarted = true;
+    _sushiExchangeStarted = true;
     await _exchangeWithSushiInitbot();
   }
 
   Future<void> _exchangeWithSushiInitbot() async {
     setState(() {
-      _exchangingWithOxApi = true;
+      _exchangingWithSushiApi = true;
       _error = null;
     });
     try {
@@ -304,7 +304,7 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
     } catch (e) {
       if (mounted) setState(() => _error = sushiTdlibAuthUserMessage(e));
     } finally {
-      if (mounted) setState(() => _exchangingWithOxApi = false);
+      if (mounted) setState(() => _exchangingWithSushiApi = false);
     }
   }
 
@@ -346,7 +346,7 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(IconsaxPlusBold.tick_circle, size: 48, color: theme.colorScheme.primary),
-            if (_exchangingWithOxApi) ...[
+            if (_exchangingWithSushiApi) ...[
               const SizedBox(height: 16),
               const CircularProgressIndicator(),
             ],
@@ -360,7 +360,7 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
-                  _oxExchangeStarted = true;
+                  _sushiExchangeStarted = true;
                   unawaited(_exchangeWithSushiInitbot());
                 },
                 child: const Text('Try again'),

@@ -36,7 +36,7 @@ String sushiTmdbMediaTypeApiValue(SushiTmdbMediaType type) {
   };
 }
 
-Map<String, String> _oxAuthHeaders(SushiRead read) {
+Map<String, String> _sushiAuthHeaders(SushiRead read) {
   final credentials = read(userProvider)?.credentials;
   if (credentials == null) return const {};
   return {
@@ -61,7 +61,7 @@ class SushiTmdbInterest extends _$SushiTmdbInterest {
 
     final apiMedia = sushiTmdbMediaTypeApiValue(mediaType);
     final uri = Uri.parse('$baseUrl/me/tmdb-interests/$apiMedia/$tmdbId');
-    final response = await http.get(uri, headers: _oxAuthHeaders(ref.read));
+    final response = await http.get(uri, headers: _sushiAuthHeaders(ref.read));
     if (response.statusCode != 200) {
       developer.log(
         'GET ${uri.path} failed status=${response.statusCode} body=${response.body}',
@@ -115,7 +115,7 @@ class SushiTmdbInterest extends _$SushiTmdbInterest {
     };
     final response = await http.put(
       uri,
-      headers: _oxAuthHeaders(ref.read),
+      headers: _sushiAuthHeaders(ref.read),
       body: jsonEncode(payload),
     );
     if (response.statusCode != 200) {

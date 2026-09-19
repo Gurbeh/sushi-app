@@ -30,6 +30,8 @@ import 'package:fladder/sushi/sushi_telegram_stream_cb.dart';
 import 'package:fladder/sushi/sushi_audio_log.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/sushi/playback/sushi_subtitle_font.dart';
+import 'package:fladder/sushi/playback/sushi_subtitle_paint.dart';
+import 'package:fladder/sushi/playback/sushi_mpv_position_guard.dart';
 import 'package:fladder/providers/settings/subtitle_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
@@ -90,6 +92,13 @@ class LibMPV extends BasePlayer {
   // would silently start missing again despite the URL being identical.
   static final Map<String, String> _externalSubtitleCache = {};
 
+  bool _progressiveTelegram = false;
+  Duration? _pendingSeek;
+  Duration _acceptedPosition = Duration.zero;
+  DateTime? _loadOpenedAt;
+  int _spuriousZeroRestores = 0;
+  bool _restoreInFlight = false;
+
   void _logAudio(String phase, {Map<String, Object?> fields = const {}}) {
     SushiAudioLog.event(phase, fields: {
       'backend': 'mpv',
@@ -119,7 +128,7 @@ class LibMPV extends BasePlayer {
     ));
   }
 
-  /// Absolute timeline offset for ox-stream remux (stream starts at ?start= but UI uses catalog clock).
+  /// Absolute timeline offset for sushi-stream remux (stream starts at ?start= but UI uses catalog clock).
   Duration _remuxTimelineBase = Duration.zero;
   Duration get playPauseFadeDuration => const Duration(milliseconds: 175);
 
@@ -140,7 +149,7 @@ class LibMPV extends BasePlayer {
         libass: !kIsWeb && settings.useLibass,
         bufferSize: settings.bufferSize * 1024 * 1024, // MPV uses buffer size in bytes
         // mpv's own protocol/demuxer errors (e.g. a custom stream_cb protocol failing to open)
-        // never reach SUSHI_STREAM/OX_AUDIO otherwise — they stay inside libmpv unless explicitly
+        // never reach SUSHI_STREAM/SUSHI_AUDIO otherwise — they stay inside libmpv unless explicitly
         // requested via mpv_request_log_messages. 'warn' is enough for real failures without
         // flooding logs with routine 'v'/'debug' chatter.
         logLevel: mpv.MPVLogLevel.warn,
@@ -162,7 +171,7 @@ class LibMPV extends BasePlayer {
       final nativePlayer = _player!.platform as dynamic;
       await nativePlayer.setProperty('force-seekable', 'yes');
       await nativePlayer.setProperty('gapless-audio', 'weak');
-      await _applyOxLibassFontDir(nativePlayer);
+      await _applySushiLibassFontDir(nativePlayer);
 
       if (defaultTargetPlatform == TargetPlatform.android) {
         // Use audiotrack as it is generally more stable on modern Android
@@ -193,6 +202,7 @@ class LibMPV extends BasePlayer {
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
     _externalSubtitleCache.clear();
+    _resetSeekGuard();
   }
 
   void setState(PlayerState state) {
@@ -215,6 +225,60 @@ class LibMPV extends BasePlayer {
     }
     lastState = state;
     _stateController.add(state);
+  }
+
+  void _resetSeekGuard() {
+    _progressiveTelegram = false;
+    _pendingSeek = null;
+    _acceptedPosition = Duration.zero;
+    _loadOpenedAt = null;
+    _spuriousZeroRestores = 0;
+    _restoreInFlight = false;
+  }
+
+  void _onMpvPosition(Duration value) {
+    if (!_progressiveTelegram) {
+      _acceptedPosition = value;
+      setState(lastState.update(position: value));
+      return;
+    }
+
+    final previous = lastState.position > _acceptedPosition ? lastState.position : _acceptedPosition;
+    final sinceOpen = _loadOpenedAt == null ? Duration.zero : DateTime.now().difference(_loadOpenedAt!);
+    final decision = sushiMpvPositionDecision(
+      previous: previous,
+      next: value,
+      pendingSeek: _pendingSeek,
+      completed: lastState.completed,
+      sinceOpen: sinceOpen,
+    );
+    if (!decision.acceptIncoming) {
+      if (decision.scheduleRestore) {
+        _scheduleSpuriousZeroRestore(sushiMpvRestoreTarget(previous: previous, pendingSeek: _pendingSeek));
+      }
+      return;
+    }
+
+    if (_pendingSeek != null && (value - _pendingSeek!).inMilliseconds.abs() <= 5000) {
+      _pendingSeek = null;
+      _spuriousZeroRestores = 0;
+    }
+    _acceptedPosition = value;
+    setState(lastState.update(position: value));
+  }
+
+  void _scheduleSpuriousZeroRestore(Duration target) {
+    if (target <= Duration.zero) return;
+    if (_restoreInFlight || _spuriousZeroRestores >= 8) return;
+    _restoreInFlight = true;
+    _spuriousZeroRestores++;
+    unawaited(() async {
+      try {
+        await _player?.seek(target);
+      } finally {
+        _restoreInFlight = false;
+      }
+    }());
   }
 
   void _handleMpvLog(mpv.PlayerLog log) {
@@ -296,7 +360,7 @@ class LibMPV extends BasePlayer {
         setState(lastState.update(playing: value));
       }),
       player.stream.buffering.listen((value) => setState(lastState.update(buffering: value))),
-      player.stream.position.listen((value) => setState(lastState.update(position: value))),
+      player.stream.position.listen(_onMpvPosition),
       player.stream.duration.listen((value) {
         if (_remuxTimelineBase > Duration.zero) return;
         setState(lastState.update(duration: value));
@@ -391,7 +455,7 @@ class LibMPV extends BasePlayer {
       final native = incomingPlayer.platform as dynamic;
       await native.setProperty('force-seekable', 'yes');
       await native.setProperty('gapless-audio', 'weak');
-      await _applyOxLibassFontDir(native);
+      await _applySushiLibassFontDir(native);
       if (defaultTargetPlatform == TargetPlatform.android) {
         await native.setProperty('ao', 'audiotrack');
       }
@@ -457,6 +521,12 @@ class LibMPV extends BasePlayer {
     _subtitleTextSeen = false;
     _externalSubtitleLoadGen++;
     _externalSubtitleCache.clear();
+    _progressiveTelegram = SushiEnv.isEnabled && sushiIsTelegramDirectPlayUrl(url);
+    _pendingSeek = startPosition > Duration.zero ? startPosition : null;
+    _acceptedPosition = Duration.zero;
+    _loadOpenedAt = DateTime.now();
+    _spuriousZeroRestores = 0;
+    _restoreInFlight = false;
 
     // Telegram loopback bridge / stream_cb: progressive Range seek path.
     final sushiStreamDirectMkv = sushiStreamProgressiveHttpUrl(url);
@@ -641,8 +711,8 @@ class LibMPV extends BasePlayer {
           // playback watchdog never flags it either, since the video is actively playing, just
           // from the wrong position. Keep retrying a few more times while the index finishes
           // landing instead of giving up after one attempt.
-          for (var attempt = 0; attempt < 3; attempt++) {
-            await Future.delayed(const Duration(milliseconds: 700));
+          for (var attempt = 0; attempt < sushiStreamMpvResumeSeekAttempts; attempt++) {
+            await Future.delayed(sushiStreamMpvResumeSeekRetryDelay);
             if ((_player?.state.position.inSeconds ?? 0) >= startPosition.inSeconds - 5) break;
             await _player?.seek(startPosition);
           }
@@ -943,7 +1013,11 @@ class LibMPV extends BasePlayer {
   }
 
   @override
-  Future<void> seek(Duration position) async => _player?.seek(position);
+  Future<void> seek(Duration position) async {
+    _pendingSeek = position;
+    _spuriousZeroRestores = 0;
+    await _player?.seek(position);
+  }
 
   /// Callers (video_player_provider.dart) invoke setAudioTrack/setSubtitleTrack immediately
   /// after loadVideo() returns — but loadVideo() itself only awaits the mpv `open` command being
@@ -1108,7 +1182,7 @@ class LibMPV extends BasePlayer {
   }
 
   /// Desktop libass has no Android asset loader — point mpv at extracted Vazirmatn.
-  Future<void> _applyOxLibassFontDir(dynamic nativePlayer) async {
+  Future<void> _applySushiLibassFontDir(dynamic nativePlayer) async {
     final dir = await SushiSubtitleFont.ensureLibassFontsDir();
     if (dir == null || dir.isEmpty) return;
     try {
@@ -1141,7 +1215,7 @@ class LibMPV extends BasePlayer {
         return;
       }
       await native.setProperty('sub-visibility', 'yes');
-      await _applyOxLibassFontDir(native);
+      await _applySushiLibassFontDir(native);
       await native.setProperty('sub-ass-override', 'force');
       await native.setProperty(
         'sub-ass-force-style',
@@ -1260,7 +1334,6 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
   StreamSubscription<List<String>>? subscription;
 
   double? _cachedMenuHeight;
-  String? _lastPaintDecisionLog;
 
   @override
   void initState() {
@@ -1306,30 +1379,14 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
     final bool isLibassEnabled = widget.controller.player.platform?.configuration.libass ?? false;
     final currentSubCodec = widget.currentSubtitleCodec.toLowerCase();
     final bool isAssSubtitle = currentSubCodec.contains('ass') || currentSubCodec.contains('ssa');
-    final bool isDesktop = defaultTargetPlatform == TargetPlatform.linux ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-
-    String paintPath = 'flutter_overlay';
-    if (isLibassEnabled) {
-      // On desktop (Linux/Windows/macOS), mpv burns ALL subtitle formats into the video when libass is enabled.
-      // On mobile (Android/iOS), only ASS/SSA subs are burned in by libass; other formats need the Flutter overlay.
-      if (isDesktop) {
-        paintPath = 'libass_desktop_burn';
-        _logSubtitlePaintDecision(paintPath, text: text, libass: true, isAss: isAssSubtitle);
-        return const SizedBox.shrink();
-      }
-      if (isAssSubtitle || text.isEmpty) {
-        paintPath = isAssSubtitle ? 'libass_ass_burn' : 'empty';
-        _logSubtitlePaintDecision(paintPath, text: text, libass: true, isAss: isAssSubtitle);
-        return const SizedBox.shrink();
-      }
-    } else if (text.isEmpty) {
-      _logSubtitlePaintDecision('empty', text: text, libass: false, isAss: isAssSubtitle);
+    final paintPath = sushiSubtitlePaintPath(
+      libassEnabled: isLibassEnabled,
+      isAss: isAssSubtitle,
+      textEmpty: text.isEmpty,
+    );
+    if (!sushiSubtitlePaintsFlutterOverlay(paintPath)) {
       return const SizedBox.shrink();
     }
-
-    _logSubtitlePaintDecision(paintPath, text: text, libass: isLibassEnabled, isAss: isAssSubtitle);
 
     final offset = SubtitlePositionCalculator.calculateOffset(
       settings: settings,
@@ -1345,28 +1402,6 @@ class _VideoSubtitlesState extends ConsumerState<_VideoSubtitles> {
       text: text,
       subtitleLanguage: subtitleLanguage,
     );
-  }
-
-  void _logSubtitlePaintDecision(
-    String path, {
-    required String text,
-    required bool libass,
-    required bool isAss,
-  }) {
-    if (text.isEmpty && path == 'empty') return;
-    final key = '$path|${widget.currentSubtitleCodec}|$libass|$isAss|${text.isEmpty}';
-    if (key == _lastPaintDecisionLog) return;
-    _lastPaintDecisionLog = key;
-    final preview = text.trim();
-    SushiStreamLog.event('subtitle_flutter_paint', fields: {
-      'path': path,
-      'codec': widget.currentSubtitleCodec.isEmpty ? '(none)' : widget.currentSubtitleCodec,
-      'libass': libass,
-      'isAss': isAss,
-      'platform': defaultTargetPlatform.name,
-      'chars': preview.length,
-      'preview': preview.length > 40 ? '${preview.substring(0, 40)}…' : preview,
-    });
   }
 
   void _measureMenuHeight() {

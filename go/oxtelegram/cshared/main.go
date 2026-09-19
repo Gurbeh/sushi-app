@@ -578,6 +578,35 @@ func ox_send_text_and_wait_reply(username *C.char, text *C.char, timeoutMs C.int
 	return C.CString(reply)
 }
 
+// ox_fetch_small_document downloads a whole small document (a subtitle file, doc 15 §7) already
+// copied into this session's own chat with botID at messageID -- verified against locator the same
+// way a video play resolves its file. Caller must ox_free the returned string.
+//
+//export ox_fetch_small_document
+func ox_fetch_small_document(botID C.int64_t, messageID C.int64_t, locatorC *C.char, timeoutMs C.int) *C.char {
+	mu.Lock()
+	c := client
+	dir := cacheDir
+	mu.Unlock()
+	if c == nil {
+		setErr(fmt.Errorf("oxtelegram not configured"))
+		return nil
+	}
+	timeout := time.Duration(timeoutMs) * time.Millisecond
+	if timeoutMs <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	text, err := c.FetchSmallDocument(ctx, int64(botID), int64(messageID), C.GoString(locatorC), dir)
+	if err != nil {
+		setErr(err)
+		return nil
+	}
+	setErr(nil)
+	return C.CString(text)
+}
+
 //export ox_ensure_main_bot_onboarded
 func ox_ensure_main_bot_onboarded(username *C.char, timeoutMs C.int) C.int {
 	mu.Lock()

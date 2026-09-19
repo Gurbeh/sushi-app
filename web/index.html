@@ -45,7 +45,7 @@
       overflow: hidden;
     }
 
-    #ox-loading {
+    #sushi-loading {
       position: fixed;
       inset: 0;
       z-index: 9999;
@@ -58,20 +58,20 @@
       transition: opacity 0.45s ease, visibility 0.45s ease;
     }
 
-    #ox-loading.ox-loading--hide {
+    #sushi-loading.sushi-loading--hide {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
     }
 
-    .ox-loading__logo {
+    .sushi-loading__logo {
       width: 96px;
       height: 96px;
       object-fit: contain;
-      animation: ox-float 3s ease-in-out infinite;
+      animation: sushi-float 3s ease-in-out infinite;
     }
 
-    .ox-loading__title {
+    .sushi-loading__title {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       font-size: clamp(1.75rem, 5vw, 2.25rem);
@@ -80,14 +80,14 @@
       color: #f9b435;
     }
 
-    .ox-loading__status {
+    .sushi-loading__status {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       font-size: 0.875rem;
       color: rgba(255, 255, 255, 0.55);
     }
 
-    .ox-loading__bar {
+    .sushi-loading__bar {
       width: min(200px, 60vw);
       height: 3px;
       border-radius: 999px;
@@ -96,7 +96,7 @@
       margin-top: 0.25rem;
     }
 
-    .ox-loading__bar::after {
+    .sushi-loading__bar::after {
       content: "";
       display: block;
       width: 40%;
@@ -106,7 +106,7 @@
       animation: ox-progress 1.4s ease-in-out infinite;
     }
 
-    @keyframes ox-float {
+    @keyframes sushi-float {
       0%,
       100% {
         transform: translateY(0);
@@ -127,22 +127,22 @@
       }
     }
   </style>
-  <script src="ox-playback-diag.js"></script>
+  <script src="sushi-playback-diag.js"></script>
 </head>
 <body>
-  <div id="ox-loading" role="status" aria-live="polite" aria-label="Loading Sushi">
-    <img class="ox-loading__logo" src="icons/Icon-192.png" width="96" height="96" alt="" />
-    <p class="ox-loading__title">Sushi</p>
-    <p class="ox-loading__status">Loading application…</p>
-    <div class="ox-loading__bar" aria-hidden="true"></div>
+  <div id="sushi-loading" role="status" aria-live="polite" aria-label="Loading Sushi">
+    <img class="sushi-loading__logo" src="icons/Icon-192.png" width="96" height="96" alt="" />
+    <p class="sushi-loading__title">Sushi</p>
+    <p class="sushi-loading__status">Loading application…</p>
+    <div class="sushi-loading__bar" aria-hidden="true"></div>
   </div>
 
   <script>
     (function () {
       function hideOxLoading() {
-        var el = document.getElementById("ox-loading");
-        if (!el || el.classList.contains("ox-loading--hide")) return;
-        el.classList.add("ox-loading--hide");
+        var el = document.getElementById("sushi-loading");
+        if (!el || el.classList.contains("sushi-loading--hide")) return;
+        el.classList.add("sushi-loading--hide");
         el.addEventListener(
           "transitionend",
           function () {

@@ -25,3 +25,9 @@ const sushiStreamMpvResumeReadyTimeout = Duration(seconds: 90);
 
 /// Default progressive-playback ready timeout.
 const sushiStreamMpvDefaultReadyTimeout = Duration(seconds: 12);
+
+/// Post-open resume seeks on gotdstream: first attempt is rejected until mpv
+/// builds the container index. Keep retrying a bit longer than 3×700ms — a
+/// 68-minute resume also has to wait out Telegram FLOOD_WAIT on the cue range.
+const sushiStreamMpvResumeSeekAttempts = 8;
+const sushiStreamMpvResumeSeekRetryDelay = Duration(seconds: 1);

@@ -60,6 +60,11 @@ final class SushiTelegramNative {
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
             Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int)>(
           'ox_send_text_and_wait_reply',
+        ),
+        fetchSmallDocument = lib.lookupFunction<
+            Pointer<Utf8> Function(Int64, Int64, Pointer<Utf8>, Int32),
+            Pointer<Utf8> Function(int, int, Pointer<Utf8>, int)>(
+          'ox_fetch_small_document',
         );
 
   final int Function(
@@ -120,6 +125,10 @@ final class SushiTelegramNative {
   final Pointer<NativeFunction<SushiStreamOpenFnNative>> streamOpenFnAddress;
   final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) fetchWebApp;
   final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int) sendTextAndWaitReply;
+
+  /// (botId, messageId, locator, timeoutMs) -> the document's full text, downloaded from this
+  /// session's own chat with that bot (doc 15 §7 subtitle delivery).
+  final Pointer<Utf8> Function(int, int, Pointer<Utf8>, int) fetchSmallDocument;
 
   static SushiTelegramNative? _instance;
 

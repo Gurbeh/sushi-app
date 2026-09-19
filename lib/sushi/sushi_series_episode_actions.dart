@@ -45,7 +45,7 @@ List<SushiSeriesPickerSeason> sushiSeriesPickerSeasons(SeriesModel series) {
         if (season.season > 0 && season.episodeCount > 0)
           SushiSeriesPickerSeason(
             seasonNumber: season.season,
-            name: _oxPickerSeasonName(season, season.season),
+            name: _sushiPickerSeasonName(season, season.season),
             episodes: season.episodes.where((episode) => episode.playAble).toList(),
             episodeCount: season.episodeCount,
           ),
@@ -59,7 +59,7 @@ List<SushiSeriesPickerSeason> sushiSeriesPickerSeasons(SeriesModel series) {
   return bySeason.entries
       .map((entry) {
         final seasonMeta = series.seasons?.firstWhereOrNull((season) => season.season == entry.key);
-        final name = _oxPickerSeasonName(seasonMeta, entry.key);
+        final name = _sushiPickerSeasonName(seasonMeta, entry.key);
         final seasonEpisodes = entry.value.where((episode) => episode.playAble).toList();
         return SushiSeriesPickerSeason(
           seasonNumber: entry.key,
@@ -72,7 +72,7 @@ List<SushiSeriesPickerSeason> sushiSeriesPickerSeasons(SeriesModel series) {
       .toList();
 }
 
-String _oxPickerSeasonName(SeasonModel? seasonMeta, int seasonNumber) {
+String _sushiPickerSeasonName(SeasonModel? seasonMeta, int seasonNumber) {
   if (seasonMeta != null) {
     if (seasonMeta.seasonName.isNotEmpty) return seasonMeta.seasonName;
     if (seasonMeta.name.isNotEmpty) return seasonMeta.name;

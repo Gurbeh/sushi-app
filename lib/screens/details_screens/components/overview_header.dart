@@ -247,7 +247,7 @@ class OverviewHeader extends ConsumerWidget {
                     showIranFlag: showIranFlag,
                   ),
                 ),
-                _OxGenresWithAdultChip(
+                _SushiGenresWithAdultChip(
                   genres: genres,
                   contentTags: contentTags,
                   officialRating: officialRating,
@@ -352,13 +352,13 @@ class OverviewHeader extends ConsumerWidget {
   }
 }
 
-class _OxGenresWithAdultChip extends StatelessWidget {
+class _SushiGenresWithAdultChip extends StatelessWidget {
   final List<GenreItems> genres;
   final List<String> contentTags;
   final String? officialRating;
   final Iterable<String>? tmdbKeywords;
 
-  const _OxGenresWithAdultChip({
+  const _SushiGenresWithAdultChip({
     required this.genres,
     this.contentTags = const [],
     this.officialRating,

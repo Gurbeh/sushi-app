@@ -35,7 +35,7 @@ class _InputDetectorState extends State<InputDetector> {
           : InputDevice.touch;
 
   /// OX phone/tablet/emulator: stay on touch/pointer so login TextFields stay editable.
-  bool get _oxLockTouchInput =>
+  bool get _sushiLockTouchInput =>
       !widget.htpcMode && !widget.leanBackMode;
 
   @override
@@ -55,7 +55,7 @@ class _InputDetectorState extends State<InputDetector> {
   }
 
   bool _handleKeyPress(KeyEvent event) {
-    if (_oxLockTouchInput) return false;
+    if (_sushiLockTouchInput) return false;
 
     if (event is KeyDownEvent) {
       if (isEditableTextFocused() &&
@@ -88,7 +88,7 @@ class _InputDetectorState extends State<InputDetector> {
   }
 
   void _updateInputDevice(InputDevice device) {
-    if (_oxLockTouchInput && device == InputDevice.dPad) return;
+    if (_sushiLockTouchInput && device == InputDevice.dPad) return;
     if (_currentInput != device) {
       // Only clear focus when leaving D-pad (TV) mode.
       // touch↔pointer switches are common on Android emulators (mouse click) — unfocusing
@@ -108,7 +108,7 @@ class _InputDetectorState extends State<InputDetector> {
       onPointerDown: _handlePointerEvent,
       behavior: HitTestBehavior.translucent,
       child: IgnorePointer(
-        ignoring: _currentInput == InputDevice.dPad && !_oxLockTouchInput,
+        ignoring: _currentInput == InputDevice.dPad && !_sushiLockTouchInput,
         child: Builder(
           builder: (context) => widget.child(_currentInput),
         ),

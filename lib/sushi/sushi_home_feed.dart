@@ -176,7 +176,7 @@ abstract final class SushiHomeFeed {
   }
 
   static void applyDashboard(Ref ref, SushiHomeFeedDashboard dashboard) {
-    ref.read(dashboardProvider.notifier).applyOxHomeFeed(dashboard);
+    ref.read(dashboardProvider.notifier).applySushiHomeFeed(dashboard);
   }
 
   static List<ItemBaseModel> _itemsFromSection(Object? section, Ref ref) {

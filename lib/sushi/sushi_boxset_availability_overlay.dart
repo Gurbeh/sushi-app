@@ -4,11 +4,11 @@ import 'package:fladder/models/boxset_model.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-const _tagCollectionComplete = 'ox-collection-complete';
-const _tagCollectionPartial = 'ox-collection-partial';
-const _tagCollectionMissing = 'ox-collection-missing';
-const _tagCatalogAvailable = 'ox-catalog-available';
-const _tagCatalogMissing = 'ox-catalog-missing';
+const _tagCollectionComplete = 'sushi-collection-complete';
+const _tagCollectionPartial = 'sushi-collection-partial';
+const _tagCollectionMissing = 'sushi-collection-missing';
+const _tagCatalogAvailable = 'sushi-catalog-available';
+const _tagCatalogMissing = 'sushi-catalog-missing';
 
 /// Seerr-style top-right badge for box set shelf cards and collection movie tiles.
 Widget? sushiCatalogAvailabilityOverlay(ItemBaseModel poster) {

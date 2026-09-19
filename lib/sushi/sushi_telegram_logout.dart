@@ -17,15 +17,15 @@ Future<void> sushiLogoutTelegramSession() async {
   SushiProviderBotsBootstrap.reset();
   sushiClearPlaybackCacheOnAccountSwitch();
   try {
-    await SushiTdlibBridgeController.instance().clearSessionAfterOxLogout();
+    await SushiTdlibBridgeController.instance().clearSessionAfterSushiLogout();
   } catch (e, st) {
     developer.log(
       'Telegram logout after OX sign-out failed: $e',
-      name: 'ox-tdlib-auth',
+      name: 'sushi-tdlib-auth',
       stackTrace: st,
     );
     if (kDebugMode) {
-      debugPrint('[ox-tdlib-auth] Telegram logout after OX sign-out failed: $e');
+      debugPrint('[sushi-tdlib-auth] Telegram logout after OX sign-out failed: $e');
     }
   }
 }

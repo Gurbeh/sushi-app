@@ -2,9 +2,9 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
-/// Image URL / decode tracing — grep logcat for `OX_IMAGE`.
+/// Image URL / decode tracing — grep logcat for `SUSHI_IMAGE`.
 abstract final class SushiImageLog {
-  static const _logName = 'OX_IMAGE';
+  static const _logName = 'SUSHI_IMAGE';
 
   static void event(String phase, {Map<String, Object?> fields = const {}}) {
     
@@ -14,7 +14,7 @@ abstract final class SushiImageLog {
       if (v == null) continue;
       parts.add('${e.key}=$v');
     }
-    final line = 'OX_IMAGE ${parts.join(' ')}';
+    final line = 'SUSHI_IMAGE ${parts.join(' ')}';
     developer.log(line, name: _logName);
     debugPrint(line);
   }

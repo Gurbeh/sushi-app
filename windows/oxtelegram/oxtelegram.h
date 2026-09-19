@@ -213,6 +213,12 @@ extern __declspec(dllexport) char* ox_fetch_webapp_init_data(char* bot, char* sh
 // timeoutMs <= 0 defaults to 30000. Caller must ox_free the returned string.
 //
 extern __declspec(dllexport) char* ox_send_text_and_wait_reply(char* username, char* text, int timeoutMs);
+
+// ox_fetch_small_document downloads a whole small document (a subtitle file, doc 15 §7) already
+// copied into this session's own chat with botID at messageID -- verified against locator the same
+// way a video play resolves its file. Caller must ox_free the returned string.
+//
+extern __declspec(dllexport) char* ox_fetch_small_document(int64_t botID, int64_t messageID, char* locatorC, int timeoutMs);
 extern __declspec(dllexport) int ox_ensure_main_bot_onboarded(char* username, int timeoutMs);
 
 // ox_stream_open_fn matches mpv_stream_cb_open_ro_fn's signature exactly

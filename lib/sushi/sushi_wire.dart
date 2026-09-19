@@ -91,6 +91,8 @@ class SushiEnvelope {
   static const int msgTypeErr = 14;
   static const int msgTypeAssignment = 15;
   static const int msgTypeEpisodesRes = 33;
+  static const int msgTypeSubtitleRes = 35;
+  static const int msgTypeSubtitleFileRes = 37;
 
   /// Throws [FormatException] on any structural problem (missing `!`, bad base64, unsupported
   /// version, truncated varints). Callers decide what a decode failure means for their message.

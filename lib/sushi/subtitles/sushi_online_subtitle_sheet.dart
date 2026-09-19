@@ -19,7 +19,7 @@ void _log(String phase, [Map<String, Object?> fields = const {}]) =>
 const _kAutomatic = 'Automatic (online)';
 const _kOnline = 'Online subtitles…';
 const _kTranslate = 'Translate with AI (Persian)';
-const _kSearching = 'Searching sub-plus…';
+const _kSearching = 'Searching subtitle…';
 const _kNoResults = 'No subtitles found';
 const _kApplied = 'Subtitle loaded';
 const _kFailed = 'Could not load subtitle';

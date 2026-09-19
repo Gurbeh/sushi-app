@@ -13,7 +13,7 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 import 'package:fladder/widgets/shared/modal_side_sheet.dart';
 
-Future<void> showOxMediaIssueSheet({
+Future<void> showSushiMediaIssueSheet({
   required BuildContext context,
   required SushiMediaIssueTarget target,
 }) async {
@@ -53,10 +53,10 @@ class SushiMediaIssueSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SushiMediaIssueSheet> createState() => _OxMediaIssueSheetState();
+  ConsumerState<SushiMediaIssueSheet> createState() => _SushiMediaIssueSheetState();
 }
 
-class _OxMediaIssueSheetState extends ConsumerState<SushiMediaIssueSheet> {
+class _SushiMediaIssueSheetState extends ConsumerState<SushiMediaIssueSheet> {
   SushiMediaIssueCategory? _selected;
   final _otherController = TextEditingController();
   final _otherFocus = FocusNode();

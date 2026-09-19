@@ -159,7 +159,7 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
     state = state.copyWith(resumeVideo: await sushiContinueLoad());
   }
 
-  void applyOxHomeFeed(SushiHomeFeedDashboard feed) {
+  void applySushiHomeFeed(SushiHomeFeedDashboard feed) {
     state = state.copyWith(
       nextUp: feed.nextUp,
       resumeVideo: feed.resumeVideo,

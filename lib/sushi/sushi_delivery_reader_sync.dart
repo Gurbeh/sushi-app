@@ -18,7 +18,7 @@ enum SushiReaderSyncResult {
 ///
 /// OX HTTP `/auth/bot-token` lookup removed (R-API-4). Without that lookup we only
 /// treat mid phone-SMS / 2FA as [unknown]; otherwise [aligned].
-Future<SushiReaderSyncResult> sushiEnsureTdlibMatchesOxUser(String? accessToken) async {
+Future<SushiReaderSyncResult> sushiEnsureTdlibMatchesUser(String? accessToken) async {
   final token = accessToken?.trim() ?? '';
   if (token.isEmpty) return SushiReaderSyncResult.aligned;
 

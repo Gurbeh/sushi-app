@@ -155,7 +155,7 @@ class SushiTmdbInterestProvider extends AutoDisposeAsyncNotifierProviderImpl<
   @override
   AutoDisposeAsyncNotifierProviderElement<SushiTmdbInterest, SushiTmdbInterestState>
       createElement() {
-    return _OxTmdbInterestProviderElement(this);
+    return _SushiTmdbInterestProviderElement(this);
   }
 
   @override
@@ -186,10 +186,10 @@ mixin SushiTmdbInterestRef
   SushiTmdbMediaType get mediaType;
 }
 
-class _OxTmdbInterestProviderElement
+class _SushiTmdbInterestProviderElement
     extends AutoDisposeAsyncNotifierProviderElement<SushiTmdbInterest,
         SushiTmdbInterestState> with SushiTmdbInterestRef {
-  _OxTmdbInterestProviderElement(super.provider);
+  _SushiTmdbInterestProviderElement(super.provider);
 
   @override
   int get tmdbId => (origin as SushiTmdbInterestProvider).tmdbId;

@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
 func TestEnsureAvailable_inWindowShortCircuit(t *testing.T) {
@@ -244,5 +247,42 @@ func TestHolesLocked(t *testing.T) {
 		if holes[i] != want[i] {
 			t.Fatalf("hole[%d]=%+v want %+v", i, holes[i], want[i])
 		}
+	}
+}
+
+func TestFloodWaitAllowsRetry_retriesAfterWait(t *testing.T) {
+	flood := tgerr.New(420, "FLOOD_WAIT_0")
+	retry, fatal := floodWaitAllowsRetry(context.Background(), flood)
+	if !retry || fatal != nil {
+		t.Fatalf("after FLOOD_WAIT sleep want retry, got retry=%v fatal=%v", retry, fatal)
+	}
+}
+
+func TestFloodWaitAllowsRetry_otherErrorIsFatal(t *testing.T) {
+	other := tgerr.New(400, "FILE_REFERENCE_EXPIRED")
+	retry, fatal := floodWaitAllowsRetry(context.Background(), other)
+	if retry || fatal == nil {
+		t.Fatalf("non-flood want fatal, got retry=%v fatal=%v", retry, fatal)
+	}
+}
+
+func TestUploadGetFileWithRetry_retriesAfterFloodWait(t *testing.T) {
+	d := &DownloadSession{ref: &VideoFileRef{Size: 1024}}
+	calls := 0
+	got, err := d.uploadGetFileWithRetry(context.Background(), func(context.Context, *tg.UploadGetFileRequest) (tg.UploadFileClass, error) {
+		calls++
+		if calls == 1 {
+			return nil, tgerr.New(420, "FLOOD_WAIT_0")
+		}
+		return &tg.UploadFile{Bytes: []byte("ok")}, nil
+	}, &tg.UploadGetFileRequest{})
+	if err != nil {
+		t.Fatalf("want retry success, got %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls=%d want 2 (flood then success)", calls)
+	}
+	if got == nil {
+		t.Fatal("nil result after retry")
 	}
 }

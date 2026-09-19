@@ -88,7 +88,7 @@ class SushiSwrHttpClient extends http.BaseClient {
     final bytes = utf8.encode(entry.body);
     final headers = Map<String, String>.from(entry.headers);
     headers.putIfAbsent('content-type', () => 'application/json');
-    headers['x-ox-swr'] = 'hit';
+    headers['x-sushi-swr'] = 'hit';
     return http.StreamedResponse(
       Stream<List<int>>.fromIterable([bytes]),
       entry.statusCode,

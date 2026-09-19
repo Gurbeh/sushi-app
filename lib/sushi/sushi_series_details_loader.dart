@@ -16,7 +16,7 @@ class SushiSeriesCatalogLoad {
   final List<dto.BaseItemDto> episodeItems;
 }
 
-List<ItemFields> _oxSeriesEpisodeListFields() {
+List<ItemFields> _sushiSeriesEpisodeListFields() {
   return sushiEpisodeListFields([
     ItemFields.mediastreams,
     ItemFields.mediasources,
@@ -26,7 +26,7 @@ List<ItemFields> _oxSeriesEpisodeListFields() {
 }
 
 Future<SushiSeriesCatalogLoad> sushiFetchSeriesCatalogBySeason(JellyService api, String seriesId) async {
-  final fields = _oxSeriesEpisodeListFields();
+  final fields = _sushiSeriesEpisodeListFields();
   final results = await Future.wait([
     api.showsSeriesIdSeasonsGet(
       seriesId: seriesId,

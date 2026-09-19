@@ -304,7 +304,24 @@ class SushiTelegramWindowsBridge {
       malloc.free(t);
     }
   }
+
+  /// Downloads a whole small document (a subtitle file, doc 15 §7) already copied into this
+  /// session's own chat with [botId] at [messageId] -- [locator] is verified the same way a video
+  /// play resolves its file.
+  Future<String> fetchSmallDocument(int botId, int messageId, String locator, int timeoutMs) async {
+    final l = locator.toNativeUtf8();
+    try {
+      final ptr = _native.fetchSmallDocument(botId, messageId, l, timeoutMs);
+      if (ptr == nullptr) {
+        final msg = _native.readCString(_native.lastError());
+        throw SushiTelegramNativeException(msg.isEmpty ? 'fetchSmallDocument failed' : msg);
+      }
+      return _native.readCString(ptr);
+    } finally {
+      malloc.free(l);
+    }
+  }
 }
 
 /// True when Windows oxtelegram.dll host should be used instead of Android Pigeon.
-bool oxTelegramUseWindowsHost() => !kIsWeb && Platform.isWindows;
+bool sushiTelegramUseWindowsHost() => !kIsWeb && Platform.isWindows;

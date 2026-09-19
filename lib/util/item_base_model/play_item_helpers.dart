@@ -639,7 +639,7 @@ extension ItemBaseModelExtensions on ItemBaseModel? {
 
     if (SushiConfig.isEnabled) {
       // Android default player is libMPV. tdlib-file:// is Exo-only; feed the HTTP bridge
-      // (same choice oxplayer_stream_url_resolver.dart makes) or mpv opens a custom/loopback
+      // (same choice sushi_playback_resolver.dart makes) or mpv opens a custom/loopback
       // URL through its internal playlist and refuses it: "Refusing to load potentially unsafe
       // URL from a playlist".
       final preferHttpBridge =

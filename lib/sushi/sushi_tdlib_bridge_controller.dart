@@ -14,7 +14,7 @@ import 'package:fladder/src/tdlib_bridge.g.dart';
 
 const _kSushiTdlibDeviceIdPrefsKey = 'sushi_td_device_id';
 const _kSushiBotTokenPrefsKey = 'sushi_bot_token';
-const _kTdlibAuthLogTag = 'ox-tdlib-auth';
+const _kTdlibAuthLogTag = 'sushi-tdlib-auth';
 
 class SushiTdlibBridgeException implements Exception {
   SushiTdlibBridgeException(this.message);
@@ -78,10 +78,10 @@ String sushiTdlibAuthUserMessage(Object error) {
 /// One instance per app process.
 class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBridgeEvents {
   SushiTdlibBridgeController._() {
-    if (!oxTelegramUseWindowsHost()) {
+    if (!sushiTelegramUseWindowsHost()) {
       SushiTdlibBridgeEvents.setUp(this);
     }
-    if (oxTelegramUseWindowsHost()) {
+    if (sushiTelegramUseWindowsHost()) {
       _windows = SushiTelegramWindowsBridge(onAuthStateChanged: onAuthStateChanged);
     }
   }
@@ -106,7 +106,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// [SushiTdlibConnectingExperience] reads this once at mount to pick logout-flavored copy
   /// ("Signing you out…") instead of the generic connect narrative, since the same widget covers
   /// both a cold app start and a post-logout reconnect and the two read very differently to
-  /// someone who just tapped Log out. Set synchronously by [clearSessionAfterOxLogout] (see its
+  /// someone who just tapped Log out. Set synchronously by [clearSessionAfterSushiLogout] (see its
   /// doc for why it can't wait for the native `closed` event); cleared once the reconnect surfaces
   /// real interactive UI (QR/code/password/ready/failed) so a later, unrelated reconnect doesn't
   /// inherit stale copy.
@@ -179,7 +179,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// narrower than "not ready", which also covers the legitimate "nobody is doing anything with
   /// this client right now" case that a silent bot-token bootstrap is meant for. Callers that
   /// might otherwise repoint the shared native client onto a different identity (e.g.
-  /// sushiEnsureTdlibMatchesOxUser's bot-token bootstrap, which — per ensureBotTokenSession's
+  /// sushiEnsureTdlibMatchesUser's bot-token bootstrap, which — per ensureBotTokenSession's
   /// doc — tears down or redirects whatever session is currently there) must check this first, or
   /// they race a login screen that is actively mid-flow on the same client.
   ///
@@ -232,11 +232,14 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
 
   @override
   void onAuthStateChanged(SushiTdlibAuthState state) {
-    _log(
-      'state → ${state.kind.name}'
-      '${state.qrLoginUrl != null ? ' qrUrl=${state.qrLoginUrl!.length}c' : ''}'
-      '${state.errorMessage != null ? ' err=${state.errorMessage}' : ''}',
-    );
+    if (state.kind != _state.kind ||
+        state.errorMessage != _state.errorMessage) {
+      _log(
+        'state → ${state.kind.name}'
+        '${state.qrLoginUrl != null ? ' qrUrl=${state.qrLoginUrl!.length}c' : ''}'
+        '${state.errorMessage != null ? ' err=${state.errorMessage}' : ''}',
+      );
+    }
     _state = state;
     if (state.kind == SushiTdlibAuthStateKind.uninitialized ||
         state.kind == SushiTdlibAuthStateKind.closed) {
@@ -248,7 +251,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
         state.kind != SushiTdlibAuthStateKind.closed &&
         state.kind != SushiTdlibAuthStateKind.waitingForPhoneNumber) {
       // Real interactive UI is about to show (QR/code/password/ready/failed) — this reconnect
-      // cycle is over. [clearSessionAfterOxLogout] is what sets this true in the first place.
+      // cycle is over. [clearSessionAfterSushiLogout] is what sets this true in the first place.
       _justLoggedOut = false;
     }
     notifyListeners();
@@ -327,7 +330,6 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       if (polled.kind != SushiTdlibAuthStateKind.uninitialized &&
           polled.kind != SushiTdlibAuthStateKind.failed) {
         _state = polled;
-        _log('ensureConfigured: already configured kind=${_state.kind.name}');
         await waitUntilReadyForAuthInput(timeout: readyTimeout);
         await _restoreBotSessionIfNeededLocked();
         return;
@@ -394,7 +396,6 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     Duration timeout = const Duration(seconds: 45),
   }) async {
     if (_isInteractiveAuthKind(_state.kind)) {
-      _log('waitUntilReadyForAuthInput: already ${_state.kind.name}');
       return;
     }
 
@@ -440,7 +441,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       // Recovery is now the caller's call: show the error with a Retry action (re-runs this
       // method) and a separate, user-confirmed "log out" action — see resetStuckSession().
       await ensureConfigured();
-      // A logOutUser() elsewhere may still be mid-flight (see clearSessionAfterOxLogout's doc) —
+      // A logOutUser() elsewhere may still be mid-flight (see clearSessionAfterSushiLogout's doc) —
       // wait for it rather than guessing from whatever state Telegram happens to report right
       // now, so the check below reflects where that sign-out actually left things.
       final pendingSignOut = _pendingIntentionalSignOut;
@@ -582,7 +583,9 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// exactly how ensureBotSessionFromCacheIfNeeded recovers (see its widened guard below).
   Future<void> submitBotToken(String token) async {
     final trimmed = token.trim();
-    _log('submitBotToken len=${trimmed.length} kind=${_state.kind.name}');
+    if (_state.kind != SushiTdlibAuthStateKind.ready) {
+      _log('submitBotToken len=${trimmed.length} kind=${_state.kind.name}');
+    }
     if (trimmed.isEmpty) {
       throw SushiTdlibBridgeException('Enter your bot token');
     }
@@ -703,9 +706,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// reconfigure, so the app got permanently stuck reporting "bot isn't connected" despite a
   /// perfectly valid cached token, on every single playback attempt, with no retry path at all.
   Future<void> ensureBotSessionFromCacheIfNeeded() async {
-    final isActuallyBot = await isNativeSessionActuallyBot();
-    _log('ensureBotSessionFromCacheIfNeeded: DEBUG state=${_state.kind.name} isActuallyBot=$isActuallyBot');
-    if (_state.kind == SushiTdlibAuthStateKind.ready && !isActuallyBot) {
+    if (_state.kind == SushiTdlibAuthStateKind.ready && !await isNativeSessionActuallyBot()) {
       return;
     }
     if (_state.kind != SushiTdlibAuthStateKind.ready &&
@@ -715,9 +716,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     }
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_kSushiBotTokenPrefsKey);
-    _log('ensureBotSessionFromCacheIfNeeded: DEBUG cachedLen=${cached?.length ?? -1}');
     if (cached == null || cached.isEmpty) return;
-    _log('ensureBotSessionFromCacheIfNeeded: re-applying cached bot token');
     try {
       await submitBotToken(cached);
     } catch (e) {
@@ -808,7 +807,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     return false;
   }
 
-  /// Tracks an in-flight [clearSessionAfterOxLogout] so [prepareForLoginScreen] can deterministically
+  /// Tracks an in-flight [clearSessionAfterSushiLogout] so [prepareForLoginScreen] can deterministically
   /// wait for a genuinely-intentional sign-out instead of guessing one happened from Telegram's
   /// reported state — see prepareForLoginScreen's doc for the bug this replaced.
   Future<void>? _pendingIntentionalSignOut;
@@ -827,9 +826,9 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// mounted and captured a stale "not a logout" reading. Confirmed live (2026-08-18): the
   /// connecting screen kept showing generic connect copy after a real Settings → Log out because
   /// of exactly that race.
-  Future<void> clearSessionAfterOxLogout() {
+  Future<void> clearSessionAfterSushiLogout() {
     _justLoggedOut = true;
-    final future = _clearSessionAfterOxLogoutLocked();
+    final future = _clearSessionAfterSushiLogoutLocked();
     _pendingIntentionalSignOut = future;
     future.whenComplete(() {
       if (identical(_pendingIntentionalSignOut, future)) {
@@ -839,12 +838,12 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     return future;
   }
 
-  Future<void> _clearSessionAfterOxLogoutLocked() async {
-    _log('clearSessionAfterOxLogout from kind=${_state.kind.name}');
+  Future<void> _clearSessionAfterSushiLogoutLocked() async {
+    _log('clearSessionAfterSushiLogout from kind=${_state.kind.name}');
     try {
       await logOut();
     } catch (e) {
-      _log('clearSessionAfterOxLogout logOut error (continuing): $e');
+      _log('clearSessionAfterSushiLogout logOut error (continuing): $e');
     }
     _configured = false;
     _activeBotToken = null;
@@ -1046,6 +1045,26 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       return _windows!.sendTextAndWaitReply(username, text, timeoutMs);
     }
     return _api.sendTextAndWaitReply(username, text, timeoutMs);
+  }
+
+  /// Downloads a whole small document (a subtitle file, doc 15 §7) from this session's own chat
+  /// with [botId] at [messageId], verified against [locator]. Windows only for now — the
+  /// Android/mobile Pigeon bridge does not export this yet (mirrors sendTextFireAndForget's
+  /// opposite-direction gap above).
+  Future<String> fetchSmallDocument({
+    required int botId,
+    required int messageId,
+    required String locator,
+    int timeoutMs = 30000,
+  }) async {
+    await ensureConfigured(readyTimeout: const Duration(seconds: 60));
+    if (_state.kind != SushiTdlibAuthStateKind.ready) {
+      throw SushiTdlibBridgeException('Telegram session not ready for fetchSmallDocument');
+    }
+    if (!_useWindows) {
+      throw SushiTdlibBridgeException('fetchSmallDocument not implemented on this platform yet');
+    }
+    return _windows!.fetchSmallDocument(botId, messageId, locator, timeoutMs);
   }
 
   /// DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress

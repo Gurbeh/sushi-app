@@ -28,10 +28,10 @@ class SushiDialogFocusTrap extends StatefulWidget {
   static bool get isActive => _active > 0;
 
   @override
-  State<SushiDialogFocusTrap> createState() => _OxDialogFocusTrapState();
+  State<SushiDialogFocusTrap> createState() => _SushiDialogFocusTrapState();
 }
 
-class _OxDialogFocusTrapState extends State<SushiDialogFocusTrap> {
+class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
   Timer? _poll;
   bool _ensuring = false;
   final _locked = <FocusScopeNode, ({bool canRequest, bool descendants})>{};
@@ -63,7 +63,7 @@ class _OxDialogFocusTrapState extends State<SushiDialogFocusTrap> {
     if (identical(node, widget.primaryFocus)) return true;
     final ctx = node.context;
     if (ctx == null) return false;
-    return ctx.findAncestorStateOfType<_OxDialogFocusTrapState>() == this;
+    return ctx.findAncestorStateOfType<_SushiDialogFocusTrapState>() == this;
   }
 
   bool _scopeContainsUs(FocusScopeNode scope) {

@@ -141,7 +141,7 @@ class SushiCatalogInterestProvider extends AutoDisposeAsyncNotifierProviderImpl<
   @override
   AutoDisposeAsyncNotifierProviderElement<SushiCatalogInterest,
       SushiCatalogInterestState> createElement() {
-    return _OxCatalogInterestProviderElement(this);
+    return _SushiCatalogInterestProviderElement(this);
   }
 
   @override
@@ -166,10 +166,10 @@ mixin SushiCatalogInterestRef
   String get catalogId;
 }
 
-class _OxCatalogInterestProviderElement
+class _SushiCatalogInterestProviderElement
     extends AutoDisposeAsyncNotifierProviderElement<SushiCatalogInterest,
         SushiCatalogInterestState> with SushiCatalogInterestRef {
-  _OxCatalogInterestProviderElement(super.provider);
+  _SushiCatalogInterestProviderElement(super.provider);
 
   @override
   String get catalogId => (origin as SushiCatalogInterestProvider).catalogId;

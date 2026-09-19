@@ -50,10 +50,10 @@ class ItemDetailsNotifier extends StateNotifier<ItemBaseModel?> {
 
         final ox = await sushiFetchLibraryItemDetails(ref, itemId);
         if (ox != null) {
-          trace.add('ox_fetch_hit');
+          trace.add('sushi_fetch_hit');
           return (item: ox.model, trace: trace, attempts: attempt + 1, lastHttpStatus: lastHttpStatus);
         }
-        trace.add('ox_fetch_miss');
+        trace.add('sushi_fetch_miss');
       }
 
       final response = await api.usersUserIdItemsItemIdGet(itemId: itemId);

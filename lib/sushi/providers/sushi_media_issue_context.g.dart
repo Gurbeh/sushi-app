@@ -141,7 +141,7 @@ class SushiMediaIssueContextProvider
 
   @override
   AutoDisposeFutureProviderElement<SushiMediaIssueContext> createElement() {
-    return _OxMediaIssueContextProviderElement(this);
+    return _SushiMediaIssueContextProviderElement(this);
   }
 
   @override
@@ -166,10 +166,10 @@ mixin SushiMediaIssueContextRef
   SushiMediaIssueTarget get target;
 }
 
-class _OxMediaIssueContextProviderElement
+class _SushiMediaIssueContextProviderElement
     extends AutoDisposeFutureProviderElement<SushiMediaIssueContext>
     with SushiMediaIssueContextRef {
-  _OxMediaIssueContextProviderElement(super.provider);
+  _SushiMediaIssueContextProviderElement(super.provider);
 
   @override
   SushiMediaIssueTarget get target =>

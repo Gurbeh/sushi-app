@@ -35,7 +35,7 @@ typedef _MpvStreamCbAddRoDart = int Function(
 /// and libmpv access work identically cross-platform via Dart FFI. What differs per platform is
 /// only which native library exports `ox_stream_open_fn`: `oxtelegram.dll` on Windows,
 /// `liboxtelegramstream.so` on Android (go/oxtelegram/cshared_android) — and, on Android, whether
-/// the *caller* (TdlibBridgeObject.OX_TELEGRAM_STREAM_CB_ENABLED, currently off by default) even
+/// the *caller* (TdlibBridgeObject.SUSHI_TELEGRAM_STREAM_CB_ENABLED, currently off by default) even
 /// hands out a `gotdstream://` uri yet, since that JNI-backed path is unvalidated on-device.
 class SushiTelegramStreamCb {
   static const _protocol = 'gotdstream';

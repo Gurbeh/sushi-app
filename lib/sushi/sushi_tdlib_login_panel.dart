@@ -67,10 +67,10 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
   bool _lockOnTwoFactor = false;
   String? _error;
   /// True when [_error] is the "wrong Telegram identity connected" message from
-  /// _maybeStartOxExchange's bot-session guard — its recovery action is a reset
+  /// _maybeStartSushiExchange's bot-session guard — its recovery action is a reset
   /// (resetForPhoneLogin), not a doomed retry of the same exchange.
   bool _blockedByBotSession = false;
-  bool _oxExchangeStarted = false;
+  bool _sushiExchangeStarted = false;
   bool _qrSheetOpen = false;
   SushiTdlibAuthStateKind? _lastKind;
   /// Phone last submitted to Telegram — shown on code step + used after back.
@@ -99,7 +99,7 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
       // Telegram session on mount (see its doc); now it's the normal case for a leftover valid
       // session, and without this the panel just sits on "ready" forever with no OX exchange
       // ever kicked off. Reuses _onStateChanged itself so the exchange-start guard
-      // (_oxExchangeStarted) stays the single source of truth — safe to call unconditionally.
+      // (_sushiExchangeStarted) stays the single source of truth — safe to call unconditionally.
       _onStateChanged();
     });
   }
@@ -261,9 +261,9 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
         _syncKeyboardForAuthStep(from: prev, to: kind);
       });
     }
-    if (kind == SushiTdlibAuthStateKind.ready && !_oxExchangeStarted) {
+    if (kind == SushiTdlibAuthStateKind.ready && !_sushiExchangeStarted) {
       _dismissKeyboard();
-      unawaited(_maybeStartOxExchange());
+      unawaited(_maybeStartSushiExchange());
     }
   }
 
@@ -276,10 +276,10 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
   /// Uses isNativeSessionActuallyBot (native ground truth), not the Dart-cached flag — this
   /// exact scenario is native silently restoring a persisted bot session without Dart ever
   /// calling submitBotToken this run, which the cached flag gets wrong (see its own doc).
-  Future<void> _maybeStartOxExchange() async {
-    if (_oxExchangeStarted) return;
+  Future<void> _maybeStartSushiExchange() async {
+    if (_sushiExchangeStarted) return;
     if (await _controller.isNativeSessionActuallyBot()) {
-      debugPrint('[ox-tdlib-auth] login panel: ready state is a bot session, skipping exchange');
+      debugPrint('[sushi-tdlib-auth] login panel: ready state is a bot session, skipping exchange');
       // Without an error, a bot session left the screen looking "done" with no way forward.
       if (mounted) {
         setState(() {
@@ -289,10 +289,10 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
       }
       return;
     }
-    if (!mounted || _controller.state.kind != SushiTdlibAuthStateKind.ready || _oxExchangeStarted) {
+    if (!mounted || _controller.state.kind != SushiTdlibAuthStateKind.ready || _sushiExchangeStarted) {
       return;
     }
-    _oxExchangeStarted = true;
+    _sushiExchangeStarted = true;
     await _exchangeWithSushiInitbot();
   }
 
@@ -304,7 +304,7 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
       await sushiEnsureLocalAccount(ref);
       await widget.onSuccess();
     } catch (e) {
-      // Keep _oxExchangeStarted so the ready UI shows the error + Try again
+      // Keep _sushiExchangeStarted so the ready UI shows the error + Try again
       // instead of the "setting up" animation looping forever.
       if (mounted) setState(() => _error = sushiTdlibAuthUserMessage(e));
     }
@@ -749,7 +749,7 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
                     unawaited(_controller.resetForPhoneLogin());
                     return;
                   }
-                  _oxExchangeStarted = true;
+                  _sushiExchangeStarted = true;
                   unawaited(_exchangeWithSushiInitbot());
                 },
                 child: Text(_blockedByBotSession ? 'Log out and use phone number' : 'Try again'),

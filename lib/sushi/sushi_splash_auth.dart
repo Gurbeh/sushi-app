@@ -23,7 +23,7 @@ enum SushiSplashAuthResult {
   sessionWithLock,
 }
 
-bool _oxTdlibSessionGateSupported() {
+bool _sushiTdlibSessionGateSupported() {
   if (kIsWeb) return false;
   try {
     return Platform.isAndroid || Platform.isWindows;
@@ -60,13 +60,13 @@ Future<SushiSplashAuthResult> sushiResolveSplashAuth(
       return SushiSplashAuthResult.needsLogin;
     }
 
-    if (SushiEnv.telegramDirectPlayConfigured && _oxTdlibSessionGateSupported()) {
+    if (SushiEnv.telegramDirectPlayConfigured && _sushiTdlibSessionGateSupported()) {
       final hasTelegramSession =
           await SushiTdlibBridgeController.instance().hasReadyUserSession();
       if (!hasTelegramSession) {
         // Keep OX tokens. `adb install -r` / TV Keystore often leaves TDLib in
         // WAITING_FOR_QR; wiping here forced QR login after every rebuild.
-        debugPrint('OX_IMAGE phase=splash_tdlib_not_ready keep_ox_session=true');
+        debugPrint('SUSHI_IMAGE phase=splash_tdlib_not_ready keep_sushi_session=true');
         return SushiSplashAuthResult.sessionReady;
       }
     }

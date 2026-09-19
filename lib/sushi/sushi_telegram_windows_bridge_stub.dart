@@ -1,7 +1,7 @@
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 /// Web/stub — Windows gotd host unavailable.
-bool oxTelegramUseWindowsHost() => false;
+bool sushiTelegramUseWindowsHost() => false;
 
 class SushiTelegramWindowsBridge {
   SushiTelegramWindowsBridge({void Function(SushiTdlibAuthState state)? onAuthStateChanged});
@@ -46,5 +46,8 @@ class SushiTelegramWindowsBridge {
       throw UnsupportedError('windows-only');
 
   Future<String> sendTextAndWaitReply(String username, String text, int timeoutMs) async =>
+      throw UnsupportedError('windows-only');
+
+  Future<String> fetchSmallDocument(int botId, int messageId, String locator, int timeoutMs) async =>
       throw UnsupportedError('windows-only');
 }

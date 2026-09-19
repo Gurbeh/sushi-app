@@ -131,6 +131,13 @@ SubplusSubFile? pickEpisodeFile(List<SubplusSubFile> files, int season, int epis
   return epOnly;
 }
 
+/// Collapses punctuation scene-release names use in place of spaces (`Ride.or.Die.2021...`,
+/// `Ride_or_Die`) down to plain whitespace, so a title match isn't defeated by the separator
+/// alone. subplus's own `title` field is already a clean display title, but subdl's packs carry
+/// their raw `release_name` here (doc 15 §7's proxy), which routinely uses dots/underscores.
+String _normalizeForTitleMatch(String s) =>
+    s.toLowerCase().replaceAll(RegExp(r'[._-]+'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
 /// Drops fuzzy search junk and same-title collisions (2017 vs 2026 *The Breadwinner*).
 ///
 /// When [year] is known, dated packs that disagree are discarded — better empty than the
@@ -142,9 +149,9 @@ List<SubplusPack> sushiFilterSubplusPacks(
   ({int season, int episode})? episode,
 }) {
   var list = packs;
-  final q = query?.trim().toLowerCase() ?? '';
+  final q = _normalizeForTitleMatch(query ?? '');
   if (q.isNotEmpty) {
-    list = [for (final p in list) if (p.title.toLowerCase().contains(q)) p];
+    list = [for (final p in list) if (_normalizeForTitleMatch(p.title).contains(q)) p];
   }
   if (episode == null) {
     list = [for (final p in list) if (!p.series) p];
@@ -203,10 +210,17 @@ class SushiSubplusClient {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': kSushiHttpUserAgent,
+            // sub-plus.ir serves Brotli when Accept-Encoding advertises it, which dart:io's
+            // HttpClient cannot decompress — silently yields an empty response body (confirmed
+            // live: FormatException: Unexpected end of input, bodyLen=0). Plain JSON only.
+            'Accept-Encoding': 'identity',
           },
           body: {'q': q, 'l': lang},
         )
         .timeout(_timeout);
+    if (resp.statusCode != 200) {
+      throw SubplusException('subtitle server error (HTTP ${resp.statusCode})');
+    }
     final body = _decodeJson(resp.body);
     if (body['ok'] != true) {
       throw SubplusException((body['description'] as String?)?.trim() ?? 'search failed');
@@ -242,10 +256,17 @@ class SushiSubplusClient {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': kSushiHttpUserAgent,
+            'Accept-Encoding': 'identity',
           },
           body: {'dl': t},
         )
         .timeout(_timeout);
+    // sub-plus.ir's dl action has been seen returning a bare empty-body 500 (server-side fault,
+    // confirmed independent of headers/cookies/tag freshness) — surface the real status instead
+    // of the opaque 'bad response' a failed jsonDecode on an empty body would otherwise produce.
+    if (resp.statusCode != 200) {
+      throw SubplusException('subtitle server error (HTTP ${resp.statusCode})');
+    }
     final body = _decodeJson(resp.body);
     if (body['ok'] != true) {
       throw SubplusException((body['description'] as String?)?.trim() ?? 'download failed');
@@ -263,7 +284,7 @@ class SushiSubplusClient {
     sushiHttpAssertAllowed(uri);
     final resp = await _client.get(
       uri,
-      headers: const {'User-Agent': kSushiHttpUserAgent},
+      headers: const {'User-Agent': kSushiHttpUserAgent, 'Accept-Encoding': 'identity'},
     ).timeout(const Duration(seconds: 45));
     if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
       throw SubplusException('zip download HTTP ${resp.statusCode}');

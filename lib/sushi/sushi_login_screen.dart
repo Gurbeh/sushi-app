@@ -108,7 +108,7 @@ class _SushiLoginScreenState extends ConsumerState<SushiLoginScreen> {
     } catch (e) {
       // Not fatal at this point — the real error is surfaced with a retry when the user
       // enters the phone/QR path (that panel re-runs ensureConfigured and renders it).
-      debugPrint('[ox-login] background Telegram warm-up failed: $e');
+      debugPrint('[sushi-login] background Telegram warm-up failed: $e');
     }
   }
 
@@ -256,15 +256,15 @@ class _SushiLoginScreenState extends ConsumerState<SushiLoginScreen> {
               children: [
                 AdaptiveFab(
                   context: context,
-                  key: const Key('ox_new_user_button'),
-                  heroTag: 'ox_new_user_button',
+                  key: const Key('sushi_new_user_button'),
+                  heroTag: 'sushi_new_user_button',
                   child: const Icon(IconsaxPlusLinear.add_square),
                   onPressed: _startAddAccount,
                 ).normal,
                 AdaptiveFab(
                   context: context,
-                  key: const Key('ox_edit_user_button'),
-                  heroTag: 'ox_edit_user_button',
+                  key: const Key('sushi_edit_user_button'),
+                  heroTag: 'sushi_edit_user_button',
                   backgroundColor:
                       _editUsersMode ? Theme.of(context).colorScheme.errorContainer : null,
                   child: const Icon(IconsaxPlusLinear.edit_2),

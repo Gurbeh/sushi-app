@@ -26,10 +26,10 @@ class SushiSeriesEpisodePickerSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SushiSeriesEpisodePickerSheet> createState() => _OxSeriesEpisodePickerSheetState();
+  ConsumerState<SushiSeriesEpisodePickerSheet> createState() => _SushiSeriesEpisodePickerSheetState();
 }
 
-class _OxSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodePickerSheet>
+class _SushiSeriesEpisodePickerSheetState extends ConsumerState<SushiSeriesEpisodePickerSheet>
     with SingleTickerProviderStateMixin {
   static const _slideDuration = Duration(milliseconds: 380);
 

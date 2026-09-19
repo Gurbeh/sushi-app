@@ -47,7 +47,7 @@ Future<void> sushiPersistRefreshFromResponse(
 
 String? _readRefreshHeader(Response<dynamic> response) {
   final headers = response.base.headers;
-  return headers['x-ox-refresh-token'] ?? headers['X-Ox-Refresh-Token'];
+  return headers['x-sushi-refresh-token'] ?? headers['X-Ox-Refresh-Token'];
 }
 
 /// Validates the stored access token on cold start; refreshes or clears the session.

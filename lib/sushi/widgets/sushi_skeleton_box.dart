@@ -14,10 +14,10 @@ class SushiSkeletonBox extends StatefulWidget {
   });
 
   @override
-  State<SushiSkeletonBox> createState() => _OxSkeletonBoxState();
+  State<SushiSkeletonBox> createState() => _SushiSkeletonBoxState();
 }
 
-class _OxSkeletonBoxState extends State<SushiSkeletonBox> with SingleTickerProviderStateMixin {
+class _SushiSkeletonBoxState extends State<SushiSkeletonBox> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override

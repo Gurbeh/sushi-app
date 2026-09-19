@@ -492,12 +492,9 @@ func (d *DownloadSession) uploadGetFileWithRetry(
 		if floodAttempts >= maxFloodRetries {
 			return nil, err
 		}
-		ok, fwErr := tgerr.FloodWait(ctx, err)
-		if fwErr != nil {
-			return nil, fwErr
-		}
-		if !ok {
-			return nil, err
+		retry, fatal := floodWaitAllowsRetry(ctx, err)
+		if !retry {
+			return nil, fatal
 		}
 		floodAttempts++
 	}
@@ -617,14 +614,28 @@ func floodRetry(ctx context.Context, fn func() error) error {
 		if attempt >= maxFloodRetries {
 			return err
 		}
-		ok, fwErr := tgerr.FloodWait(ctx, err)
-		if fwErr != nil {
-			return fwErr
-		}
-		if !ok {
-			return err
+		retry, fatal := floodWaitAllowsRetry(ctx, err)
+		if !retry {
+			return fatal
 		}
 	}
+}
+
+// floodWaitAllowsRetry sleeps out a FLOOD_WAIT and reports whether the RPC should be
+// retried. gotd's FloodWait returns (true, originalErr) after a successful sleep — that
+// error is the wait that already elapsed, not a fatal failure. The previous
+// `if waitErr != nil { return waitErr }` treated a finished wait as a hard fail, so
+// mpv's next stream_cb read got -1, ffmpeg logged "partial file", and playback jumped
+// to the start of the file.
+func floodWaitAllowsRetry(ctx context.Context, err error) (retry bool, fatal error) {
+	if err == nil {
+		return false, nil
+	}
+	flood, waitErr := tgerr.FloodWait(ctx, err)
+	if flood {
+		return true, nil
+	}
+	return false, waitErr
 }
 
 func getCDNFile(ctx context.Context, api *tg.Client, redirect *tg.UploadFileCDNRedirect, offset, limit int64) ([]byte, []byte, error) {

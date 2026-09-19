@@ -26,6 +26,7 @@ import 'package:fladder/sushi/sushi_env.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
+import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -677,7 +678,7 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   Future<void> seek(Duration position) {
     final model = ref.read(playBackModel);
     if (kIsWeb && _isRemuxStreamUrl(model?.media?.url) && model != null) {
-      // Progressive remux (ox-stream stream.ts) has no random access; the browser can only
+      // Progressive remux (sushi-stream stream.ts) has no random access; the browser can only
       // play forward from ?start=. Re-request the stream from the target position instead of
       // asking the player to seek (which silently fails or stalls).
       ref.read(mediaPlaybackProvider.notifier).update(
@@ -887,6 +888,11 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       model: model,
     );
     log('sushi_sub_auto_result ok=${r.ok} error=${r.errorCode} label=${r.label}', name: 'sushi.subs');
+    // This pipeline is otherwise entirely silent (auto-attempt, quiet fallback by design) —
+    // 'busy'/'stale' are internal races, not real failures worth surfacing.
+    if (sushiSubtitleOpShouldFallback(r)) {
+      FladderSnack.show('Online subtitle unavailable (${r.errorCode})');
+    }
   }
 
   @override

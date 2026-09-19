@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 
 /// Audio / volume / track-selection tracing for Android playback debug.
 ///
-/// Visible in `pnpm dev:android:logs --stream` (filter includes `OX_AUDIO`).
+/// Visible in `pnpm dev:android:logs --stream` (filter includes `SUSHI_AUDIO`).
 abstract final class SushiAudioLog {
-  static const _logName = 'OX_AUDIO';
+  static const _logName = 'SUSHI_AUDIO';
 
   static void event(String phase, {Map<String, Object?> fields = const {}}) {
     
@@ -16,7 +16,7 @@ abstract final class SushiAudioLog {
       if (v == null) continue;
       parts.add('${e.key}=$v');
     }
-    final line = 'OX_AUDIO ${parts.join(' ')}';
+    final line = 'SUSHI_AUDIO ${parts.join(' ')}';
     developer.log(line, name: _logName);
     debugPrint(line);
   }

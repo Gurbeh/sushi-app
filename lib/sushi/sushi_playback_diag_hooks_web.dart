@@ -2,14 +2,14 @@ import 'dart:convert';
 import 'dart:js_interop';
 
 /// Web-only DOM hooks for stream / video diagnostics.
-/// Bootstrap lives in [web/ox-playback-diag.js] (loaded from index.html).
+/// Bootstrap lives in [web/sushi-playback-diag.js] (loaded from index.html).
 abstract final class SushiPlaybackDiagHooks {
   static bool _installed = false;
 
   static void install() {
     if (_installed) return;
     try {
-      _oxPlaybackDiagInstall();
+      _sushiPlaybackDiagInstall();
       _installed = true;
     } catch (e) {
       _installed = false;
@@ -19,7 +19,7 @@ abstract final class SushiPlaybackDiagHooks {
   static void uninstall() {
     if (!_installed) return;
     try {
-      _oxPlaybackDiagUninstall();
+      _sushiPlaybackDiagUninstall();
     } catch (_) {}
     _installed = false;
   }
@@ -27,7 +27,7 @@ abstract final class SushiPlaybackDiagHooks {
   static Map<String, Object?> snapshot() {
     if (!_installed) return const {};
     try {
-      final raw = _oxPlaybackDiagSnapshotJson();
+      final raw = _sushiPlaybackDiagSnapshotJson();
       if (raw == null || raw.isEmpty) return const {};
       return _decodeMap(raw);
     } catch (e) {
@@ -43,7 +43,7 @@ abstract final class SushiPlaybackDiagHooks {
       if (!_installed) {
         return {'url': url, 'ok': false, 'error': 'hooks_unavailable'};
       }
-      final raw = await _oxPlaybackDiagFetchRange(url.toJS).toDart;
+      final raw = await _sushiPlaybackDiagFetchRange(url.toJS).toDart;
       if (raw == null) return {'url': url, 'ok': false, 'error': 'empty_response'};
       return _decodeMap(raw.toDart);
     } catch (e) {
@@ -57,7 +57,7 @@ abstract final class SushiPlaybackDiagHooks {
       if (!_installed) {
         return {'url': url, 'ok': false, 'error': 'hooks_unavailable'};
       }
-      final raw = await _oxPlaybackDiagProbeVideo(url.toJS).toDart;
+      final raw = await _sushiPlaybackDiagProbeVideo(url.toJS).toDart;
       if (raw == null) return {'url': url, 'ok': false, 'error': 'empty_response'};
       return _decodeMap(raw.toDart);
     } catch (e) {
@@ -76,17 +76,17 @@ abstract final class SushiPlaybackDiagHooks {
   }
 }
 
-@JS('window.__oxPlaybackDiagInstall')
-external void _oxPlaybackDiagInstall();
+@JS('window.__sushiPlaybackDiagInstall')
+external void _sushiPlaybackDiagInstall();
 
-@JS('window.__oxPlaybackDiagUninstall')
-external void _oxPlaybackDiagUninstall();
+@JS('window.__sushiPlaybackDiagUninstall')
+external void _sushiPlaybackDiagUninstall();
 
-@JS('window.__oxPlaybackDiagSnapshotJson')
-external String? _oxPlaybackDiagSnapshotJson();
+@JS('window.__sushiPlaybackDiagSnapshotJson')
+external String? _sushiPlaybackDiagSnapshotJson();
 
-@JS('window.__oxPlaybackDiagFetchRange')
-external JSPromise<JSString?> _oxPlaybackDiagFetchRange(JSString url);
+@JS('window.__sushiPlaybackDiagFetchRange')
+external JSPromise<JSString?> _sushiPlaybackDiagFetchRange(JSString url);
 
-@JS('window.__oxPlaybackDiagProbeVideo')
-external JSPromise<JSString?> _oxPlaybackDiagProbeVideo(JSString url);
+@JS('window.__sushiPlaybackDiagProbeVideo')
+external JSPromise<JSString?> _sushiPlaybackDiagProbeVideo(JSString url);
