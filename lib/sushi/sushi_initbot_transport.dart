@@ -192,7 +192,23 @@ abstract final class SushiAssignmentStore {
 /// onboarding first, since /initbot never creates a binding itself (docs/02 §1) — for a session
 /// account, only that conversation does. Use this at login time; a bound session refreshing its
 /// already-current Assignment should call [sushiRefreshInitbot] instead, which skips onboarding.
+Future<SushiAssignment>? _runInitbotAfterReadyInFlight;
+
 Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
+  final inFlight = _runInitbotAfterReadyInFlight;
+  if (inFlight != null) return inFlight;
+  final future = _sushiRunInitbotAfterTdlibReadyBody();
+  _runInitbotAfterReadyInFlight = future;
+  try {
+    return await future;
+  } finally {
+    if (identical(_runInitbotAfterReadyInFlight, future)) {
+      _runInitbotAfterReadyInFlight = null;
+    }
+  }
+}
+
+Future<SushiAssignment> _sushiRunInitbotAfterTdlibReadyBody() async {
   assert(SushiConfig.isEnabled);
 
   final botSession = await SushiTdlibBridgeController.instance()

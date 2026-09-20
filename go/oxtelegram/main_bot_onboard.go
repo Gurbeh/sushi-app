@@ -45,12 +45,27 @@ func (c *Client) EnsureMainBotOnboarded(ctx context.Context, mainBotUsername str
 	if mainBotUsername == "" {
 		return fmt.Errorf("main bot username required")
 	}
+	if c.Health() == HealthDegraded {
+		if err := c.reviveIfSessionDead(ctx); err != nil {
+			return err
+		}
+	}
 	api := c.API()
 	if api == nil {
 		return fmt.Errorf("client not configured")
 	}
 
 	peer, userID, err := c.resolveInputPeerUser(ctx, mainBotUsername)
+	if err != nil && isConnectionDeadErr(err) {
+		if reviveErr := c.reviveIfSessionDead(ctx); reviveErr != nil {
+			return err
+		}
+		api = c.API()
+		if api == nil {
+			return err
+		}
+		peer, userID, err = c.resolveInputPeerUser(ctx, mainBotUsername)
+	}
 	if err != nil {
 		return err
 	}
@@ -66,8 +81,8 @@ func (c *Client) EnsureMainBotOnboarded(ctx context.Context, mainBotUsername str
 			return nil // no keyboard left to press -- as far through as this flow goes.
 		}
 		if !isOnboardingCallback(btn.Data) {
-			// Home / Download / Settings / etc. Bind already happened, or this chat never
-			// entered startLogin. Clicking further cannot create a binding.
+			// Home after `/start login`: finish() already Bind'd (or already-bound).
+			// Do not click Download.
 			return nil
 		}
 		next, err := c.pressCallbackAndAwait(ctx, api, peer, userID, msg.ID, btn.Data)
@@ -79,15 +94,26 @@ func (c *Client) EnsureMainBotOnboarded(ctx context.Context, mainBotUsername str
 	return nil
 }
 
-func (c *Client) startMainBotConversation(ctx context.Context, api *tg.Client, peer *tg.InputPeerUser, userID int64) (*tg.Message, error) {
-	waitCh := c.registerMessageWaiter(userID)
-	defer c.unregisterMessageWaiter(userID, waitCh)
+func isConnectionDeadErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "connection dead")
+}
 
+func (c *Client) reviveIfSessionDead(ctx context.Context) error {
+	c.mu.Lock()
+	sink := c.sink
+	c.mu.Unlock()
+	return c.Configure(ctx, sink)
+}
+
+func (c *Client) startMainBotConversation(ctx context.Context, api *tg.Client, peer *tg.InputPeerUser, userID int64) (*tg.Message, error) {
 	has, err := c.dialogHasMessages(ctx, api, peer)
 	if err != nil {
-		has = false // fall through and try to start; worst case is a duplicate /start.
+		has = false
 	}
 	if !has {
+		// Open the private chat. Telegram may ignore a repeated StartBot payload on an
+		// existing peer, so this is only the door-opener — `/start login` is always sent
+		// as a real user message below (that's what later.go routeStart matches).
 		if _, err := api.MessagesStartBot(ctx, &tg.MessagesStartBotRequest{
 			Bot:        &tg.InputUser{UserID: userID, AccessHash: peer.AccessHash},
 			Peer:       peer,
@@ -96,14 +122,26 @@ func (c *Client) startMainBotConversation(ctx context.Context, api *tg.Client, p
 		}); err != nil {
 			return nil, fmt.Errorf("MessagesStartBot: %w", err)
 		}
-	} else {
-		if _, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
+		// Drain the StartBot reply so it cannot steal the /start login waiter.
+		ch := c.registerMessageWaiter(userID)
+		_, _ = c.waitForMessageWithTimeout(ctx, ch, 3*time.Second)
+		c.unregisterMessageWaiter(userID, ch)
+	}
+	return c.sendLoginStart(ctx, api, peer, userID)
+}
+
+func (c *Client) sendLoginStart(ctx context.Context, api *tg.Client, peer *tg.InputPeerUser, userID int64) (*tg.Message, error) {
+	waitCh := c.registerMessageWaiter(userID)
+	defer c.unregisterMessageWaiter(userID, waitCh)
+	if err := floodRetry(ctx, func() error {
+		_, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
 			Peer:     peer,
 			Message:  mainBotLoginStartText,
 			RandomID: cryptoRandomID(),
-		}); err != nil {
-			return nil, fmt.Errorf("MessagesSendMessage: %w", err)
-		}
+		})
+		return err
+	}); err != nil {
+		return nil, fmt.Errorf("MessagesSendMessage: %w", err)
 	}
 	return c.waitForMessage(ctx, waitCh)
 }
@@ -114,14 +152,21 @@ func (c *Client) pressCallbackAndAwait(ctx context.Context, api *tg.Client, peer
 
 	req := &tg.MessagesGetBotCallbackAnswerRequest{Peer: peer, MsgID: msgID}
 	req.SetData(data)
-	if _, err := api.MessagesGetBotCallbackAnswer(ctx, req); err != nil {
+	if err := floodRetry(ctx, func() error {
+		_, err := api.MessagesGetBotCallbackAnswer(ctx, req)
+		return err
+	}); err != nil {
 		return nil, fmt.Errorf("GetBotCallbackAnswer: %w", err)
 	}
 	return c.waitForMessage(ctx, waitCh)
 }
 
 func (c *Client) waitForMessage(ctx context.Context, waitCh chan *tg.Message) (*tg.Message, error) {
-	timer := time.NewTimer(onboardStepTimeout)
+	return c.waitForMessageWithTimeout(ctx, waitCh, onboardStepTimeout)
+}
+
+func (c *Client) waitForMessageWithTimeout(ctx context.Context, waitCh chan *tg.Message, d time.Duration) (*tg.Message, error) {
+	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
 	case msg := <-waitCh:
