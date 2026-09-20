@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/sushi/cache/sushi_catalog.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
+import 'package:fladder/sushi/sushi_local_session.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 
 final sushiCatalogDbProvider = Provider<SushiCatalogDatabase>((ref) {
@@ -12,7 +13,12 @@ final sushiCatalogDbProvider = Provider<SushiCatalogDatabase>((ref) {
 });
 
 final sushiCatalogControllerProvider = Provider<SushiCatalogController>((ref) {
-  final catalog = SushiCatalogController(ref.watch(sushiCatalogDbProvider));
+  final catalog = SushiCatalogController(
+    ref.watch(sushiCatalogDbProvider),
+    sessionOwner: sushiCatalogSessionOwnerFromAssignment,
+    readPersistedOwner: SushiCatalogOwnerStore.read,
+    persistOwner: SushiCatalogOwnerStore.write,
+  );
   final lifecycle = _SushiPrefetchLifecycle(catalog);
   WidgetsBinding.instance.addObserver(lifecycle);
   ref.onDispose(() {

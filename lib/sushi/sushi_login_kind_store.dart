@@ -54,6 +54,17 @@ abstract final class SushiLoginKindStore {
     await prefs.setString(_currentKey, kind.name);
   }
 
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = [
+      for (final key in prefs.getKeys())
+        if (key == _currentKey || key.startsWith(_keyPrefix)) key,
+    ];
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+  }
+
   /// Stored kind wins. Else: personal-bot token ≈ bot login; TDLib ready as a user ≈ session.
   /// Native still waiting for phone (no user session) ≈ bot without /connectbot.
   static Future<SushiLoginKind?> resolve({

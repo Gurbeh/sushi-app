@@ -49,6 +49,9 @@ typedef SushiEpisodesFetcher = Future<SushiEpisodesRes?> Function({
   int page,
 });
 typedef SushiHomeFetcher = Future<SushiHomeRes?> Function({required int tab});
+typedef SushiCatalogSessionOwner = Future<String> Function();
+typedef SushiCatalogOwnerRead = Future<String> Function();
+typedef SushiCatalogOwnerWrite = Future<void> Function(String owner);
 
 /// Client-first cache (docs/11): screens read SQLite, network only updates.
 ///
@@ -64,6 +67,9 @@ class SushiCatalogController {
     DateTime Function()? clock,
     Duration prefetchGap = sushiPrefetchGap,
     Future<void> Function(Duration duration)? sleep,
+    this.sessionOwner,
+    this.readPersistedOwner,
+    this.persistOwner,
   })  : _fetchItem = fetchItem,
         _fetchFiles = fetchFiles,
         _fetchEpisodes = fetchEpisodes,
@@ -71,6 +77,12 @@ class SushiCatalogController {
         _clock = clock ?? DateTime.now,
         _prefetchGap = prefetchGap,
         _sleep = sleep ?? Future<void>.delayed;
+
+  /// Current Sushi assignment identity (binding token). Empty = no usable session.
+  /// Null [sessionOwner] skips the lock (unit tests that do not care about logout).
+  final SushiCatalogSessionOwner? sessionOwner;
+  final SushiCatalogOwnerRead? readPersistedOwner;
+  final SushiCatalogOwnerWrite? persistOwner;
 
   final SushiCatalogStore _store;
   final SushiItemFetcher _fetchItem;
@@ -87,13 +99,29 @@ class SushiCatalogController {
   Completer<void>? _busyDone;
   List<SushiRow> _queue = [];
   SushiCachedHome? _prefetchHome;
+  Completer<void>? _bindInFlight;
 
-  Future<SushiCachedHome?> peekHome() => _store.readHome();
+  Future<SushiCachedHome?> peekHome() async {
+    await _bindSession();
+    return _store.readHome();
+  }
 
   Future<bool> homeIsStale() async {
-    final home = await _store.readHome();
+    final home = await peekHome();
     if (home == null || home.isEmpty) return true;
     return !_clock().isBefore(home.fetchedAt.add(home.ttl));
+  }
+
+  /// Logout / account-switch: drop SQLite rows and the persisted owner stamp.
+  Future<void> wipeSession() async {
+    await _wipeCatalogRows();
+    await persistOwner?.call('');
+  }
+
+  Future<void> _wipeCatalogRows() async {
+    cancelPrefetch();
+    _prefetchHome = null;
+    await _store.clearAll();
   }
 
   Future<SushiCachedHome?> refreshHome({bool force = false}) {
@@ -125,6 +153,7 @@ class SushiCatalogController {
   }
 
   Future<SushiTitleSnapshot?> peekTitle({required int tmdbId, required SushiKind kind}) async {
+    await _bindSession();
     final page = await _store.readTitle(tmdbId, sushiKindToWire(kind));
     if (page == null) return null;
     final episodeId = page.episodes.firstOrNull?.episodeId;
@@ -202,7 +231,8 @@ class SushiCatalogController {
     required int tmdbId,
     required SushiKind kind,
     required int seasonNo,
-  }) {
+  }) async {
+    await _bindSession();
     return _store.readSeason(tmdbId, sushiKindToWire(kind), seasonNo);
   }
 
@@ -244,6 +274,7 @@ class SushiCatalogController {
 
   /// P2: `/item` only for viewport-ish home cards missing from SQLite (docs/11 §4).
   Future<void> prefetchVisibleHome(SushiCachedHome home) async {
+    await _bindSession();
     _prefetchHome = home;
     final pending = <SushiRow>[];
     for (final row in sushiHomePrefetchPlan(home)) {
@@ -268,9 +299,39 @@ class SushiCatalogController {
     unawaited(prefetchVisibleHome(home));
   }
 
+  Future<void> _bindSession() async {
+    final getOwner = sessionOwner;
+    if (getOwner == null) return;
+    final inFlight = _bindInFlight;
+    if (inFlight != null) {
+      await inFlight.future;
+      return;
+    }
+    final done = Completer<void>();
+    _bindInFlight = done;
+    try {
+      final owner = await getOwner();
+      final stored = readPersistedOwner != null ? await readPersistedOwner!() : '';
+      if (owner.isEmpty) {
+        // No usable assignment — leftover rows from the previous identity must not paint Play.
+        await _wipeCatalogRows();
+        if (stored.isNotEmpty) await persistOwner?.call('');
+        return;
+      }
+      if (owner == stored) return;
+      debugPrint('[sushi] catalog session mismatch — wiping');
+      await _wipeCatalogRows();
+      await persistOwner?.call(owner);
+    } finally {
+      done.complete();
+      if (identical(_bindInFlight, done)) _bindInFlight = null;
+    }
+  }
+
   Future<T> _exclusiveRead<T>(Future<T> Function() run) async {
     _p0++;
     try {
+      await _bindSession();
       await _waitIdle();
       return await run();
     } finally {

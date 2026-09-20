@@ -104,6 +104,25 @@ void main() {
     expect(a.providerId, 1);
     expect(a.epoch, 2);
   });
+
+  test('sushiEnsureAssignmentReady accepts a live pool', () {
+    sushiEnsureAssignmentReady(
+      const SushiAssignment(
+        apiBotUsername: 'OXStreamer31bot',
+        pool: ['OXStreamer31bot'],
+        providerId: 1,
+        bindingToken: 'tok',
+        epoch: 1,
+      ),
+    );
+  });
+
+  test('sushiEnsureAssignmentReady rejects pending', () {
+    expect(
+      () => sushiEnsureAssignmentReady(SushiAssignment.stubPending(reason: 'timeout')),
+      throwsStateError,
+    );
+  });
 }
 
 List<int> _uvarint(int n) {

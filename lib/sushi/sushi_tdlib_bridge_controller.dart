@@ -879,9 +879,20 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       _log('clearSessionAfterSushiLogout logOut error (continuing): $e');
     }
     _configured = false;
-    _activeBotToken = null;
+    await clearCachedBotToken();
     _state = SushiTdlibAuthState(kind: SushiTdlibAuthStateKind.uninitialized);
     notifyListeners();
+  }
+
+  /// Drops the BotFather token used to restore a bot session after process death.
+  Future<void> clearCachedBotToken() async {
+    _activeBotToken = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSushiBotTokenPrefsKey);
+    } catch (e) {
+      _log('clearCachedBotToken prefs: $e');
+    }
   }
 
   /// Abort QR (or any mid-auth) and recreate client so phone login works again.
@@ -896,7 +907,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
         _log('resetForPhoneLogin logOut error (continuing): $e');
       }
       _configured = false;
-      _activeBotToken = null;
+      await clearCachedBotToken();
       _state = SushiTdlibAuthState(kind: SushiTdlibAuthStateKind.uninitialized);
       notifyListeners();
       await ensureConfigured();

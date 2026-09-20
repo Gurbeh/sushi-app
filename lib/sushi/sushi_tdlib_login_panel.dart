@@ -300,7 +300,8 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
   Future<void> _exchangeWithSushiInitbot() async {
     setState(() => _error = null);
     try {
-      await sushiRunInitbotAfterTdlibReady();
+      final assignment = await sushiRunInitbotAfterTdlibReady();
+      sushiEnsureAssignmentReady(assignment);
       await sushiEnsureLocalAccount(ref);
       await widget.onSuccess();
     } catch (e) {

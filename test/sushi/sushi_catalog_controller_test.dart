@@ -54,6 +54,14 @@ class _MemStore implements SushiCatalogStore {
 
   @override
   Future<void> writeHome(SushiCachedHome home) async => this.home = home;
+
+  @override
+  Future<void> clearAll() async {
+    titles.clear();
+    seasons.clear();
+    files = null;
+    home = null;
+  }
 }
 
 SushiItemRes _page({required int tmdbId, required int episodeId, Uint8List? wire, List<SushiEpisode>? episodes}) {
@@ -456,5 +464,53 @@ void main() {
     final cached = await catalog.openSeason(tmdbId: 1396, kind: SushiKind.series, seasonNo: 1);
     expect(cached, hasLength(2));
     expect(calls, 2);
+  });
+
+  test('empty session owner wipes leftover home and files', () async {
+    final store = _MemStore();
+    store.home = _cachedHome(slider: [_row(1084244)]);
+    store.files = (files: [_file(23699)], fetchedAt: DateTime(2026, 1, 1));
+    var persisted = 'old-binding';
+    final catalog = SushiCatalogController(
+      store,
+      sessionOwner: () async => '',
+      readPersistedOwner: () async => persisted,
+      persistOwner: (owner) async => persisted = owner,
+    );
+    expect(await catalog.peekHome(), isNull);
+    expect(store.home, isNull);
+    expect(store.files, isNull);
+    expect(persisted, isEmpty);
+  });
+
+  test('same session owner keeps cached home', () async {
+    final store = _MemStore();
+    store.home = _cachedHome(slider: [_row(1)]);
+    var persisted = 'token-a';
+    final catalog = SushiCatalogController(
+      store,
+      sessionOwner: () async => 'token-a',
+      readPersistedOwner: () async => persisted,
+      persistOwner: (owner) async => persisted = owner,
+    );
+    final home = await catalog.peekHome();
+    expect(home, isNotNull);
+    expect(home!.slider, hasLength(1));
+    expect(store.home, isNotNull);
+  });
+
+  test('session owner change wipes catalog', () async {
+    final store = _MemStore();
+    store.home = _cachedHome(slider: [_row(1)]);
+    var persisted = 'token-a';
+    final catalog = SushiCatalogController(
+      store,
+      sessionOwner: () async => 'token-b',
+      readPersistedOwner: () async => persisted,
+      persistOwner: (owner) async => persisted = owner,
+    );
+    expect(await catalog.peekHome(), isNull);
+    expect(store.home, isNull);
+    expect(persisted, 'token-b');
   });
 }

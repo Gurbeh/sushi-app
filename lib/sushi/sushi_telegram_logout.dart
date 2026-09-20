@@ -10,10 +10,10 @@ import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 /// OX [authProvider.logOutUser] alone leaves AuthReady — QR then fails with
 /// `Cannot start QR login from state=ready`.
 ///
-/// Does not re-warm Telegram here (that blocked logout UI for ~30s+). Login bootstrap
-/// calls [SushiTdlibBridgeController.prepareForLoginScreen] afterward.
+/// Catalog / assignment reset is [sushiResetLocalSession] — await that on the logout
+/// path before this. Native logOut can stay unawaited so the login screen is not
+/// blocked ~30s.
 Future<void> sushiLogoutTelegramSession() async {
-  
   SushiProviderBotsBootstrap.reset();
   sushiClearPlaybackCacheOnAccountSwitch();
   try {

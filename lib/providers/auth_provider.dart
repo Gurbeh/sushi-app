@@ -11,7 +11,9 @@ import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/credentials_model.dart';
 import 'package:fladder/models/login_screen_model.dart';
 import 'package:fladder/sushi/sushi_api_disk_cache.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_image_auth.dart';
+import 'package:fladder/sushi/sushi_local_session.dart';
 import 'package:fladder/sushi/sushi_telegram_logout.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
@@ -198,7 +200,8 @@ class AuthNotifier extends StateNotifier<LoginScreenModel> {
       }
     }
     
-      unawaited(sushiLogoutTelegramSession());
+    await sushiResetLocalSession(catalog: ref.read(sushiCatalogControllerProvider));
+    unawaited(sushiLogoutTelegramSession());
     
     clearAllProviders();
     return null;

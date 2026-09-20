@@ -67,4 +67,8 @@ abstract class SushiCatalogStore {
   Future<void> writeSeason(int tmdbId, int kind, int seasonNo, List<SushiEpisode> episodes);
   Future<SushiCachedHome?> readHome();
   Future<void> writeHome(SushiCachedHome home);
+
+  /// Drops every cached title/home/files row. Logout and session-owner mismatch call this
+  /// so a previous Telegram identity cannot paint Play from leftover `/files`.
+  Future<void> clearAll();
 }

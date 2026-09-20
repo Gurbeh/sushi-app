@@ -38,6 +38,13 @@ class SushiRequestedNotifier extends StateNotifier<Set<String>> {
 
   static const _prefsKey = 'sushi_open_requests';
 
+  static Future<void> clearPersisted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefsKey);
+    } catch (_) {}
+  }
+
   String _key(int tmdbId, int kind) => '$tmdbId:$kind';
 
   Future<void> _load() async {

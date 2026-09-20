@@ -209,6 +209,17 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
     }
   }
 
+  @override
+  Future<void> clearAll() async {
+    await transaction(() async {
+      await delete(catalogItems).go();
+      await delete(itemPages).go();
+      await delete(episodeFileLists).go();
+      await delete(seasonEpisodeLists).go();
+      await delete(homeSnapshots).go();
+    });
+  }
+
   Future<void> _upsertItem(SushiRow row) async {
     if (row.tmdbId == 0) return;
     await into(catalogItems).insertOnConflictUpdate(

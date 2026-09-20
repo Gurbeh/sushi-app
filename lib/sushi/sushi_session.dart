@@ -7,6 +7,8 @@ import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/account_model.dart';
 import 'package:fladder/sushi/sushi_env.dart';
 import 'package:fladder/sushi/sushi_login_kind_store.dart';
+import 'package:fladder/sushi/sushi_local_session.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_provider_read.dart';
 import 'package:fladder/sushi/sushi_image_auth.dart';
 import 'package:fladder/sushi/sushi_session_store.dart';
@@ -137,6 +139,7 @@ Future<void> sushiLogoutLocallySkippingServer(
     await read(sharedUtilityProvider).saveAccounts(saved);
   }
   SushiImageAuth.clear();
+  await sushiResetLocalSession(catalog: read(sushiCatalogControllerProvider));
   read(authProvider.notifier).clearAllProviders();
   read(sushiSessionRevokedProvider.notifier).state++;
 }
@@ -148,6 +151,7 @@ Future<void> sushiInvalidateLocalSession(SushiRead read, AccountModel account) a
     credentials: account.credentials.copyWith(token: ''),
   );
   await read(sharedUtilityProvider).updateAccountInfo(cleared);
+  await sushiResetLocalSession(catalog: read(sushiCatalogControllerProvider));
   read(authProvider.notifier).clearAllProviders();
   read(sushiSessionRevokedProvider.notifier).state++;
 }

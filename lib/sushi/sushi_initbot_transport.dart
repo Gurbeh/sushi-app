@@ -212,6 +212,19 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
   return sushiRefreshInitbot();
 }
 
+/// Phone/QR login must not enter Home with a pending assignment — leftover catalog
+/// would then paint Play while `/play` skips.
+void sushiEnsureAssignmentReady(SushiAssignment assignment) {
+  if (!assignment.pending && assignment.apiSendTargets.isNotEmpty) return;
+  final blob = assignment.rawReply.toLowerCase();
+  if (blob.contains('user_is_bot') || blob.contains("can't send messages to other bots")) {
+    throw StateError(
+      'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then tap Login again.',
+    );
+  }
+  throw StateError('Sushi is not ready yet. Finish setup in Telegram, then try again.');
+}
+
 /// Re-runs `/initbot` for an already-bound session, without touching main-bot: /initbot is
 /// idempotent (docs/02 §1), so this just re-syncs the Assignment — the API bot pool and delivery
 /// bot list it carries can both change server-side after the client last asked (docs/02 §7, docs/10
@@ -276,6 +289,11 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
 }
 
 bool _sushiColdStartInitbotDone = false;
+
+/// Next dashboard mount must re-run `/initbot` (logout / account switch).
+void sushiResetInitbotColdStart() {
+  _sushiColdStartInitbotDone = false;
+}
 
 /// Fire-and-forget refresh, once per process: paints whatever is already cached immediately, then
 /// quietly re-syncs in the background (docs/02 §7's cold-start half of bot rotation). Also arms the

@@ -57,6 +57,12 @@ class SushiPlayWarmup {
     if (id != null) schedule(id);
   }
 
+  void clear() {
+    _cache.clear();
+    _inFlight.clear();
+    _pending = null;
+  }
+
   void schedule(int? fileId) {
     
     if (fileId == null || fileId <= 0) return;

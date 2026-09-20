@@ -298,7 +298,8 @@ class _SushiTdlibQrLoginPanelState extends ConsumerState<SushiTdlibQrLoginPanel>
       _error = null;
     });
     try {
-      await sushiRunInitbotAfterTdlibReady();
+      final assignment = await sushiRunInitbotAfterTdlibReady();
+      sushiEnsureAssignmentReady(assignment);
       await sushiEnsureLocalAccount(ref);
       await widget.onSuccess();
     } catch (e) {
