@@ -125,14 +125,30 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
     if (mounted) setState(() {});
   }
 
-  /// Joins the background warm-up so this panel can leave the `uninitialized` loading state.
-  /// Errors here render inline (see the `uninitialized` branch in [build]) with a Try again.
-  Future<void> _ensureConnected() async {
+  /// Native client is down or not past WaitTdlibParameters — phone form still shows so the
+  /// user can type while [ensureConfigured] runs in the background.
+  static bool _isPhoneWarmupKind(SushiTdlibAuthStateKind kind) {
+    switch (kind) {
+      case SushiTdlibAuthStateKind.uninitialized:
+      case SushiTdlibAuthStateKind.closed:
+      case SushiTdlibAuthStateKind.loggingOut:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// Joins the background warm-up. Phone field stays visible; errors render under the form.
+  Future<void> _ensureConnected({bool throwOnError = false}) async {
     if (!mounted) return;
-    if (_controller.state.kind != SushiTdlibAuthStateKind.uninitialized) return;
+    if (!_isPhoneWarmupKind(_controller.state.kind) &&
+        _controller.state.kind != SushiTdlibAuthStateKind.waitingForPhoneNumber) {
+      return;
+    }
     try {
       await _controller.ensureConfigured();
     } catch (e) {
+      if (throwOnError) rethrow;
       if (mounted) setState(() => _error = sushiTdlibAuthUserMessage(e));
     }
   }
@@ -146,7 +162,11 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
       SushiTdlibAuthStateKind.waitingForCode => _codeController.text.trim().isNotEmpty,
       SushiTdlibAuthStateKind.waitingForPassword => _passwordController.text.isNotEmpty,
       SushiTdlibAuthStateKind.failed when onPassword => _passwordController.text.isNotEmpty,
-      SushiTdlibAuthStateKind.waitingForPhoneNumber => _phoneController.text.trim().isNotEmpty,
+      SushiTdlibAuthStateKind.waitingForPhoneNumber ||
+      SushiTdlibAuthStateKind.uninitialized ||
+      SushiTdlibAuthStateKind.closed ||
+      SushiTdlibAuthStateKind.loggingOut =>
+        _phoneController.text.trim().isNotEmpty,
       _ => false,
     };
     if (!canSubmit) {
@@ -170,13 +190,18 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
 
   void _focusAuthField(SushiTdlibAuthStateKind kind, {required bool showIme, int retry = 0}) {
     final field = switch (kind) {
-      SushiTdlibAuthStateKind.waitingForPhoneNumber => _phoneFieldKey.currentState,
+      SushiTdlibAuthStateKind.waitingForPhoneNumber ||
+      SushiTdlibAuthStateKind.uninitialized ||
+      SushiTdlibAuthStateKind.closed ||
+      SushiTdlibAuthStateKind.loggingOut =>
+        _phoneFieldKey.currentState,
       SushiTdlibAuthStateKind.waitingForCode => _codeFieldKey.currentState,
       SushiTdlibAuthStateKind.waitingForPassword => _passwordFieldKey.currentState,
       _ => null,
     };
     if (field == null) {
       final expectsField = kind == SushiTdlibAuthStateKind.waitingForPhoneNumber ||
+          _isPhoneWarmupKind(kind) ||
           kind == SushiTdlibAuthStateKind.waitingForCode ||
           kind == SushiTdlibAuthStateKind.waitingForPassword;
       if (showIme && expectsField && retry < 8) {
@@ -343,11 +368,10 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
             setState(() => _error = 'Finish QR sign-in, or cancel it first.');
             break;
           case SushiTdlibAuthStateKind.waitingForPhoneNumber:
-            // Dismiss before RPC — Android keeps IME open if focus moves later without hide.
-            _dismissKeyboard();
-            final phone = _phoneController.text.trim();
-            _submittedPhone = phone;
-            await _controller.submitPhoneNumber(phone);
+          case SushiTdlibAuthStateKind.uninitialized:
+          case SushiTdlibAuthStateKind.closed:
+          case SushiTdlibAuthStateKind.loggingOut:
+            await _submitEnteredPhone();
             break;
           default:
             throw SushiTdlibBridgeException(
@@ -361,6 +385,25 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
       _submitLocked = false;
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _submitEnteredPhone() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      throw SushiTdlibBridgeException('Enter a phone number with country code');
+    }
+    if (_isPhoneWarmupKind(_controller.state.kind)) {
+      await _ensureConnected(throwOnError: true);
+    }
+    if (_controller.state.kind != SushiTdlibAuthStateKind.waitingForPhoneNumber) {
+      throw SushiTdlibBridgeException(
+        'Telegram is not ready for phone login yet (state=${_controller.state.kind.name})',
+      );
+    }
+    // Dismiss before RPC — Android keeps IME open if focus moves later without hide.
+    _dismissKeyboard();
+    _submittedPhone = phone;
+    await _controller.submitPhoneNumber(phone);
   }
 
   Future<void> _backToPhoneNumber() async {
@@ -515,49 +558,7 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
     final showQrOption = widget.showQrShortcut && onPhoneContinueStep;
     final showBackToQr = widget.onBackToQr != null && onPhoneContinueStep;
     final showBackToPhone = showPasswordStep || kind == SushiTdlibAuthStateKind.waitingForCode;
-
-    // Still bringing the connection up: a plain spinner instead of the phone form whose Continue
-    // button can only fail (submitPhoneNumber requires waitingForPhoneNumber). Restricted to
-    // uninitialized because closed/failed are real outcomes with their own messaging, and the
-    // transient kinds noted above must keep rendering the normal form. The user reached this by
-    // choosing "Continue with phone", so a quiet "Connecting…" is enough — no takeover.
-    if (kind == SushiTdlibAuthStateKind.uninitialized) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _error == null
-              ? [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Connecting…',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ]
-              : [
-                  Icon(IconsaxPlusBold.warning_2,
-                      size: 40, color: theme.colorScheme.error),
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.colorScheme.error),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () {
-                      setState(() => _error = null);
-                      unawaited(_ensureConnected());
-                    },
-                    child: const Text('Try again'),
-                  ),
-                ],
-        ),
-      );
-    }
+    final warmingTelegram = _isPhoneWarmupKind(kind) && _error == null;
 
     if (kind == SushiTdlibAuthStateKind.waitingForQrConfirmation && !_qrSheetOpen) {
       return Column(
@@ -781,7 +782,8 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
         buttonLabel = 'Continue';
     }
 
-    final sendingPhone = _busy && kind == SushiTdlibAuthStateKind.waitingForPhoneNumber;
+    final sendingPhone = _busy &&
+        (kind == SushiTdlibAuthStateKind.waitingForPhoneNumber || _isPhoneWarmupKind(kind));
     // Keep buttons focusable for D-pad even when the field is empty — null onPressed
     // removes the node from the focus tree and traps the remote on the TextField.
     final actionsEnabled = !_busy && !_submitLocked;
@@ -807,6 +809,14 @@ class _SushiTdlibLoginPanelState extends ConsumerState<SushiTdlibLoginPanel> {
             order: const NumericFocusOrder(1),
             child: field,
           ),
+          if (warmingTelegram && !sendingPhone) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Preparing Telegram… you can enter your number now.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
           if (sendingPhone) ...[
             const SizedBox(height: 12),
             Text(

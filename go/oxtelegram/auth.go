@@ -63,6 +63,7 @@ type AuthController struct {
 	// loggedIn is signaled by UpdateLoginToken (QR accepted on phone). Created once;
 	// RequestQrLogin always reads this same channel.
 	loggedIn qrlogin.LoggedIn
+	kind     AuthStateKind
 	// botMode is set once SubmitBotToken succeeds. ResolveVideoFile reads it (via IsBotMode) to
 	// decide whether it's safe to resolve a public channel directly (session accounts) or must
 	// instead wait for the server's live-forwarded push (bot accounts — see Client.pushedDocs).
@@ -119,7 +120,22 @@ func newAuthController(
 }
 
 func (a *AuthController) emit(kind AuthStateKind, qrURL, hint, errMsg string) {
+	a.mu.Lock()
+	a.kind = kind
+	a.mu.Unlock()
 	a.sink.OnAuthStateChanged(string(kind), qrURL, hint, errMsg)
+}
+
+// Kind is the last state pushed to the sink. Used by Client.Configure to tell a logged-out
+// but still-alive engine apart from a healthy waitingForPhoneNumber/ready session — Status()
+// succeeds in both cases, so without this Configure no-op'd after AuthLogOut.
+func (a *AuthController) Kind() AuthStateKind {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.kind == "" {
+		return AuthUninitialized
+	}
+	return a.kind
 }
 
 // checkInitialStatus runs once right after Configure to emit the correct starting state —

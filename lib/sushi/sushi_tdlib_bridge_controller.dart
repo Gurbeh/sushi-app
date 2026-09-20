@@ -306,6 +306,11 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   /// the real play action of a state that ever settled.
   Future<void>? _ensureConfiguredInFlight;
 
+  /// Bumped by [clearSessionAfterSushiLogout] so an in-flight [waitUntilReadyForAuthInput]
+  /// that started against the old client aborts instead of polling `uninitialized` for 45s
+  /// after native `logOut` nulls the client (Pixel 10 Pro, 2026-09-20).
+  int _configureEpoch = 0;
+
   /// Idempotent — safe to call from every login panel's initState, and from every prefetch/play
   /// attempt (see _ensureConfiguredInFlight — concurrent callers share one attempt).
   /// Waits until TDLib accepts phone/QR input (past setTdlibParameters) — for bot-mode sessions,
@@ -315,6 +320,11 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   Future<void> ensureConfigured({
     Duration readyTimeout = const Duration(seconds: 45),
   }) {
+    final pendingSignOut = _pendingIntentionalSignOut;
+    if (pendingSignOut != null) {
+      _log('ensureConfigured: awaiting in-flight sign-out');
+      return pendingSignOut.then((_) => ensureConfigured(readyTimeout: readyTimeout));
+    }
     final inFlight = _ensureConfiguredInFlight;
     if (inFlight != null) return inFlight;
     final future = _ensureConfiguredLocked(readyTimeout);
@@ -328,6 +338,7 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
   }
 
   Future<void> _ensureConfiguredLocked(Duration readyTimeout) async {
+    final epoch = _configureEpoch;
     if (_configured) {
       // Don't trust the cached flag alone — re-verify against native's actual current state.
       // Observed in practice: _configured stays true (this singleton survives Dart hot restarts)
@@ -335,10 +346,13 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       // configure() again and drive it forward — waitUntilReadyForAuthInput then polls a dead
       // state for the full timeout instead of failing fast or self-healing.
       final polled = _useWindows ? _windows!.currentAuthState() : await _api.currentAuthState();
-      if (polled.kind != SushiTdlibAuthStateKind.uninitialized &&
-          polled.kind != SushiTdlibAuthStateKind.failed) {
+      // `closed` / `loggingOut` are a torn-down session, not a live client to keep polling.
+      // Treating them like `ready` sat on Connecting… for 45s after Settings → Log out
+      // (Pixel 10 Pro, 2026-09-20): native already nulled the client.
+      if (!_needsNativeRecreate(polled.kind)) {
         _state = polled;
         await waitUntilReadyForAuthInput(timeout: readyTimeout);
+        if (epoch != _configureEpoch) return;
         await _restoreBotSessionIfNeededLocked();
         return;
       }
@@ -394,7 +408,24 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     _log('ensureConfigured: currentAuthState=${_state.kind.name}');
     notifyListeners();
     await waitUntilReadyForAuthInput(timeout: readyTimeout);
+    if (epoch != _configureEpoch) return;
     await _restoreBotSessionIfNeededLocked();
+  }
+
+  static bool _needsNativeRecreate(SushiTdlibAuthStateKind kind) {
+    switch (kind) {
+      case SushiTdlibAuthStateKind.uninitialized:
+      case SushiTdlibAuthStateKind.failed:
+      case SushiTdlibAuthStateKind.closed:
+      case SushiTdlibAuthStateKind.loggingOut:
+        return true;
+      case SushiTdlibAuthStateKind.waitingForPhoneNumber:
+      case SushiTdlibAuthStateKind.waitingForCode:
+      case SushiTdlibAuthStateKind.waitingForPassword:
+      case SushiTdlibAuthStateKind.waitingForQrConfirmation:
+      case SushiTdlibAuthStateKind.ready:
+        return false;
+    }
   }
 
   /// Only ever called from inside _ensureConfiguredLocked (hence "Locked" — under the same
@@ -419,8 +450,13 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     }
 
     _log('waitUntilReadyForAuthInput: polling (now=${_state.kind.name})');
+    final epoch = _configureEpoch;
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
+      if (epoch != _configureEpoch) {
+        _log('waitUntilReadyForAuthInput: aborted (sign-out)');
+        return;
+      }
       final polled = _useWindows ? _windows!.currentAuthState() : await _api.currentAuthState();
       if (polled.kind != _state.kind) {
         _log('waitUntilReadyForAuthInput: polled ${polled.kind.name}');
@@ -453,6 +489,15 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
     _log('prepareForLoginScreen phoneFirst=$phoneFirst');
     _suppressBotSessionRestore = true;
     try {
+      // Must finish the OX sign-out's native logOut+close BEFORE configure. The other order
+      // (configure first, await sign-out after) is what stuck login on Connecting… after
+      // Settings → Log out: Kotlin configure short-circuited on the still-live client, then
+      // logOut nulled it, and Dart polled `uninitialized` for 45s (Pixel 10 Pro, 2026-09-20).
+      final pendingSignOut = _pendingIntentionalSignOut;
+      if (pendingSignOut != null) {
+        _log('prepareForLoginScreen: awaiting in-flight intentional sign-out');
+        await pendingSignOut;
+      }
       // A "stuck at <kind>" SushiTdlibBridgeException from ensureConfigured propagates as-is
       // — this used to auto-recover by force-calling logOut() on the real Telegram session, which
       // also fires on an ordinary cold launch whose first connect is merely slow (e.g. waking from
@@ -460,14 +505,6 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
       // Recovery is now the caller's call: show the error with a Retry action (re-runs this
       // method) and a separate, user-confirmed "log out" action — see resetStuckSession().
       await ensureConfigured();
-      // A logOutUser() elsewhere may still be mid-flight (see clearSessionAfterSushiLogout's doc) —
-      // wait for it rather than guessing from whatever state Telegram happens to report right
-      // now, so the check below reflects where that sign-out actually left things.
-      final pendingSignOut = _pendingIntentionalSignOut;
-      if (pendingSignOut != null) {
-        _log('prepareForLoginScreen: awaiting in-flight intentional sign-out');
-        await pendingSignOut;
-      }
       if (phoneFirst && _state.kind == SushiTdlibAuthStateKind.waitingForQrConfirmation) {
         await resetForPhoneLogin();
       }
@@ -873,6 +910,8 @@ class SushiTdlibBridgeController extends ChangeNotifier implements SushiTdlibBri
 
   Future<void> _clearSessionAfterSushiLogoutLocked() async {
     _log('clearSessionAfterSushiLogout from kind=${_state.kind.name}');
+    _configureEpoch++;
+    _ensureConfiguredInFlight = null;
     try {
       await logOut();
     } catch (e) {

@@ -145,19 +145,30 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
         val existing = client
         val existingAuth = authController
         if (existing != null && existingAuth != null) {
-            // Hot restart / re-prepare: client already live — push current auth to Dart immediately.
-            onAuthStateChanged(existingAuth.state.value)
-            // A live client object is NOT proof of a live connection: gotd does not resurrect a run
-            // loop that exited, and the client keeps answering as if healthy afterwards. Returning
-            // here unconditionally (as this did) made the Go-side rebuild unreachable from Dart, so
-            // a dropped socket could only be fixed by killing the app. Kick a reconnect instead —
-            // it is a no-op when the connection really is healthy.
-            scope.launch { runCatching { existing.ensureConnected(existingAuth.sink) } }
-            callback(Result.success(Unit))
-            return
+            when (existingAuth.state.value) {
+                is TdlibAuthState.Closed, is TdlibAuthState.LoggingOut -> {
+                    // AuthLogOut left the Kotlin wrapper alive; Go Configure would no-op on a
+                    // still-running engine and Dart would poll uninitialized until timeout.
+                    Log.i("OXPLAY_TDLIB", "configure: recreating client after ${existingAuth.state.value}")
+                    existing.close()
+                    clearNativeSession()
+                }
+                else -> {
+                    // Hot restart / re-prepare: client already live — push current auth to Dart immediately.
+                    onAuthStateChanged(existingAuth.state.value)
+                    // A live client object is NOT proof of a live connection: gotd does not resurrect a run
+                    // loop that exited, and the client keeps answering as if healthy afterwards. Returning
+                    // here unconditionally (as this did) made the Go-side rebuild unreachable from Dart, so
+                    // a dropped socket could only be fixed by killing the app. Kick a reconnect instead —
+                    // it is a no-op when the connection really is healthy.
+                    scope.launch { runCatching { existing.ensureConnected(existingAuth.sink) } }
+                    callback(Result.success(Unit))
+                    return
+                }
+            }
         }
-        if (existing != null) {
-            existing.close()
+        if (client != null) {
+            client?.close()
             clearNativeSession()
         }
 

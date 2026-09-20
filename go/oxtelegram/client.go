@@ -441,8 +441,14 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 	if c.tg != nil {
 		alive := c.runDone != nil && !isClosed(c.runDone)
 		tg := c.tg
+		auth := c.Auth
 		c.mu.Unlock()
-		if alive {
+		authKind := AuthUninitialized
+		if auth != nil {
+			authKind = auth.Kind()
+		}
+		loggedOut := authKind == AuthClosed || authKind == AuthLoggingOut
+		if alive && !loggedOut {
 			_, err := tg.Auth().Status(ctx)
 			if !isEngineClosedErr(err) {
 				if err != nil {
@@ -452,7 +458,7 @@ func (c *Client) Configure(ctx context.Context, sink AuthEventSink) error {
 			}
 		}
 		c.mu.Lock()
-		// Run loop gone, or RPC engine closed while Run still sat on innerCtx.Done().
+		// Run loop gone, logged out, or RPC engine closed while Run still sat on innerCtx.Done().
 		if c.cancel != nil {
 			c.cancel()
 		}
