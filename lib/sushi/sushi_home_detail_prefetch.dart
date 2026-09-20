@@ -9,6 +9,7 @@ import 'package:fladder/models/items/movie_model.dart';
 import 'package:fladder/models/items/series_model.dart';
 import 'package:fladder/models/view_model.dart';
 import 'package:fladder/sushi/sushi_library_item_ratings.dart';
+import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
 import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/sushi_series_details_loader.dart';
 import 'package:fladder/sushi/sushi_playback_prefetch.dart';
@@ -166,11 +167,14 @@ abstract final class SushiHomeDetailPrefetch {
 
   static List<ItemBaseModel> _sliderItems(Ref ref, HomeModel dashboard) {
     final settings = ref.read(homeSettingsProvider).carouselSettings;
+    final rails = ref.read(sushiHomeRailsProvider);
     return capSliderItems(
       sushiAssembleHomeCarousel(
         settings: settings,
         nextUp: dashboard.nextUp,
         resume: dashboard.resumeVideo,
+        trendingMovies: rails.trending,
+        trendingSeries: rails.seriesTrending,
       ),
     );
   }

@@ -137,6 +137,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       settings: homeSettings.carouselSettings,
       nextUp: dashboardData.nextUp,
       resume: allResume,
+      trendingMovies: sushiRails.trending,
+      trendingSeries: sushiRails.seriesTrending,
     );
     final homeBannerPosters = SushiTvUiLimits.shouldCapHomeSlider(ref)
         ? SushiTvUiLimits.capHomeSliderItems(homeCarouselItems)
@@ -166,13 +168,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final showListSkeleton = !sushiHasRails && (!dashboardData.loaded || dashboardData.loading);
 
     // R-RAIL-1: item once on home. Banner → continue (no min) → catalog rails (min floor).
+    // Exception: continue watching still lists titles that are also on the banner.
     final homeSeen = <String>{};
     if (showBanner) {
       sushiTakeUnseenHomeItems(homeBannerPosters, homeSeen);
     }
-    final continueWatchingPosters = sushiTakeUnseenHomeItems(resumeVideo, homeSeen);
-    final continueListeningPosters = sushiTakeUnseenHomeItems(resumeAudio, homeSeen);
-    final continueReadingPosters = sushiTakeUnseenHomeItems(resumeBooks, homeSeen);
+    final continueWatchingPosters = sushiAssembleContinueRail(resumeVideo, homeSeen);
+    final continueListeningPosters = sushiAssembleContinueRail(resumeAudio, homeSeen);
+    final continueReadingPosters = sushiAssembleContinueRail(resumeBooks, homeSeen);
 
     final forYouAsync = ref.watch(sushiForYouDashboardProvider);
     final forYouLoading = forYouAsync.isLoading && !forYouAsync.hasValue;

@@ -30,6 +30,46 @@ void main() {
     expect(items.map((e) => sushiHomeItemKey(e)).toList(), ['1:1', '2:1', '3:1']);
   });
 
+  test('carousel pins trending movie then trending series first', () {
+    final items = sushiAssembleHomeCarousel(
+      settings: HomeCarouselSettings.combined,
+      nextUp: [_item(10), _item(20, kind: SushiKind.series)],
+      resume: [_item(1), _item(2, kind: SushiKind.series)],
+      trendingMovies: [_item(99, title: 'Trend movie'), _item(98)],
+      trendingSeries: [_item(88, kind: SushiKind.series, title: 'Trend series')],
+    );
+    expect(items.map((e) => sushiHomeItemKey(e)).toList(), ['99:1', '88:2', '1:1', '2:2', '10:1', '20:2']);
+  });
+
+  test('carousel falls back to slider movie then series when trending empty', () {
+    final items = sushiAssembleHomeCarousel(
+      settings: HomeCarouselSettings.nextUp,
+      nextUp: [_item(10), _item(11), _item(20, kind: SushiKind.series)],
+      resume: [_item(1)],
+    );
+    expect(items.map((e) => sushiHomeItemKey(e)).toList(), ['10:1', '20:2', '11:1']);
+  });
+
+  test('resume-only carousel keeps resume order', () {
+    final items = sushiAssembleHomeCarousel(
+      settings: HomeCarouselSettings.cont,
+      nextUp: [_item(10)],
+      resume: [_item(1), _item(2, kind: SushiKind.series)],
+      trendingMovies: [_item(99)],
+      trendingSeries: [_item(88, kind: SushiKind.series)],
+    );
+    expect(items.map((e) => sushiHomeItemKey(e)).toList(), ['1:1', '2:2']);
+  });
+
+  test('continue rail keeps titles already on the banner', () {
+    final seen = <String>{};
+    sushiTakeUnseenHomeItems([_item(1), _item(2)], seen);
+    final cw = sushiAssembleContinueRail([_item(1), _item(3)], seen);
+    expect(cw.map(sushiHomeItemKey).toList(), ['1:1', '3:1']);
+    final leftover = sushiTakeUnseenHomeItems([_item(1), _item(3), _item(4)], seen);
+    expect(leftover.map(sushiHomeItemKey).toList(), ['4:1']);
+  });
+
   test('same TMDB movie and series stay both', () {
     final items = sushiUniqueHomeItems([
       _item(550, kind: SushiKind.movie, title: 'Fight Club'),

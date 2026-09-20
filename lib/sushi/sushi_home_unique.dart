@@ -55,6 +55,26 @@ List<ItemBaseModel> sushiUniqueHomeItems(Iterable<ItemBaseModel> items) {
   return sushiTakeUnseenHomeItems(items, <String>{});
 }
 
+/// Continue-watching row. Unique, no floor. Keeps titles already on the banner — slider overlap
+/// is the exception to R-RAIL-1. Still records keys in [seen] so catalog rails drop them.
+List<ItemBaseModel> sushiAssembleContinueRail(
+  Iterable<ItemBaseModel> resume,
+  Set<String> seen,
+) {
+  final posters = sushiUniqueHomeItems(resume);
+  for (final item in posters) {
+    seen.add(sushiHomeItemKey(item));
+  }
+  return posters;
+}
+
+ItemBaseModel? sushiFirstHomeItemOfType(Iterable<ItemBaseModel> items, FladderItemType type) {
+  for (final item in items) {
+    if (item.type == type) return item;
+  }
+  return null;
+}
+
 List<SushiRow> sushiUniqueRows(Iterable<SushiRow> rows) {
   final seen = <String>{};
   final out = <SushiRow>[];
@@ -66,17 +86,39 @@ List<SushiRow> sushiUniqueRows(Iterable<SushiRow> rows) {
 
 /// Banner list. Unique across sources (resume + slider). Carousel viewport clones stay in the
 /// widget, not here.
+///
+/// Slide 1 = trendiest movie, slide 2 = trendiest series (TMDB week rails, then catalog slider).
+/// Resume-only carousels stay resume order.
 List<ItemBaseModel> sushiAssembleHomeCarousel({
   required HomeCarouselSettings settings,
   required List<ItemBaseModel> nextUp,
   required List<ItemBaseModel> resume,
+  List<ItemBaseModel> trendingMovies = const [],
+  List<ItemBaseModel> trendingSeries = const [],
 }) {
   final raw = switch (settings) {
     HomeCarouselSettings.nextUp => nextUp,
     HomeCarouselSettings.combined => [...resume, ...nextUp],
     HomeCarouselSettings.cont => resume,
   };
-  return sushiUniqueHomeItems(raw);
+  if (settings == HomeCarouselSettings.cont) {
+    return sushiUniqueHomeItems(raw);
+  }
+  final pinMovie = sushiFirstHomeItemOfType(trendingMovies, FladderItemType.movie) ??
+      sushiFirstHomeItemOfType(nextUp, FladderItemType.movie) ??
+      (settings == HomeCarouselSettings.combined
+          ? sushiFirstHomeItemOfType(resume, FladderItemType.movie)
+          : null);
+  final pinSeries = sushiFirstHomeItemOfType(trendingSeries, FladderItemType.series) ??
+      sushiFirstHomeItemOfType(nextUp, FladderItemType.series) ??
+      (settings == HomeCarouselSettings.combined
+          ? sushiFirstHomeItemOfType(resume, FladderItemType.series)
+          : null);
+  return sushiUniqueHomeItems([
+    if (pinMovie != null) pinMovie,
+    if (pinSeries != null) pinSeries,
+    ...raw,
+  ]);
 }
 
 /// Catalog home rows after banner + continue watching. Unique (R-RAIL-1). Every row except
