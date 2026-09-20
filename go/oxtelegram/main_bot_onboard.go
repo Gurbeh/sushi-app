@@ -11,14 +11,19 @@ import (
 
 const (
 	onboardStepTimeout = 20 * time.Second
-	// Generous: language + quality + audio + login is 4 presses for a brand new identity. A few
-	// extra steps of headroom absorb an unexpected intermediate screen without looping forever.
+	// Generous: language + quality + audio is 3 presses for a brand new identity. A few extra
+	// steps of headroom absorb an unexpected intermediate screen without looping forever.
 	onboardMaxSteps = 8
+	// later.go routeStart: rest == "login" runs startLogin (prefs then Bind). Anything else,
+	// including StartParam "sushi" or a bare /start, opens Home. Home's first button is Download
+	// (copy.go homeKeyboardFor) and never writes a binding — /initbot then stays pending.
+	mainBotLoginStartParam = "login"
+	mainBotLoginStartText  = "/start login"
 )
 
 // EnsureMainBotOnboarded gets a session account through main-bot's onboarding conversation
-// (language, quality, audio, then "login") without a human tapping anything, by pressing the
-// first inline button main-bot offers at each step and reading its reply.
+// (language, quality, audio, then Bind) without a human tapping anything, by sending
+// `/start login` and pressing the first inline button at each onboarding step.
 //
 // Why this exists: `/initbot` never creates a binding itself (docs/02 §1) -- for a session
 // account, only main-bot's onboarding does, by design a human conversation answered with inline
@@ -27,14 +32,11 @@ const (
 // senders without the user seeing it -- this is the same idea applied to main-bot, since there is
 // no bot-token/B2B shortcut available to a session identity the way there is for delivery bots.
 //
-// Every one of main-bot's keyboards (copy.go) has the "proceed" choice first: language defaults to
-// Persian, quality to the best offered, audio to original, and the finished/already-bound screen's
-// first button is "login" itself -- so always pressing the first button reaches a bound account in
-// the same handful of steps a person tapping through the default path would. Re-pressing "login"
-// after a binding already exists is idempotent (main-bot just repeats "already set" with the same
-// keyboard), which is why running out of onboardMaxSteps is reported as done rather than an error:
-// by then either a binding exists or it does not, and another /initbot call is what tells the
-// caller which.
+// Onboarding keyboards (copy.go) put the proceed choice first: language defaults to Persian,
+// quality to 2160p, audio to original. After Bind, finish() shows Home whose first button is
+// Download — we stop there instead of clicking it. Running out of onboardMaxSteps is reported as
+// done rather than an error: by then either a binding exists or it does not, and another
+// /initbot call is what tells the caller which.
 func (c *Client) EnsureMainBotOnboarded(ctx context.Context, mainBotUsername string) error {
 	if c.Auth != nil && c.Auth.IsBotMode() {
 		return nil // no dialog list, no onboarding conversation to have.
@@ -63,6 +65,11 @@ func (c *Client) EnsureMainBotOnboarded(ctx context.Context, mainBotUsername str
 		if btn == nil {
 			return nil // no keyboard left to press -- as far through as this flow goes.
 		}
+		if !isOnboardingCallback(btn.Data) {
+			// Home / Download / Settings / etc. Bind already happened, or this chat never
+			// entered startLogin. Clicking further cannot create a binding.
+			return nil
+		}
 		next, err := c.pressCallbackAndAwait(ctx, api, peer, userID, msg.ID, btn.Data)
 		if err != nil {
 			return fmt.Errorf("onboarding step %d: %w", step, err)
@@ -85,14 +92,14 @@ func (c *Client) startMainBotConversation(ctx context.Context, api *tg.Client, p
 			Bot:        &tg.InputUser{UserID: userID, AccessHash: peer.AccessHash},
 			Peer:       peer,
 			RandomID:   cryptoRandomID(),
-			StartParam: "sushi",
+			StartParam: mainBotLoginStartParam,
 		}); err != nil {
 			return nil, fmt.Errorf("MessagesStartBot: %w", err)
 		}
 	} else {
 		if _, err := api.MessagesSendMessage(ctx, &tg.MessagesSendMessageRequest{
 			Peer:     peer,
-			Message:  "/start",
+			Message:  mainBotLoginStartText,
 			RandomID: cryptoRandomID(),
 		}); err != nil {
 			return nil, fmt.Errorf("MessagesSendMessage: %w", err)
@@ -146,6 +153,17 @@ func firstCallbackButton(msg *tg.Message) *tg.KeyboardButtonCallback {
 		}
 	}
 	return nil
+}
+
+// isOnboardingCallback is true for main-bot's language / quality / audio / login buttons
+// (copy.go cbLocalePrefix, cbQualityPrefix, cbAudioPrefix, cbMenuLogin). Home's first button
+// is Download (`m:dl`) and must not be auto-clicked.
+func isOnboardingCallback(data []byte) bool {
+	s := string(data)
+	return strings.HasPrefix(s, "l:") ||
+		strings.HasPrefix(s, "q:") ||
+		strings.HasPrefix(s, "a:") ||
+		s == "m:login"
 }
 
 // --- message waiters (keyed by peer user id, full message rather than just '!' framed text) ---

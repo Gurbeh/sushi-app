@@ -119,8 +119,23 @@ void main() {
 
   test('sushiEnsureAssignmentReady rejects pending', () {
     expect(
+      () => sushiEnsureAssignmentReady(SushiAssignment.stubPending(reason: 'no pool')),
+      throwsA(isA<StateError>().having(
+        (e) => e.message,
+        'message',
+        contains('Finish setup in Telegram'),
+      )),
+    );
+  });
+
+  test('sushiEnsureAssignmentReady distinguishes timeout', () {
+    expect(
       () => sushiEnsureAssignmentReady(SushiAssignment.stubPending(reason: 'timeout')),
-      throwsStateError,
+      throwsA(isA<StateError>().having(
+        (e) => e.message,
+        'message',
+        contains('timed out talking to Telegram'),
+      )),
     );
   });
 }

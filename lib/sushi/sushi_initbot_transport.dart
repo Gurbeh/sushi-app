@@ -197,19 +197,26 @@ Future<SushiAssignment> sushiRunInitbotAfterTdlibReady() async {
 
   final botSession = await SushiTdlibBridgeController.instance()
       .isNativeSessionActuallyBot();
+  Object? onboardErr;
   if (!botSession) {
     try {
       await sushiEnsureMainBotOnboarded(
         username: SushiConfig.mainBotUsername,
         timeoutMs: 90000,
       );
-    } catch (e) {
-      debugPrint(
-          '[sushi] main-bot onboarding failed (continuing to /initbot anyway): $e');
+    } catch (e, st) {
+      debugPrint('[sushi] main-bot onboarding failed: $e\n$st');
+      onboardErr = e;
     }
   }
 
-  return sushiRefreshInitbot();
+  final assignment = await sushiRefreshInitbot();
+  if (onboardErr != null &&
+      (assignment.pending || assignment.apiSendTargets.isEmpty)) {
+    throw StateError(
+        'Could not finish Sushi setup in Telegram: $onboardErr');
+  }
+  return assignment;
 }
 
 /// Phone/QR login must not enter Home with a pending assignment — leftover catalog
@@ -220,6 +227,11 @@ void sushiEnsureAssignmentReady(SushiAssignment assignment) {
   if (blob.contains('user_is_bot') || blob.contains("can't send messages to other bots")) {
     throw StateError(
       'Your bot cannot message Sushi bots yet. In @BotFather, turn on Bot to Bot Communication Mode for that bot, then tap Login again.',
+    );
+  }
+  if (blob.contains('timeout')) {
+    throw StateError(
+      'Sushi timed out talking to Telegram. Check the network and try Login again.',
     );
   }
   throw StateError('Sushi is not ready yet. Finish setup in Telegram, then try again.');
