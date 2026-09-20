@@ -113,15 +113,17 @@ class _TVPosterRowState extends ConsumerState<TVPosterRow> {
             itemWidthBuilder: (index) => _itemWidth(index, posterHeight),
             onFocusChange: (hasFocus) async {
               if (hasFocus == _hasFocus) return;
-              setState(() => _hasFocus = hasFocus);
+              // Fladder order: restore lastFocused before expanding the selected card.
               if (hasFocus) {
                 await Future.delayed(animationDelay);
-                if (!mounted || !_hasFocus) return;
+                if (!mounted) return;
                 context.ensureVisible(
                   alignment: tvVerticalScrollAlignment(),
                   alignmentPolicy: tvVerticalScrollPolicy(),
                 );
               }
+              if (!mounted) return;
+              setState(() => _hasFocus = hasFocus);
             },
             onFocused: (index) {
               final changed = index != _selectedIndex;
