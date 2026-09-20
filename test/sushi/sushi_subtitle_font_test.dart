@@ -14,10 +14,35 @@ void main() {
       expect(SushiSubtitleFont.isPersianOrArabicLanguage('Unknown'), isFalse);
     });
 
-    test('detects Arabic script in subtitle text', () {
-      expect(SushiSubtitleFont.textUsesArabicScript('سلام دنیا'), isTrue);
-      expect(SushiSubtitleFont.textUsesArabicScript('Hello world'), isFalse);
-      expect(SushiSubtitleFont.textUsesArabicScript('این یک Hello است'), isTrue);
+    test('cue background uses 2px horizontal padding', () {
+      expect(SushiSubtitleFont.cueBackgroundHorizontalPadding, 2);
+    });
+
+    test('Persian track language forces RTL even on mixed ASCII punctuation', () {
+      expect(
+        SushiSubtitleFont.textDirectionFor('سلام دنیا.', language: 'fa'),
+        TextDirection.rtl,
+      );
+      expect(
+        SushiSubtitleFont.textDirectionFor('Hello.', language: 'fa'),
+        TextDirection.rtl,
+      );
+      expect(
+        SushiSubtitleFont.textDirectionFor('Hello.', language: 'en'),
+        TextDirection.ltr,
+      );
+    });
+
+    test('isolateForPaint wraps RTL cues so ASCII punctuation stays in embedding', () {
+      const cue = 'سلام دنیا.';
+      final isolated = SushiSubtitleFont.isolateForPaint(cue, TextDirection.rtl);
+      expect(isolated, startsWith('\u202B'));
+      expect(isolated, endsWith('\u202C'));
+      expect(isolated, contains(cue));
+      expect(
+        SushiSubtitleFont.isolateForPaint(cue, TextDirection.ltr),
+        cue,
+      );
     });
 
     test('prefers track language over script', () {

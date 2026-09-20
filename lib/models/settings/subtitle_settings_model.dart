@@ -175,7 +175,8 @@ class SubtitleText extends ConsumerWidget {
     final fillScreen = ref.watch(videoPlayerSettingsProvider.select((value) => value.fillScreen));
     final fontSize = ref.read(subtitleSettingsProvider.select((value) => value.fontSize));
     final usePersianFont = SushiSubtitleFont.shouldUsePersianFont(language: subtitleLanguage, text: text);
-    final textDirection = usePersianFont ? SushiSubtitleFont.textDirectionFor(text) : TextDirection.ltr;
+    final textDirection = SushiSubtitleFont.textDirectionFor(text, language: subtitleLanguage);
+    final paintedText = SushiSubtitleFont.isolateForPaint(text, textDirection);
     final fillStyle = usePersianFont
         ? SushiSubtitleFont.backgroundStyleFor(subModel, usePersianFont: true)
         : subModel.backGroundStyle;
@@ -193,9 +194,9 @@ class SubtitleText extends ConsumerWidget {
                     .clamp(0.0, 1.0),
               )));
 
-          double getTextHeight(BuildContext context, String text, TextStyle style) {
+          double getTextHeight(BuildContext context, String value, TextStyle style) {
             final TextPainter textPainter = TextPainter(
-              text: TextSpan(text: text, style: style),
+              text: TextSpan(text: value, style: style),
               textDirection: textDirection,
               textScaler: MediaQuery.textScalerOf(context),
             )..layout(minWidth: 0, maxWidth: double.infinity);
@@ -210,7 +211,7 @@ class SubtitleText extends ConsumerWidget {
 
           final double desiredPosition = (safeAvailableHeight * offset).clamp(0.0, double.infinity);
 
-          double textHeight = getTextHeight(context, text, textStyle);
+          double textHeight = getTextHeight(context, paintedText, textStyle);
           final double safeTextHeight = textHeight.isFinite ? textHeight : 0.0;
 
           final double maxPosition = math.max(0.0, safeAvailableHeight - safeTextHeight);
@@ -237,11 +238,14 @@ class SubtitleText extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(clampDouble(textScale / 10, 2, 12)),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SushiSubtitleFont.cueBackgroundHorizontalPadding,
+                          ),
                           child: Text(
-                            text,
+                            paintedText,
                             style: fillStyle.copyWith(fontSize: textScale),
                             textAlign: TextAlign.center,
+                            textDirection: textDirection,
                           ),
                         ),
                       ),
@@ -251,11 +255,14 @@ class SubtitleText extends ConsumerWidget {
                       child: Container(
                         constraints: BoxConstraints(maxWidth: constraints.maxWidth, maxHeight: constraints.maxHeight),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SushiSubtitleFont.cueBackgroundHorizontalPadding,
+                          ),
                           child: Text(
-                            text,
+                            paintedText,
                             style: textStyle.copyWith(fontSize: textScale),
                             textAlign: TextAlign.center,
+                            textDirection: textDirection,
                           ),
                         ),
                       ),

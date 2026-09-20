@@ -79,6 +79,9 @@ abstract final class SushiSubtitleFont {
   /// Default boxed caption: black fill, readable on busy video, user can turn down to 0.
   static const defaultBackground = Color.fromRGBO(0, 0, 0, 0.55);
 
+  /// Tight left/right inset inside the boxed caption background.
+  static const cueBackgroundHorizontalPadding = 2.0;
+
   /// Sushi default subtitle appearance (white fill + thin black outline + boxed background).
   static const defaultSettings = SubtitleSettingsModel(
     color: Colors.white,
@@ -162,8 +165,16 @@ abstract final class SushiSubtitleFont {
     return textUsesArabicScript(text);
   }
 
-  static TextDirection textDirectionFor(String text) =>
-      textUsesArabicScript(text) ? TextDirection.rtl : TextDirection.ltr;
+  static TextDirection textDirectionFor(String text, {String? language}) {
+    if (isPersianOrArabicLanguage(language)) return TextDirection.rtl;
+    return textUsesArabicScript(text) ? TextDirection.rtl : TextDirection.ltr;
+  }
+
+  /// Wrap an RTL cue so ASCII `.` `?` `-` follow the embedding, not LTR.
+  static String isolateForPaint(String text, TextDirection direction) {
+    if (text.isEmpty || direction != TextDirection.rtl) return text;
+    return '${Unicode.RLE}$text${Unicode.PDF}';
+  }
 
   static TextStyle styleFor(SubtitleSettingsModel model, {required bool usePersianFont}) {
     if (!usePersianFont) return model.style;
