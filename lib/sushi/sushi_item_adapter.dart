@@ -12,6 +12,8 @@ import 'package:fladder/models/items/overview_model.dart';
 import 'package:fladder/models/items/person_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
+import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -180,12 +182,64 @@ ImagesData sushiTitleImages(String itemId, ImagesData? base, SushiItemRes item) 
   return ImagesData(
     primary: base?.primary ?? sushiTmdbImage(item.row.poster, key: itemId),
     // MediaHeader maxWidth 700 + BoxFit.contain; original PNG is 1–2s on first paint.
-    logo: sushiTmdbImage(item.logo, key: '${itemId}_logo', size: 'w780', extension: 'png') ??
+    logo: sushiTmdbImage(item.logo, key: '${itemId}_logo', size: sushiTmdbDetailSize, extension: 'png') ??
         base?.logo,
     backDrop: item.backdrop.isEmpty
         ? base?.backDrop
-        : [sushiTmdbImage(item.backdrop, key: '${itemId}_bd', size: 'w780')!],
+        : [sushiTmdbImage(item.backdrop, key: '${itemId}_bd', size: sushiTmdbDetailSize)!],
   );
+}
+
+/// Copy title-page logo/backdrop onto a home card. Home rows only have the poster (R-META-1);
+/// Fladder's slider paints backdrop, so slider items pick this up from the cached `/item`.
+ItemBaseModel sushiAttachTitleImages(ItemBaseModel item, SushiItemRes page) {
+  final images = sushiTitleImages(item.id, item.images, page);
+  return switch (item) {
+    MovieModel m => m.copyWith(images: images),
+    SeriesModel s => s.copyWith(images: images),
+    EpisodeModel e => e.copyWith(images: images, parentImages: images),
+    _ => item.copyWith(images: images),
+  };
+}
+
+bool sushiHomeItemMatchesPage(ItemBaseModel item, SushiItemRes page) {
+  final identity = sushiContinueIdentity(item);
+  if (identity == null) return false;
+  return identity.tmdbId == page.row.tmdbId && identity.kind == page.row.kind;
+}
+
+List<ItemBaseModel> sushiPatchHomeItemImages(List<ItemBaseModel> items, SushiItemRes page) {
+  if (page.backdrop.isEmpty && page.logo.isEmpty) return items;
+  var changed = false;
+  final out = <ItemBaseModel>[];
+  for (final item in items) {
+    if (!sushiHomeItemMatchesPage(item, page)) {
+      out.add(item);
+      continue;
+    }
+    changed = true;
+    out.add(sushiAttachTitleImages(item, page));
+  }
+  return changed ? out : items;
+}
+
+typedef SushiTitlePageLookup = Future<SushiItemRes?> Function({required int tmdbId, required SushiKind kind});
+
+/// Overlay cached `/item` images onto compact home cards. Misses stay poster-only.
+Future<List<ItemBaseModel>> sushiAttachCachedTitleImages(
+  List<ItemBaseModel> items,
+  SushiTitlePageLookup peek,
+) {
+  return Future.wait(items.map((item) async {
+    final identity = sushiContinueIdentity(item);
+    if (identity == null) return item;
+    if (item.images?.backDrop?.isNotEmpty == true || item.getPosters?.backDrop?.isNotEmpty == true) {
+      return item;
+    }
+    final page = await peek(tmdbId: identity.tmdbId, kind: identity.kind);
+    if (page == null || (page.backdrop.isEmpty && page.logo.isEmpty)) return item;
+    return sushiAttachTitleImages(item, page);
+  }));
 }
 
 /// Merges a fetched [SushiItemRes] (overview) and its files (mediaStreams) into an already-shown

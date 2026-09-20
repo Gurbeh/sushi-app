@@ -411,4 +411,36 @@ void main() {
     expect(enriched.overview.runTime, const Duration(minutes: 30));
     expect(enriched.availableEpisodes!.first.overview.runTime, const Duration(minutes: 30));
   });
+
+  test('home card picks up title-page backdrop for the slider', () {
+    final base = sushiRowToItemBaseModel(
+      const SushiRow(
+        tmdbId: 550,
+        kind: SushiKind.movie,
+        title: 'Fight Club',
+        year: 1999,
+        rating: 80,
+        poster: 'fc_poster',
+      ),
+    );
+    const page = SushiItemRes(
+      row: SushiRow(
+        tmdbId: 550,
+        kind: SushiKind.movie,
+        title: 'Fight Club',
+        year: 1999,
+        rating: 80,
+        poster: 'fc_poster',
+      ),
+      overview: '',
+      releasedOn: 0,
+      episodes: [],
+      backdrop: 'fc_bd',
+      logo: 'fc_logo',
+    );
+    final attached = sushiAttachTitleImages(base, page);
+    expect(attached.images?.backDrop?.first.path, contains('/w780/fc_bd.jpg'));
+    final patched = sushiPatchHomeItemImages([base], page);
+    expect(patched.single.images?.backDrop?.first.path, contains('/w780/fc_bd.jpg'));
+  });
 }

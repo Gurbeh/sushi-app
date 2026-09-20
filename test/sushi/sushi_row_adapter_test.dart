@@ -57,4 +57,15 @@ void main() {
     expect(sushiScopeForViewId(sushiViewPlaylists), SushiListScope.playlists);
     expect(sushiScopeForViewId(sushiViewLater), SushiListScope.later);
   });
+
+  test('TMDB size rewrite only touches /t/p/{size}/', () {
+    expect(
+      sushiRewriteTmdbSize('https://image.tmdb.org/t/p/w500/abc.jpg', sushiTmdbSliderBackdropSize),
+      'https://image.tmdb.org/t/p/w1280/abc.jpg',
+    );
+    expect(
+      sushiRewriteTmdbSize('https://jellyfin.example/Items/1/Images/Backdrop?fillWidth=2000', 'w1280'),
+      'https://jellyfin.example/Items/1/Images/Backdrop?fillWidth=2000',
+    );
+  });
 }

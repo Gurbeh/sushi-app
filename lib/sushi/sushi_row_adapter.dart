@@ -15,12 +15,32 @@ const _sushiTmdbIdPrefix = 'sushi_tmdb_';
 const _sushiPlaylistIdPrefix = 'sushi_playlist_';
 const _sushiBoxsetIdPrefix = 'sushi_boxset_';
 
-ImageData? sushiTmdbImage(String strippedPath, {required String key, String size = 'w500', String extension = 'jpg'}) {
+final _sushiTmdbSize = RegExp(r'/t/p/(w\d+|original)/');
+
+/// TMDB CDN size token. Slider backdrops use [sushiTmdbSliderBackdropSize] (never `original`, R-META-8).
+const sushiTmdbPosterSize = 'w500';
+const sushiTmdbDetailSize = 'w780';
+const sushiTmdbSliderBackdropSize = 'w1280';
+
+ImageData? sushiTmdbImage(String strippedPath, {required String key, String size = sushiTmdbPosterSize, String extension = 'jpg'}) {
   if (strippedPath.isEmpty) return null;
   return ImageData(
     path: 'https://image.tmdb.org/t/p/$size/$strippedPath.$extension',
     key: key,
   );
+}
+
+/// Swap `/t/p/{size}/` on a TMDB CDN URL. Non-TMDB paths (Jellyfin fill query) stay untouched.
+String sushiRewriteTmdbSize(String path, String size) {
+  if (!_sushiTmdbSize.hasMatch(path)) return path;
+  return path.replaceFirst(_sushiTmdbSize, '/t/p/$size/');
+}
+
+ImageData? sushiTmdbImageAtSize(ImageData? image, String size) {
+  if (image == null || image.path.isEmpty) return image;
+  final rewritten = sushiRewriteTmdbSize(image.path, size);
+  if (rewritten == image.path) return image;
+  return image.copyWith(path: rewritten, key: '${image.key}_$size');
 }
 
 /// Recovers the TMDB id from an id built by [sushiRowToItemBaseModel], or null if [itemId] isn't

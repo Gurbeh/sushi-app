@@ -21,6 +21,8 @@ import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_home_transport.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 final dashboardProvider = StateNotifierProvider<DashboardNotifier, HomeModel>((ref) {
@@ -141,21 +143,46 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
 
   Future<void> _applySushiHome(SushiCachedHome home) async {
     await sushiNoteLatestApp(home.latestApp);
+    final catalog = ref.read(sushiCatalogControllerProvider);
+    catalog.onTitleCached = _onSliderTitleCached;
     List<ItemBaseModel> map(List<SushiRow> rows) => rows.map(sushiRowToItemBaseModel).toList();
-    final slider = map(home.slider);
+    Future<List<ItemBaseModel>> withHeroes(List<ItemBaseModel> items) {
+      return sushiAttachCachedTitleImages(items, catalog.peekCachedTitle);
+    }
+
+    final slider = await withHeroes(map(home.slider));
     sushiApplySushiHomeRailsRef(
       ref,
       SushiHomeRailsData(
         slider: slider,
         mostWatched: map(home.mostWatched),
-        trending: map(home.trending),
+        trending: await withHeroes(map(home.trending)),
         seriesMostWatched: map(home.seriesMostWatched),
-        seriesTrending: map(home.seriesTrending),
+        seriesTrending: await withHeroes(map(home.seriesTrending)),
       ),
     );
-    final resume = await sushiContinueLoad();
+    final resume = await withHeroes(await sushiContinueLoad());
     state = state.copyWith(nextUp: slider, resumeVideo: resume);
-    unawaited(ref.read(sushiCatalogControllerProvider).prefetchVisibleHome(home));
+    unawaited(catalog.prefetchVisibleHome(home));
+  }
+
+  void _onSliderTitleCached(SushiItemRes page) {
+    if (!mounted) return;
+    final rails = ref.read(sushiHomeRailsProvider);
+    sushiApplySushiHomeRailsRef(
+      ref,
+      SushiHomeRailsData(
+        slider: sushiPatchHomeItemImages(rails.slider, page),
+        mostWatched: rails.mostWatched,
+        trending: sushiPatchHomeItemImages(rails.trending, page),
+        seriesMostWatched: rails.seriesMostWatched,
+        seriesTrending: sushiPatchHomeItemImages(rails.seriesTrending, page),
+      ),
+    );
+    state = state.copyWith(
+      nextUp: sushiPatchHomeItemImages(state.nextUp, page),
+      resumeVideo: sushiPatchHomeItemImages(state.resumeVideo, page),
+    );
   }
 
   /// Re-reads the client-owned continue-watching store into [state] — no `/home` bot round-trip.

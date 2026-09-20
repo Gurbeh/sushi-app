@@ -84,6 +84,9 @@ class SushiCatalogController {
   final SushiCatalogOwnerRead? readPersistedOwner;
   final SushiCatalogOwnerWrite? persistOwner;
 
+  /// Home slider paints backdrop from the title page. Prefetch calls this after `/item` lands.
+  void Function(SushiItemRes page)? onTitleCached;
+
   final SushiCatalogStore _store;
   final SushiItemFetcher _fetchItem;
   final SushiFilesFetcher _fetchFiles;
@@ -165,6 +168,12 @@ class SushiCatalogController {
     return SushiTitleSnapshot(page: page, files: files, fromCache: true, lite: true);
   }
 
+  /// Title page only — home slider overlay. Skips `/files`.
+  Future<SushiItemRes?> peekCachedTitle({required int tmdbId, required SushiKind kind}) async {
+    await _bindSession();
+    return _store.readTitle(tmdbId, sushiKindToWire(kind));
+  }
+
   /// Paint from [peekTitle] first. This call does the network update.
   Future<SushiTitleSnapshot> openTitle({
     required int tmdbId,
@@ -182,7 +191,10 @@ class SushiCatalogController {
         if (live != null) {
           page = live;
           lite = false;
-          if (sushiItemResPlayable(live)) await _store.writeTitle(live);
+          if (sushiItemResPlayable(live)) {
+            await _store.writeTitle(live);
+            onTitleCached?.call(live);
+          }
         }
       }
 
@@ -361,6 +373,7 @@ class SushiCatalogController {
         final live = await _fetchItem(tmdbId: row.tmdbId, kind: kind);
         if (live != null && sushiItemResPlayable(live)) {
           await _store.writeTitle(live);
+          onTitleCached?.call(live);
         }
         if (_prefetchGap > Duration.zero && _queue.isNotEmpty && _p0 == 0 && epoch == _epoch) {
           await _sleep(_prefetchGap);
