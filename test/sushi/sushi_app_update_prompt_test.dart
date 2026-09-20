@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fladder/routes/auto_router.gr.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
+import 'package:fladder/sushi/sushi_config.dart';
 
 void main() {
   tearDown(() {
@@ -74,6 +75,26 @@ void main() {
     sushiBindUpdatePrompt(prefs, '1.1.191');
     expect(sushiLatestApp.value?.version, '1.1.192');
     expect(await sushiShouldOfferUpdate(currentVersion: '1.1.191', prefs: prefs), isTrue);
+  });
+
+  test('install-error open-bot deep link carries start=download', () {
+    expect(sushiMainBotDownloadStart, 'download');
+    final tg = sushiMainBotDownloadTgUri();
+    expect(tg.scheme, 'tg');
+    expect(tg.host, 'resolve');
+    expect(tg.queryParameters['domain'], SushiConfig.mainBotUsername);
+    expect(tg.queryParameters['start'], 'download');
+    expect(
+      SushiConfig.mainBotAppCodeUrl(sushiMainBotDownloadStart),
+      'https://t.me/${SushiConfig.mainBotUsername}?start=download',
+    );
+  });
+
+  test('error copy names the download-from-app action', () {
+    const fa = SushiUpdateCopy(true);
+    const en = SushiUpdateCopy(false);
+    expect(fa.openBot, 'از اپ دانلود کن');
+    expect(en.openBot, 'Download the app');
   });
 
   test('sushiClearPersistedLatestApp drops the shelf stamp', () async {

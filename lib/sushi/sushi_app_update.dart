@@ -285,11 +285,20 @@ Future<void> _installFile(File file) async {
   throw StateError('in-app install is not supported on this platform');
 }
 
+/// `/start download` rest. Main-bot answers with the platform APK picker, not Home.
+const sushiMainBotDownloadStart = 'download';
+
+Uri sushiMainBotDownloadTgUri() {
+  return Uri.parse(
+    'tg://resolve?domain=${SushiConfig.mainBotUsername}&start=$sushiMainBotDownloadStart',
+  );
+}
+
 Future<void> sushiOpenMainBotDownload() async {
-  final uri = Uri.parse('tg://resolve?domain=${SushiConfig.mainBotUsername}');
+  final uri = sushiMainBotDownloadTgUri();
   if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
     await launchUrl(
-      Uri.parse(SushiConfig.mainBotAppCodeUrl('')),
+      Uri.parse(SushiConfig.mainBotAppCodeUrl(sushiMainBotDownloadStart)),
       mode: LaunchMode.externalApplication,
     );
   }
@@ -318,8 +327,8 @@ class SushiUpdateCopy {
   String get later => _fa ? 'بعدا' : 'Later';
   String get downloading => _fa ? 'داره میاد…' : 'Downloading…';
   String get installing => _fa ? 'داره نصب میشه…' : 'Installing…';
-  String get failed => _fa ? 'دانلود نشد. از ربات بگیر.' : 'Download failed. Get it from the bot.';
-  String get openBot => _fa ? 'باز کردن ربات' : 'Open bot';
+  String get failed => _fa ? 'دانلود نشد. از اپ دانلود کن.' : 'Download failed. Get it from the bot.';
+  String get openBot => _fa ? 'از اپ دانلود کن' : 'Download the app';
 }
 
 Future<void> sushiShowUpdateDialog({
