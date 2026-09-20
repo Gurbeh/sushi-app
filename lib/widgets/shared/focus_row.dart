@@ -16,6 +16,30 @@ import 'package:fladder/widgets/shared/ensure_visible.dart';
 /// vertical position first, instead of falling straight through to that generic search.
 final Set<FocusNode> _activeRowGroups = <FocusNode>{};
 
+/// Last vertical d-pad hop. [ensureVisible] uses this so UP does not center the
+/// already-visible row above (that slide looks like scrolling down).
+TraversalDirection? lastVerticalTraversal;
+
+/// Alignment for the last vertical hop. UP keeps the row near the top; DOWN
+/// keeps current center-ish behaviour so the new row and its info stay in view.
+double tvVerticalScrollAlignment() {
+  return switch (lastVerticalTraversal) {
+    TraversalDirection.up => 0.2,
+    TraversalDirection.down => 0.55,
+    _ => 0.5,
+  };
+}
+
+/// UP: do not yank a visible upper row to the center. DOWN: pin newly revealed
+/// rows at the end so they enter from below.
+ScrollPositionAlignmentPolicy tvVerticalScrollPolicy() {
+  return switch (lastVerticalTraversal) {
+    TraversalDirection.up => ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+    TraversalDirection.down => ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+    _ => ScrollPositionAlignmentPolicy.explicit,
+  };
+}
+
 /// The nearest other registered row group strictly above/below [current] in [direction], scoped
 /// to the same [FocusScopeNode] (so rows on a different, offstage page are never candidates), or
 /// null if there isn't one (or [direction] isn't vertical).
@@ -51,7 +75,10 @@ FocusNode? adjacentRowGroup(FocusNode current, TraversalDirection direction) {
 
 class FocusRow extends StatefulWidget {
   final Widget child;
-  final double ensureVisibleAlignment;
+
+  /// Null = pick alignment from [lastVerticalTraversal] so UP/DOWN scroll the
+  /// matching way. Pass an explicit value to lock a page (e.g. details = 1.0).
+  final double? ensureVisibleAlignment;
   final FocusNode? focusNode;
   final WidgetOrderTraversalPolicy? traversalPolicy;
   final bool escapeToNavBar;
@@ -60,7 +87,7 @@ class FocusRow extends StatefulWidget {
 
   const FocusRow({
     required this.child,
-    this.ensureVisibleAlignment = 0.5,
+    this.ensureVisibleAlignment,
     this.focusNode,
     this.traversalPolicy,
     this.onGroupFocused,
@@ -138,7 +165,13 @@ class _FocusRowState extends State<FocusRow> {
 
       target.requestFocus();
       try {
-        target.context?.ensureVisible(alignment: widget.ensureVisibleAlignment);
+        final alignment = widget.ensureVisibleAlignment;
+        target.context?.ensureVisible(
+          alignment: alignment ?? tvVerticalScrollAlignment(),
+          alignmentPolicy: alignment == null
+              ? tvVerticalScrollPolicy()
+              : ScrollPositionAlignmentPolicy.explicit,
+        );
       } catch (_) {}
 
       _clearedByVertical = false;
@@ -278,6 +311,7 @@ class _RowFocusPolicy extends WidgetOrderTraversalPolicy {
         return true;
       case TraversalDirection.up:
       case TraversalDirection.down:
+        lastVerticalTraversal = direction;
         onVertical?.call();
         // Stay inside a Wrap's next/previous visual row first, then step to the nearest
         // registered sibling row (e.g. the next FocusRow up/down the page). Escape via

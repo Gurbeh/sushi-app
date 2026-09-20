@@ -7,12 +7,13 @@ extension EnsureVisibleHelper on BuildContext {
     double alignment = 0.5,
     Curve curve = Curves.fastOutSlowIn,
     bool onlyNearest = false,
+    ScrollPositionAlignmentPolicy alignmentPolicy = ScrollPositionAlignmentPolicy.explicit,
   }) {
     final scrollable = Scrollable.maybeOf(this);
     if (scrollable == null) return Future.value();
 
     final renderObject = findRenderObject();
-    if (onlyNearest && renderObject != null) {
+    if (onlyNearest && renderObject != null && alignmentPolicy == ScrollPositionAlignmentPolicy.explicit) {
       final viewport = RenderAbstractViewport.of(renderObject);
       final target = alignment;
       final offset = viewport.getOffsetToReveal(renderObject, target).offset;
@@ -30,6 +31,7 @@ extension EnsureVisibleHelper on BuildContext {
       duration: duration,
       alignment: alignment,
       curve: curve,
+      alignmentPolicy: alignmentPolicy,
     );
   }
 }

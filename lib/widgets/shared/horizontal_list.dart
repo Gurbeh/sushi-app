@@ -559,6 +559,7 @@ class HorizontalRailFocus extends WidgetOrderTraversalPolicy {
     // Step to the nearest registered sibling row (e.g. the next PosterRow up/down the page)
     // before falling back to Flutter's generic geometric search, which can skip an adjacent
     // row entirely when it scrolls to a different offset than this one.
+    lastVerticalTraversal = direction;
     final adjacentGroup = adjacentRowGroup(parentNode, direction);
     if (adjacentGroup != null) {
       final cb = FocusTraversalPolicy.defaultTraversalRequestFocusCallback;

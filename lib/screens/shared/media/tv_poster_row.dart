@@ -23,6 +23,7 @@ import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/widgets/shared/animated_visibility.dart';
 import 'package:fladder/widgets/shared/clickable_text.dart';
 import 'package:fladder/widgets/shared/ensure_visible.dart';
+import 'package:fladder/widgets/shared/focus_row.dart';
 import 'package:fladder/widgets/shared/horizontal_list.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
@@ -112,13 +113,15 @@ class _TVPosterRowState extends ConsumerState<TVPosterRow> {
             itemWidthBuilder: (index) => _itemWidth(index, posterHeight),
             onFocusChange: (hasFocus) async {
               if (hasFocus == _hasFocus) return;
+              setState(() => _hasFocus = hasFocus);
               if (hasFocus) {
                 await Future.delayed(animationDelay);
+                if (!mounted || !_hasFocus) return;
                 context.ensureVisible(
-                  alignment: 0.5,
+                  alignment: tvVerticalScrollAlignment(),
+                  alignmentPolicy: tvVerticalScrollPolicy(),
                 );
               }
-              setState(() => _hasFocus = hasFocus);
             },
             onFocused: (index) {
               final changed = index != _selectedIndex;

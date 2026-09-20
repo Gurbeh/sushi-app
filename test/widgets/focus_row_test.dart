@@ -101,4 +101,114 @@ void main() {
 
     expect(Focus.of(tester.element(find.text('Follow'))).hasPrimaryFocus, isTrue);
   });
+
+  testWidgets('d-pad up moves to the FocusRow above, not the first on the page', (tester) async {
+    lastVerticalTraversal = null;
+    await tester.pumpWidget(
+      _tvHost(
+        child: Column(
+          children: [
+            FocusRow(
+              child: FilledButton(
+                onPressed: () {},
+                child: const Text('Banner'),
+              ),
+            ),
+            const SizedBox(height: 48),
+            FocusRow(
+              child: FilledButton(
+                onPressed: () {},
+                child: const Text('Continue'),
+              ),
+            ),
+            const SizedBox(height: 48),
+            FocusRow(
+              child: FilledButton(
+                autofocus: true,
+                onPressed: () {},
+                child: const Text('Trending'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(Focus.of(tester.element(find.text('Trending'))).hasPrimaryFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    expect(
+      Focus.of(tester.element(find.text('Continue'))).hasPrimaryFocus,
+      isTrue,
+      reason: 'up from a rail must land on the adjacent row, not the top banner',
+    );
+    expect(lastVerticalTraversal, TraversalDirection.up);
+  });
+
+  testWidgets('d-pad up does not increase scroll offset (no down-slide)', (tester) async {
+    lastVerticalTraversal = null;
+    final controller = ScrollController();
+    await tester.pumpWidget(
+      _tvHost(
+        child: SizedBox(
+          height: 220,
+          child: ListView(
+            controller: controller,
+            children: [
+              SizedBox(
+                height: 140,
+                child: FocusRow(
+                  child: FilledButton(
+                    onPressed: () {},
+                    child: const Text('Upper'),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 140,
+                child: FocusRow(
+                  child: FilledButton(
+                    autofocus: true,
+                    onPressed: () {},
+                    child: const Text('Lower'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(Focus.of(tester.element(find.text('Lower'))).hasPrimaryFocus, isTrue);
+    final offsetBefore = controller.offset;
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    expect(Focus.of(tester.element(find.text('Upper'))).hasPrimaryFocus, isTrue);
+    expect(
+      controller.offset,
+      lessThanOrEqualTo(offsetBefore + 0.5),
+      reason: 'UP must not scroll the upper row downward (center-align looks like down)',
+    );
+  });
+
+  test('tvVerticalScrollPolicy maps UP to keepVisibleAtStart', () {
+    lastVerticalTraversal = TraversalDirection.up;
+    expect(tvVerticalScrollPolicy(), ScrollPositionAlignmentPolicy.keepVisibleAtStart);
+    expect(tvVerticalScrollAlignment(), 0.2);
+
+    lastVerticalTraversal = TraversalDirection.down;
+    expect(tvVerticalScrollPolicy(), ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+    expect(tvVerticalScrollAlignment(), 0.55);
+
+    lastVerticalTraversal = null;
+    expect(tvVerticalScrollPolicy(), ScrollPositionAlignmentPolicy.explicit);
+    expect(tvVerticalScrollAlignment(), 0.5);
+  });
 }
