@@ -8,25 +8,20 @@ int sushiSeasonTotalEpisodeCount(SeasonModel season) {
   return season.childCount ?? 0;
 }
 
+/// `season.episodes` is the client's authoritative on-disk list once enriched (possibly empty
+/// when nothing in the season has been ingested yet) — `childCount`/`episodeCount` are TMDB
+/// totals, not on-disk counts, so they must never be used as an "available" fallback here. Doing
+/// so previously made an entirely un-ingested season (0 known episodes) look fully watched,
+/// since `onDisk` came out equal to `total` by coincidence.
 int sushiSeasonAvailableEpisodeCount(SeasonModel season) {
-  if (season.episodes.isNotEmpty) {
-    final fromEpisodes = season.episodes
-        .where((episode) => episode.status == EpisodeStatus.available)
-        .length;
-    if (fromEpisodes > 0) return fromEpisodes;
-  }
-  return season.childCount ?? 0;
+  return season.episodes.where((episode) => episode.status == EpisodeStatus.available).length;
 }
 
 /// True when every on-disk episode in the season is marked played (Fladder check icon).
 bool sushiSeasonShowWatchedTick(SeasonModel season) {
-  
   final total = sushiSeasonTotalEpisodeCount(season);
   final onDisk = sushiSeasonAvailableEpisodeCount(season);
-  if (season.episodes.isEmpty) {
-    if (onDisk < total) return false;
-    return (season.userData.unPlayedItemCount ?? 0) == 0;
-  }
+  if (onDisk < total) return false;
   final playable = season.episodes.where((episode) => episode.status == EpisodeStatus.available);
   if (playable.isEmpty) return false;
   return playable.every((episode) => episode.userData.played);
@@ -34,7 +29,6 @@ bool sushiSeasonShowWatchedTick(SeasonModel season) {
 
 /// Season poster badge: `3/10` partial on disk, `0/10` none, unplayed when full on disk, else tick.
 String? sushiSeasonPosterCountText(SeasonModel season) {
-  
   final total = sushiSeasonTotalEpisodeCount(season);
   if (total <= 0) return null;
   final onDisk = sushiSeasonAvailableEpisodeCount(season);

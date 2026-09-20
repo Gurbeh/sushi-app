@@ -94,4 +94,32 @@ void main() {
   test('empty availableEpisodes hides the rail', () {
     expect(sushiShowSeriesEpisodeRail(_series()), isFalse);
   });
+
+  test('a season with nothing ingested yet never shows the watched tick', () {
+    // Nothing has been ingested for this season: no episodes are known at all, even though
+    // the TMDB index (episodeCount/childCount) reports a full season exists.
+    final season = _season(const [], episodeCount: 10);
+    expect(sushiSeasonAvailableEpisodeCount(season), 0);
+    expect(sushiSeasonShowWatchedTick(season), isFalse);
+    expect(sushiSeasonPosterCountText(season), '0/10');
+  });
+
+  test('a partially-ingested season shows the on-disk count, not a false tick', () {
+    final season = _season(
+      [_episode(1), _episode(2), _episode(3), _episode(4), _episode(5)],
+      episodeCount: 27,
+    );
+    expect(sushiSeasonAvailableEpisodeCount(season), 5);
+    expect(sushiSeasonShowWatchedTick(season), isFalse);
+    expect(sushiSeasonPosterCountText(season), '5/27');
+  });
+
+  test('a fully-ingested, fully-watched season shows the tick', () {
+    final watched = [
+      for (final e in [_episode(1), _episode(2)])
+        e.copyWith(userData: e.userData.copyWith(played: true)),
+    ];
+    final season = _season(watched, episodeCount: 2);
+    expect(sushiSeasonShowWatchedTick(season), isTrue);
+  });
 }

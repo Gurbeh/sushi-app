@@ -12,6 +12,11 @@ import 'package:flutter/services.dart';
 /// 1. Detects when [FocusManager.primaryFocus] is outside the dialog
 /// 2. Disables that foreign [FocusScopeNode] so later `requestFocus` calls no-op
 /// 3. Moves focus back onto the dialog action
+///
+/// On dismiss the reverse must happen in that same turn: unlock first, then
+/// give primary focus back. Otherwise TV has no focused widget (the route
+/// restore already failed against a locked scope) and D-pad keys go nowhere
+/// until a force-close.
 class SushiDialogFocusTrap extends StatefulWidget {
   const SushiDialogFocusTrap({
     required this.child,
@@ -34,6 +39,8 @@ class SushiDialogFocusTrap extends StatefulWidget {
 class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
   Timer? _poll;
   bool _ensuring = false;
+  bool _closing = false;
+  FocusNode? _restoreFocus;
   final _locked = <FocusScopeNode, ({bool canRequest, bool descendants})>{};
 
   @override
@@ -51,6 +58,10 @@ class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
     super.didChangeDependencies();
     FocusScope.of(context).traversalEdgeBehavior =
         TraversalEdgeBehavior.closedLoop;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      _beginClose();
+    }
   }
 
   bool _onKey(KeyEvent event) {
@@ -72,26 +83,39 @@ class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
   }
 
   void _ensure() {
-    if (!mounted || _ensuring) return;
+    if (_closing || !mounted || _ensuring) return;
     _ensuring = true;
     try {
+      if (_closing || !mounted) return;
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) {
+        _beginClose();
+        return;
+      }
       final primary = FocusManager.instance.primaryFocus;
       if (_owns(primary)) return;
 
       if (primary != null) {
         _lockForeignScope(primary);
       }
+      if (_closing) return;
       _focusSelf();
     } finally {
       _ensuring = false;
+      if (_closing) {
+        _unlock();
+      }
     }
   }
 
   void _lockForeignScope(FocusNode thief) {
+    if (_closing) return;
     final scope = thief.enclosingScope;
     if (scope == null) return;
     if (identical(scope, FocusManager.instance.rootScope)) return;
     if (_scopeContainsUs(scope)) return;
+
+    _restoreFocus = thief;
     if (_locked.containsKey(scope)) return;
 
     _locked[scope] = (
@@ -103,6 +127,7 @@ class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
   }
 
   void _focusSelf() {
+    if (_closing) return;
     final node = widget.primaryFocus;
     if (node != null && node.canRequestFocus) {
       node.requestFocus();
@@ -120,18 +145,51 @@ class _SushiDialogFocusTrapState extends State<SushiDialogFocusTrap> {
 
   void _unlock() {
     for (final entry in _locked.entries) {
-      entry.key.canRequestFocus = entry.value.canRequest;
-      entry.key.descendantsAreFocusable = entry.value.descendants;
+      try {
+        entry.key.canRequestFocus = entry.value.canRequest;
+        entry.key.descendantsAreFocusable = entry.value.descendants;
+      } catch (_) {}
     }
     _locked.clear();
   }
 
-  @override
-  void dispose() {
+  void _restoreFocusSoon(FocusNode? preferred) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (preferred != null && preferred.canRequestFocus && preferred.context != null) {
+        preferred.requestFocus();
+        return;
+      }
+      final primary = FocusManager.instance.primaryFocus;
+      if (primary != null &&
+          primary.canRequestFocus &&
+          primary.context != null &&
+          !identical(primary, FocusManager.instance.rootScope)) {
+        return;
+      }
+      for (final node in FocusManager.instance.rootScope.traversalDescendants) {
+        if (node.canRequestFocus && node.context != null) {
+          node.requestFocus();
+          return;
+        }
+      }
+    });
+  }
+
+  void _beginClose() {
+    if (_closing) return;
+    _closing = true;
     _poll?.cancel();
     HardwareKeyboard.instance.removeHandler(_onKey);
     FocusManager.instance.removeListener(_ensure);
+    final preferred = _restoreFocus;
+    _restoreFocus = null;
     _unlock();
+    _restoreFocusSoon(preferred);
+  }
+
+  @override
+  void dispose() {
+    _beginClose();
     SushiDialogFocusTrap._active--;
     super.dispose();
   }

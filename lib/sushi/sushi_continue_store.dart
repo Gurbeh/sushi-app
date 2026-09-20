@@ -185,7 +185,9 @@ SushiContinueEntry? sushiContinueEntryFromItem(
 
 /// Series stay in continue-watching until every episode is finished.
 /// A <5% bounce (next/prev skip, immediate Back) must not wipe an in-progress row.
-/// A finished episode with [nextEpisode] becomes that next episode at 0%.
+/// A finished episode with [nextEpisode] becomes that next episode at 0%. When the live
+/// playback queue couldn't resolve a next episode (its season boundary isn't ingested yet),
+/// fall back to "same season, episode + 1" instead of dropping the row — always last watched +1.
 SushiContinueEntry? sushiContinueRememberDecision({
   required SushiContinueEntry incoming,
   SushiContinueEntry? existing,
@@ -197,12 +199,33 @@ SushiContinueEntry? sushiContinueRememberDecision({
   }
   final durationKnown = incoming.durationMs > 0;
   if (durationKnown && incoming.isFinished) {
-    return nextEpisode;
+    return nextEpisode ?? _sushiSyntheticNextEntry(incoming);
   }
   if (durationKnown && incoming.isStarted) {
     return incoming;
   }
   return existing ?? incoming;
+}
+
+/// "Last watched + 1" placeholder for a finished episode whose season/episode number is known
+/// but whose successor wasn't part of the playback queue (not ingested on the client yet).
+SushiContinueEntry? _sushiSyntheticNextEntry(SushiContinueEntry finished) {
+  final season = finished.season;
+  final episode = finished.episode;
+  if (season == null || episode == null) return null;
+  return SushiContinueEntry(
+    tmdbId: finished.tmdbId,
+    kind: finished.kind,
+    title: finished.title,
+    year: finished.year,
+    rating: finished.rating,
+    poster: finished.poster,
+    positionMs: 0,
+    durationMs: 0,
+    atMs: finished.atMs,
+    season: season,
+    episode: episode + 1,
+  );
 }
 
 Future<void> sushiContinueRemember(

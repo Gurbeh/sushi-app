@@ -200,7 +200,7 @@ void main() {
     expect(keep?.positionMs, 0);
   });
 
-  test('series finished with no next episode drops continue-watching', () {
+  test('series finished with no next episode falls back to last watched + 1', () {
     const finished = SushiContinueEntry(
       tmdbId: 1396,
       kind: SushiKind.series,
@@ -215,10 +215,11 @@ void main() {
       season: 5,
       episode: 16,
     );
-    expect(
-      sushiContinueRememberDecision(incoming: finished, existing: finished),
-      isNull,
-    );
+    final keep = sushiContinueRememberDecision(incoming: finished, existing: finished);
+    expect(keep?.season, 5);
+    expect(keep?.episode, 17);
+    expect(keep?.positionMs, 0);
+    expect(keep?.episodeItemId, isNull);
   });
 
   test('movie bounce <5% still drops', () {

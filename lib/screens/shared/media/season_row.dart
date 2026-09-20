@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
 import 'package:fladder/sushi/sushi_season_availability.dart';
+import 'package:fladder/sushi/sushi_season_playable.dart';
+import 'package:fladder/sushi/sushi_season_watch_actions.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
 import 'package:fladder/theme.dart';
@@ -19,6 +22,25 @@ import 'package:fladder/widgets/shared/horizontal_list.dart';
 import 'package:fladder/widgets/shared/item_actions.dart';
 import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 import 'package:fladder/widgets/shared/status_card.dart';
+
+/// Season card long-press/right-click menu: bulk mark-watched up front, then the generic
+/// actions. Without this, the generic "Mark as watched" action marks the season's own
+/// synthetic id — which nothing else reads — instead of the episodes inside it.
+List<ItemAction> _sushiSeasonMenuActions(BuildContext context, WidgetRef ref, SeasonModel season) {
+  if (!sushiSeasonHasPlayableEpisodes(season)) {
+    return season.generateActions(context, ref);
+  }
+  final played = sushiSeasonShowWatchedTick(season);
+  return [
+    ItemActionButton(
+      icon: Icon(played ? IconsaxPlusLinear.eye_slash : IconsaxPlusLinear.eye),
+      label: Text(played ? context.localized.markAsUnwatched : context.localized.markAsWatched),
+      action: () => sushiSeasonMarkPlayed(ref, season, !played),
+    ),
+    ItemActionDivider(),
+    ...season.generateActions(context, ref),
+  ];
+}
 
 class SeasonsRow extends ConsumerWidget {
   final EdgeInsets contentPadding;
@@ -106,7 +128,7 @@ class SeasonPoster extends ConsumerWidget {
                   await showMenu(
                       context: context,
                       position: position,
-                      items: season.generateActions(context, ref).popupMenuItems(useIcons: true));
+                      items: _sushiSeasonMenuActions(context, ref, season).popupMenuItems(useIcons: true));
                 },
                 onTap: () async {
                   await season.navigateTo(context, ref: ref, tag: myKey);
@@ -120,7 +142,8 @@ class SeasonPoster extends ConsumerWidget {
                           content: (context, scrollController) => ListView(
                             shrinkWrap: true,
                             controller: scrollController,
-                            children: season.generateActions(context, ref).listTileItems(context, useIcons: true),
+                            children:
+                                _sushiSeasonMenuActions(context, ref, season).listTileItems(context, useIcons: true),
                           ),
                         );
                       }
@@ -215,7 +238,8 @@ class SeasonPoster extends ConsumerWidget {
                         child: PopupMenuButton(
                           tooltip: context.localized.options,
                           icon: const Icon(Icons.more_vert, color: Colors.white),
-                          itemBuilder: (context) => season.generateActions(context, ref).popupMenuItems(useIcons: true),
+                          itemBuilder: (context) =>
+                              _sushiSeasonMenuActions(context, ref, season).popupMenuItems(useIcons: true),
                         ),
                       ),
                     ),

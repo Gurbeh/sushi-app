@@ -86,16 +86,43 @@ UserData _watchUserData(
 SeriesModel sushiAttachResumeEpisode(SeriesModel series, SushiContinueEntry? resume) {
   if (resume == null || resume.isFinished) return series;
   final id = resume.episodeItemId;
-  if (id == null || id.isEmpty) return series;
-  if (series.availableEpisodes?.any((e) => e.id == id) == true) return series;
-  final stub = EpisodeModel(
+  final season = resume.season;
+  final episode = resume.episode;
+  final hasId = id != null && id.isNotEmpty;
+  if (!hasId && (season == null || episode == null)) return series;
+  final alreadyKnown = hasId
+      ? series.availableEpisodes?.any((e) => e.id == id) == true
+      : series.availableEpisodes?.any((e) => e.season == season && e.episode == episode) == true;
+  if (alreadyKnown) return series;
+  final stub = sushiEpisodeStub(
+    series,
+    season: season ?? 1,
+    episode: episode ?? 1,
+    id: id,
+  );
+  return series.copyWith(
+    availableEpisodes: [...?series.availableEpisodes, stub],
+  );
+}
+
+/// Placeholder episode for a season/episode number the client has no catalog data for yet
+/// (not ingested, or only known from a continue-watching entry). Used both to reattach a
+/// stored resume position and to represent "last watched + 1" when that next episode hasn't
+/// been indexed on the client.
+EpisodeModel sushiEpisodeStub(
+  SeriesModel series, {
+  required int season,
+  required int episode,
+  String? id,
+}) {
+  return EpisodeModel(
     seriesName: series.name,
-    season: resume.season ?? 1,
-    episode: resume.episode ?? 1,
+    season: season,
+    episode: episode,
     episodeEnd: null,
     location: ItemLocation.filesystem,
-    name: 'Episode ${resume.episode ?? 1}',
-    id: id,
+    name: 'Episode $episode',
+    id: id ?? 'sushi_ep_stub_${series.id}_${season}_$episode',
     overview: series.overview,
     parentId: series.id,
     playlistId: null,
@@ -108,9 +135,6 @@ SeriesModel sushiAttachResumeEpisode(SeriesModel series, SushiContinueEntry? res
     canDelete: false,
     canDownload: true,
     jellyType: BaseItemKind.episode,
-  );
-  return series.copyWith(
-    availableEpisodes: [...?series.availableEpisodes, stub],
   );
 }
 
