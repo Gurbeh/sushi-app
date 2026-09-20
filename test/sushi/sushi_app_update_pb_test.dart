@@ -68,13 +68,13 @@ void main() {
     expect(SushiSemver.parse('1.1.150-nightly')?.patch, 150);
   });
 
-  test('sushiNoteLatestApp ignores empty and keeps the last real one', () {
+  test('sushiNoteLatestApp ignores empty and keeps the last real one', () async {
     sushiLatestApp.value = null;
-    sushiNoteLatestApp(null);
+    await sushiNoteLatestApp(null);
     expect(sushiLatestApp.value, isNull);
-    sushiNoteLatestApp(const SushiLatestApp(platform: 'windows', version: '2.0.0'));
+    await sushiNoteLatestApp(const SushiLatestApp(platform: 'windows', version: '2.0.0'));
     expect(sushiLatestApp.value?.version, '2.0.0');
-    sushiNoteLatestApp(const SushiLatestApp(platform: 'windows', version: ''));
+    await sushiNoteLatestApp(const SushiLatestApp(platform: 'windows', version: ''));
     expect(sushiLatestApp.value?.version, '2.0.0');
   });
 

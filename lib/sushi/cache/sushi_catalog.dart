@@ -6,6 +6,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:fladder/sushi/cache/sushi_catalog_store.dart';
+import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 
@@ -176,6 +177,7 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
       seq: row.seq,
       ttl: Duration(milliseconds: row.ttlMs),
       fetchedAt: row.fetchedAt,
+      latestApp: SushiLatestApp.fromJson(map['latestApp']),
     );
   }
 
@@ -194,6 +196,7 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
             'trending': [for (final r in home.trending) r.toJson()],
             'seriesMostWatched': [for (final r in home.seriesMostWatched) r.toJson()],
             'seriesTrending': [for (final r in home.seriesTrending) r.toJson()],
+            'latestApp': home.latestApp?.toJson(),
           }),
         ),
       ),

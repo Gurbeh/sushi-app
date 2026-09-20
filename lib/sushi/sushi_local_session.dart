@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_delivery_reader_sync.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_initbot_transport.dart';
@@ -56,6 +57,7 @@ Future<void> sushiResetLocalSession({SushiCatalogController? catalog}) async {
   SushiTdlibSessionCache.clearAll();
   sushiClearPlaybackCacheOnAccountSwitch();
   SushiProviderBotsBootstrap.reset();
+  await sushiClearPersistedLatestApp();
   await SushiTdlibBridgeController.instance().clearCachedBotToken();
   if (catalog != null) {
     await catalog.wipeSession();

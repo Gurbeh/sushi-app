@@ -1,3 +1,4 @@
+import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 
@@ -11,6 +12,7 @@ class SushiCachedHome {
     required this.seq,
     required this.ttl,
     required this.fetchedAt,
+    this.latestApp,
   });
 
   final List<SushiRow> slider;
@@ -21,6 +23,7 @@ class SushiCachedHome {
   final int seq;
   final Duration ttl;
   final DateTime fetchedAt;
+  final SushiLatestApp? latestApp;
 
   bool get isEmpty =>
       slider.isEmpty &&

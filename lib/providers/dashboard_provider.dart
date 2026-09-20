@@ -18,7 +18,9 @@ import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
+import 'package:fladder/sushi/sushi_home_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 
 final dashboardProvider = StateNotifierProvider<DashboardNotifier, HomeModel>((ref) {
@@ -119,6 +121,8 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
 
     if (!force && cached != null && !cached.isEmpty && !await catalog.homeIsStale()) {
       debugPrint('[sushi] home cache hit seq=${cached.seq}');
+      // Catalog TTL can skip rails; still ping movies `/home` so latest_app can move (ADR 0019).
+      unawaited(sushiFetchHome(tab: sushiHomeTabMovies));
       return;
     }
 
@@ -136,6 +140,7 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   }
 
   Future<void> _applySushiHome(SushiCachedHome home) async {
+    await sushiNoteLatestApp(home.latestApp);
     List<ItemBaseModel> map(List<SushiRow> rows) => rows.map(sushiRowToItemBaseModel).toList();
     final slider = map(home.slider);
     sushiApplySushiHomeRailsRef(

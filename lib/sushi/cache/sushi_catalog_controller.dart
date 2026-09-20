@@ -146,6 +146,7 @@ class SushiCatalogController {
         seq: series?.seq ?? movies?.seq ?? 0,
         ttl: Duration(seconds: ttlSeconds > 0 ? ttlSeconds : sushiHomeTtlFallback.inSeconds),
         fetchedAt: _clock(),
+        latestApp: movies?.latestApp ?? series?.latestApp,
       );
       await _store.writeHome(home);
       return home;

@@ -26,7 +26,11 @@ Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
   final requestText = sushiEncodeRequestText(
     'home',
     corr,
-    sushiEncodeHomeReq(tab: tab, platform: platform),
+    sushiEncodeHomeReq(
+      tab: tab,
+      platform: platform,
+      currentVersion: sushiUpdateCurrentVersion(),
+    ),
   );
 
   try {
@@ -46,7 +50,7 @@ Future<SushiHomeRes?> sushiFetchHome({required int tab}) async {
       return null;
     }
     final home = SushiHomeRes.decode(env.payload);
-    sushiNoteLatestApp(home.latestApp);
+    await sushiNoteLatestApp(home.latestApp);
     return home;
   } catch (e, st) {
     debugPrint('[sushi] home fetch failed: $e\n$st');

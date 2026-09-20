@@ -113,4 +113,16 @@ class SushiLatestApp {
     }
     return SushiLatestApp(platform: platform, version: version);
   }
+
+  Map<String, Object?> toJson() => {'platform': platform, 'version': version};
+
+  static SushiLatestApp? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final version = '${raw['version'] ?? ''}'.trim();
+    if (version.isEmpty) return null;
+    return SushiLatestApp(
+      platform: '${raw['platform'] ?? ''}',
+      version: version,
+    );
+  }
 }

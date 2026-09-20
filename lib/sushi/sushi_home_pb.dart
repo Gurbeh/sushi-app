@@ -229,9 +229,14 @@ class SushiHomeRes {
   }
 }
 
-/// Encodes a `sushi.v1.HomeReq`: field 1 `tab` (varint enum, [sushiHomeTabMovies]/
-/// [sushiHomeTabSeries]), field 2 `since_seq` (varint).
-Uint8List sushiEncodeHomeReq({required int tab, int sinceSeq = 0, String platform = ''}) {
+/// Encodes a `sushi.v1.HomeReq`: field 1 `tab`, field 2 `since_seq`, field 3 `platform`,
+/// field 4 `current_version`.
+Uint8List sushiEncodeHomeReq({
+  required int tab,
+  int sinceSeq = 0,
+  String platform = '',
+  String currentVersion = '',
+}) {
   final out = BytesBuilder();
   void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
   if (tab != 0) {
@@ -245,6 +250,12 @@ Uint8List sushiEncodeHomeReq({required int tab, int sinceSeq = 0, String platfor
   if (platform.isNotEmpty) {
     writeTag(3, 2);
     final bytes = utf8.encode(platform);
+    out.add(sushiUvarint(bytes.length));
+    out.add(bytes);
+  }
+  if (currentVersion.isNotEmpty) {
+    writeTag(4, 2);
+    final bytes = utf8.encode(currentVersion);
     out.add(sushiUvarint(bytes.length));
     out.add(bytes);
   }

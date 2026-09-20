@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
+import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 
@@ -297,6 +298,40 @@ void main() {
     expect(homeCalls, 2);
     expect(live?.slider.single.tmdbId, 5);
     expect(store.home?.seq, 11);
+  });
+
+  test('stale home copies latest_app from the live movies tab', () async {
+    final store = _MemStore()
+      ..home = SushiCachedHome(
+        slider: const [
+          SushiRow(tmdbId: 1, kind: SushiKind.movie, title: 'Old', year: 2020, rating: 1, poster: ''),
+        ],
+        mostWatched: const [],
+        trending: const [],
+        seriesMostWatched: const [],
+        seriesTrending: const [],
+        seq: 1,
+        ttl: const Duration(hours: 1),
+        fetchedAt: DateTime(2026, 1, 1),
+      );
+    final catalog = SushiCatalogController(
+      store,
+      fetchHome: ({required tab}) async {
+        return SushiHomeRes(
+          rails: const [],
+          seq: 12,
+          ttlSeconds: 3600,
+          latestApp: tab == sushiHomeTabMovies
+              ? const SushiLatestApp(platform: 'android_new', version: '1.1.192')
+              : null,
+        );
+      },
+      clock: () => DateTime(2026, 1, 1, 2),
+    );
+
+    final live = await catalog.refreshHome();
+    expect(live?.latestApp?.version, '1.1.192');
+    expect(store.home?.latestApp?.platform, 'android_new');
   });
 
   test('home slider concat uniques overlapping TMDB ids', () async {

@@ -72,6 +72,15 @@ void main() {
     expect(bytes[2], 0x1a); // field 3, wire 2
   });
 
+  test('sushiEncodeHomeReq appends current_version as field 4', () {
+    final bytes = sushiEncodeHomeReq(
+      tab: sushiHomeTabMovies,
+      platform: 'android_new',
+      currentVersion: '1.1.191',
+    );
+    expect(bytes.contains(0x22), isTrue); // field 4, wire 2
+  });
+
   test('sushiEncodeHomeReq omits zero-value fields', () {
     expect(sushiEncodeHomeReq(tab: 0, sinceSeq: 0), isEmpty);
   });

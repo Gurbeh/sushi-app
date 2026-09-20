@@ -25,6 +25,8 @@ export 'package:fladder/sushi/sushi_app_platform.dart' show sushiAppUpdateLocato
 export 'package:fladder/sushi/sushi_app_update_pb.dart' show SushiLatestApp;
 
 const _kSkippedVersionKey = 'sushi_skipped_app_version';
+const _kLatestAppVersionKey = 'sushi_latest_app_version';
+const _kLatestAppPlatformKey = 'sushi_latest_app_platform';
 
 /// Latest shelf version from HomeRes. Null until the first home answer that carried one.
 final ValueNotifier<SushiLatestApp?> sushiLatestApp = ValueNotifier<SushiLatestApp?>(null);
@@ -32,10 +34,18 @@ final ValueNotifier<SushiLatestApp?> sushiLatestApp = ValueNotifier<SushiLatestA
 SharedPreferences? _updatePrefs;
 String _updateCurrentVersion = '';
 
+String sushiUpdateCurrentVersion() => _updateCurrentVersion;
+
 /// Called once from bootstrap so the prompt host can skip/compare without a Riverpod read.
 void sushiBindUpdatePrompt(SharedPreferences prefs, String currentVersion) {
   _updatePrefs = prefs;
   _updateCurrentVersion = currentVersion;
+  final version = (prefs.getString(_kLatestAppVersionKey) ?? '').trim();
+  if (version.isEmpty) return;
+  sushiLatestApp.value = SushiLatestApp(
+    platform: prefs.getString(_kLatestAppPlatformKey) ?? '',
+    version: version,
+  );
 }
 
 GlobalKey<NavigatorState>? _updateNavigatorKey;
@@ -94,9 +104,22 @@ void sushiBindLatestAppRefresher(Future<void> Function() refresh) {
 }
 
 /// Called from the home transport whenever a HomeRes includes latest_app (ADR 0019).
-void sushiNoteLatestApp(SushiLatestApp? latest) {
+Future<void> sushiNoteLatestApp(SushiLatestApp? latest) async {
   if (latest == null || latest.version.isEmpty) return;
   sushiLatestApp.value = latest;
+  final prefs = _updatePrefs;
+  if (prefs == null) return;
+  await prefs.setString(_kLatestAppVersionKey, latest.version);
+  await prefs.setString(_kLatestAppPlatformKey, latest.platform);
+}
+
+Future<void> sushiClearPersistedLatestApp() async {
+  sushiLatestApp.value = null;
+  try {
+    final prefs = _updatePrefs ?? await SharedPreferences.getInstance();
+    await prefs.remove(_kLatestAppVersionKey);
+    await prefs.remove(_kLatestAppPlatformKey);
+  } catch (_) {}
 }
 
 bool sushiIsNewerApp(String currentVersion, String latestVersion) {
@@ -446,6 +469,7 @@ class _SushiUpdatePromptHostState extends State<SushiUpdatePromptHost> with Widg
     sushiLatestApp.addListener(_onLatestApp);
     _updateRouteListener = _onRouteChanged;
     _updateRouteListenable?.addListener(_onRouteChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_maybeShow()));
   }
 
   @override

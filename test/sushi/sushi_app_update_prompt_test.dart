@@ -54,14 +54,35 @@ void main() {
   test('sushiShouldOfferUpdate skips a version the user dismissed', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
-    sushiNoteLatestApp(const SushiLatestApp(platform: 'android_tv', version: '2.0.0'));
+    await sushiNoteLatestApp(const SushiLatestApp(platform: 'android_tv', version: '2.0.0'));
 
     expect(await sushiShouldOfferUpdate(currentVersion: '1.9.0', prefs: prefs), isTrue);
 
     await sushiSkipAppVersion(prefs, '2.0.0');
     expect(await sushiShouldOfferUpdate(currentVersion: '1.9.0', prefs: prefs), isFalse);
 
-    sushiNoteLatestApp(const SushiLatestApp(platform: 'android_tv', version: '2.1.0'));
+    await sushiNoteLatestApp(const SushiLatestApp(platform: 'android_tv', version: '2.1.0'));
     expect(await sushiShouldOfferUpdate(currentVersion: '1.9.0', prefs: prefs), isTrue);
+  });
+
+  test('sushiBindUpdatePrompt restores last latest_app so cold start can prompt', () async {
+    SharedPreferences.setMockInitialValues({
+      'sushi_latest_app_version': '1.1.192',
+      'sushi_latest_app_platform': 'android_new',
+    });
+    final prefs = await SharedPreferences.getInstance();
+    sushiBindUpdatePrompt(prefs, '1.1.191');
+    expect(sushiLatestApp.value?.version, '1.1.192');
+    expect(await sushiShouldOfferUpdate(currentVersion: '1.1.191', prefs: prefs), isTrue);
+  });
+
+  test('sushiClearPersistedLatestApp drops the shelf stamp', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    sushiBindUpdatePrompt(prefs, '1.1.191');
+    await sushiNoteLatestApp(const SushiLatestApp(platform: 'android_new', version: '1.1.192'));
+    await sushiClearPersistedLatestApp();
+    expect(sushiLatestApp.value, isNull);
+    expect(prefs.getString('sushi_latest_app_version'), isNull);
   });
 }
