@@ -266,6 +266,27 @@ func TestFloodWaitAllowsRetry_otherErrorIsFatal(t *testing.T) {
 	}
 }
 
+func TestUploadGetFileWithRetry_retriesAfterTimeout503(t *testing.T) {
+	d := &DownloadSession{ref: &VideoFileRef{Size: 1024}}
+	calls := 0
+	got, err := d.uploadGetFileWithRetry(context.Background(), func(context.Context, *tg.UploadGetFileRequest) (tg.UploadFileClass, error) {
+		calls++
+		if calls == 1 {
+			return nil, tgerr.New(503, "Timeout")
+		}
+		return &tg.UploadFile{Bytes: []byte("ok")}, nil
+	}, &tg.UploadGetFileRequest{})
+	if err != nil {
+		t.Fatalf("want retry success, got %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls=%d want 2 (timeout then success)", calls)
+	}
+	if got == nil {
+		t.Fatal("nil result after retry")
+	}
+}
+
 func TestUploadGetFileWithRetry_retriesAfterFloodWait(t *testing.T) {
 	d := &DownloadSession{ref: &VideoFileRef{Size: 1024}}
 	calls := 0

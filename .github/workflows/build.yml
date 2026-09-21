@@ -45,8 +45,6 @@ env:
   # Sushi-only CI secrets (Infisical sushi /client-ci + GitHub Actions mirrors).
   SUSHI_MAIN_BOT: ${{ secrets.SUSHI_MAIN_BOT }}
   SUSHI_INIT_BOT: ${{ secrets.SUSHI_INIT_BOT }}
-  SUSHI_API_BASE_URL: ${{ secrets.SUSHI_API_BASE_URL }}
-  SUSHI_API_BASE_IRAN: ${{ secrets.SUSHI_API_BASE_IRAN }}
   TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
   TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
   TELEGRAM_HOSTED_WEBAPP_HTTPS_URL: ${{ secrets.TELEGRAM_HOSTED_WEBAPP_HTTPS_URL }}
@@ -128,6 +126,7 @@ jobs:
       android_version_code: ${{ steps.fetch.outputs.android_version_code }}
       flutter_version: ${{ steps.fetch.outputs.flutter_version }}
       nightly_version: ${{ steps.fetch.outputs.nightly_version }}
+      app_version: ${{ steps.fetch.outputs.app_version }}
       build_type: ${{ needs.check-trigger.outputs.build_type }}
     steps:
       - uses: actions/checkout@v5
@@ -143,17 +142,20 @@ jobs:
           FLUTTER_VERSION=$(jq -r '.flutter' .fvmrc)
           echo "flutter_version=${FLUTTER_VERSION}" >> "$GITHUB_OUTPUT"
 
-          if [[ "${{ needs.check-trigger.outputs.build_type }}" == "nightly" ]]; then
-            NIGHTLY_VERSION="${VERSION_NAME}-nightly"
-            echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
-            echo "Nightly version: $NIGHTLY_VERSION"
-          else
-            echo "nightly_version=" >> "$GITHUB_OUTPUT"
-          fi
-
           # Must exceed legacy split-APK versionCodes on Play (base*1000+abi) and pubspec-era +N codes.
           ANDROID_VERSION_CODE=$((10000 + ${GITHUB_RUN_NUMBER}))
           echo "android_version_code=${ANDROID_VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ needs.check-trigger.outputs.build_type }}" == "nightly" ]]; then
+            # Serial makes the next nightly newer than the one already installed.
+            NIGHTLY_VERSION="${VERSION_NAME}-nightly.${ANDROID_VERSION_CODE}"
+            echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "app_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "Nightly version: $NIGHTLY_VERSION"
+          else
+            echo "nightly_version=" >> "$GITHUB_OUTPUT"
+            echo "app_version=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "Base version: $VERSION_NAME"
           echo "Flutter version: $FLUTTER_VERSION"
@@ -304,6 +306,7 @@ jobs:
           .github/scripts/retry_command.sh 5 60 -- \
             flutter build apk --release --split-per-abi \
               --split-debug-info=build/debug-info \
+              --build-name=${{ needs.fetch-info.outputs.app_version }} \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --flavor direct \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
@@ -495,6 +498,7 @@ jobs:
             rm -rf build/windows/x64/libmpv build/windows/x64/ANGLE 2>/dev/null || true
             pwsh -NoProfile -File .github/scripts/prefetch_mpv_windows.ps1
             if flutter build windows --release \
+              --build-name=${{ needs.fetch-info.outputs.app_version }} \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
               exit 0
@@ -513,7 +517,7 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: windows/windows_setup.iss
-          options: /O+ /DFLADDER_VERSION="${{ needs.fetch-info.outputs.version_name }}"
+          options: /O+ /DFLADDER_VERSION="${{ needs.fetch-info.outputs.app_version }}"
 
       - uses: actions/upload-artifact@v5
         with:
@@ -567,6 +571,7 @@ jobs:
 
           for attempt in 1 2 3 4 5; do
             if prepare_ios_deps && flutter build ipa --no-codesign --flavor production \
+              --build-name=${{ needs.fetch-info.outputs.app_version }} \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
               exit 0
@@ -636,6 +641,7 @@ jobs:
           for attempt in 1 2 3 4 5; do
             prepare_macos_deps
             if flutter build macos --flavor production --release \
+              --build-name=${{ needs.fetch-info.outputs.app_version }} \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"; then
               exit 0
@@ -704,6 +710,7 @@ jobs:
           .github/scripts/prefetch_mimalloc_linux.sh
           .github/scripts/retry_command.sh 3 30 -- \
             flutter build linux --release \
+              --build-name=${{ needs.fetch-info.outputs.app_version }} \
               --build-number=${{ needs.fetch-info.outputs.android_version_code }} \
               --dart-define-from-file="$FLUTTER_BUILD_ENV_FILE"
 
@@ -736,7 +743,7 @@ jobs:
           chmod +x .github/scripts/download_with_retry.sh .github/scripts/retry_command.sh
           mkdir -p .ci-cache
 
-          VERSION_TO_USE="${{ needs.fetch-info.outputs.version_name }}"
+          VERSION_TO_USE="${{ needs.fetch-info.outputs.app_version }}"
           sed -i -E "s/(version:\\s*)latest/\\1${VERSION_TO_USE}/" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_OWNER|${{ github.repository_owner }}|g" AppImageBuilder.yml
           sed -i "s|PLACEHOLDER_REPO|${{ github.event.repository.name }}|g" AppImageBuilder.yml

@@ -16,6 +16,7 @@ import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
+import 'package:fladder/models/video_stream_model.dart';
 import 'package:fladder/util/bitrate_helper.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
 
@@ -42,6 +43,9 @@ class SushiPlaybackModel extends PlaybackModel {
   DateTime? _lastProgAt;
 
   int? get resolvedEpisodeId => episodeId ?? sushiEpisodeIdFromItemId(item.id);
+
+  @override
+  String? playerKindLabel(BuildContext context) => PlaybackType.directStream.name(context);
 
   @override
   List<SubStreamModel> get subStreams => [SubStreamModel.no(), ...mediaStreams?.subStreams ?? []];

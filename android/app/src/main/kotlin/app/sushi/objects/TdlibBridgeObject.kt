@@ -68,7 +68,12 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
      *  dashboard-prefetch burst. Root cause not yet isolated (native crash trace rolls out of the
      *  logcat ring buffer before it can be captured), but it reliably reproduced with this flag on
      *  and did not reproduce on the proven HTTP bridge path — see jni_bridge.go's doc for the
-     *  round-trip this bypasses. Re-enable only after that hang is root-caused and fixed. */
+     *  round-trip this bypasses.
+     *
+     *  R-UI-16: this is the only switch. Dart must not register stream_cb / dlopen
+     *  liboxtelegramstream.so while this is false. Two Go runtimes in one process crash with
+     *  `bulkBarrierPreWrite: unaligned arguments` (Pixel 2026-09-19, 2026-09-21). Re-enable only
+     *  after that hang is root-caused and a three-play device pass with prefetch on stays up. */
     private const val OX_TELEGRAM_STREAM_CB_ENABLED = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -494,7 +499,9 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
     private fun closeAfterPlayback(fileId: Int) {
         val fetcher = fetchers.remove(fileId)
         if (currentPlaybackFileId == fileId) currentPlaybackFileId = null
-        OxTelegramStreamBridge.unregisterSession(fileId)
+        if (OX_TELEGRAM_STREAM_CB_ENABLED) {
+            OxTelegramStreamBridge.unregisterSession(fileId)
+        }
         if (fetcher == null) {
             Log.i("OXPLAY_TDLIB", "closeAfterPlayback fileId=$fileId — already released, no-op")
             return

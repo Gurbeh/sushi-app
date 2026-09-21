@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
-import 'package:fladder/sushi/sushi_telegram_delivery_api.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 /// Prepares every delivery sender on the user's Telegram account: started (so the bot may message
@@ -70,23 +69,11 @@ abstract final class SushiProviderBotsBootstrap {
     });
   }
 
+  /// No-op: the backend's provider-bot list was fetched over HTTP, which Sushi no longer uses.
+  /// Provider bots are started/muted lazily as they're encountered during delivery instead, so
+  /// this always reports ready rather than blocking prefetch/play on a warmup that can't run.
   static Future<void> _run() async {
-    try {
-      final bots = await SushiTelegramDeliveryApi.providerBots();
-      if (bots.isEmpty) {
-        // Either the backend has no senders configured or the call failed. Both are worth one more
-        // attempt on the next app enter, so this is deliberately not marked done.
-        debugPrint('SUSHI_TDLIB: no provider bots to prepare');
-        return;
-      }
-      final ok = await SushiTdlibBridgeController.instance().ensureProviderBotsReady(bots);
-      if (ok) {
-        _done = true;
-      } else {
-        debugPrint('SUSHI_TDLIB: provider bot bootstrap deferred — session not ready yet');
-      }
-    } catch (e) {
-      debugPrint('SUSHI_TDLIB: provider bot bootstrap failed: $e');
-    }
+    debugPrint('SUSHI_TDLIB: provider bot pre-bootstrap skipped (no HTTP backend)');
+    _done = true;
   }
 }

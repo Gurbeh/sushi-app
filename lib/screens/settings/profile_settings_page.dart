@@ -313,9 +313,9 @@ class _UserSettingsPageState extends ConsumerState<ProfileSettingsPage> with Wid
             ],
           ),
         ],
-        if (SushiEnv.apiBaseUrl != null) ...[
+        if (SushiEnv.isEnabled) ...[
           const SizedBox(height: 16),
-          ...sushiProfileDeleteAccountGroup(context, ref),
+          ...sushiProfileDeleteAccountGroup(context),
         ],
       ],
     );

@@ -168,3 +168,24 @@ Future<SushiTdlibDeliveryRef?> sushiDeliveryRefForLocator(String locator) {
   final controller = SushiTdlibBridgeController.instance();
   return _enqueue(() => controller.deliveryRefForLocator(locator), priority: true);
 }
+
+/// Subtitle document download (doc 15 §7). Same gomobile JNI as playback — must not overlap
+/// `startPlaybackSession` / protocol calls on a second Dart isolate. Fast lane so a hop-to-next
+/// episode's play is not stuck behind `/home`.
+Future<String> sushiFetchSmallDocument({
+  required int botId,
+  required int messageId,
+  required String locator,
+  int timeoutMs = 30000,
+}) {
+  final controller = SushiTdlibBridgeController.instance();
+  return _enqueue(
+    () => controller.fetchSmallDocument(
+      botId: botId,
+      messageId: messageId,
+      locator: locator,
+      timeoutMs: timeoutMs,
+    ),
+    priority: true,
+  );
+}

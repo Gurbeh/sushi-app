@@ -94,7 +94,7 @@ class _CurrentlyPlayingBarState extends ConsumerState<FloatingPlayerBar> {
           }),
       ItemActionButton(
         label: Text(context.localized.stop),
-        action: () async => ref.read(videoPlayerProvider).stop(),
+        action: () async => ref.read(videoPlayerProvider).stop(leavingPlayer: true),
         icon: const Icon(IconsaxPlusBold.stop),
       ),
       ItemActionButton(
@@ -128,7 +128,7 @@ class _CurrentlyPlayingBarState extends ConsumerState<FloatingPlayerBar> {
           if (direction == DismissDirection.up) {
             await openFullScreenPlayer();
           } else {
-            await ref.read(videoPlayerProvider).stop();
+            await ref.read(videoPlayerProvider).stop(leavingPlayer: true);
           }
           return false;
         },

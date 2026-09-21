@@ -4,10 +4,7 @@ import 'package:fladder/providers/library_screen_provider.dart';
 Set<LibraryViewType> sushiLibraryLoadTypes(LibraryScreenModel state) => libraryLoadTypes(state);
 
 bool sushiShowLibraryRecommended(LibraryScreenModel state) {
-  
-    return state.viewType.isEmpty || state.viewType.contains(LibraryViewType.recommended);
-  
-  return state.viewType.contains(LibraryViewType.recommended);
+  return state.viewType.isEmpty || state.viewType.contains(LibraryViewType.recommended);
 }
 
 bool sushiLibraryHasCachedContent(LibraryScreenModel state) {

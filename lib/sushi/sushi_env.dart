@@ -3,10 +3,11 @@ import 'package:fladder/sushi/sushi_config.dart';
 
 /// Build-time and runtime env for the Sushi client.
 abstract final class SushiEnv {
-  /// True when an HTTP API base URL is configured (optional for Telegram-native Sushi).
-  static bool get isEnabled => apiBaseUrl != null;
+  /// True when Sushi's Telegram-native backend is configured. Sushi has no HTTP/domain
+  /// backend — everything goes over the Telegram bot API (see sushi_*_transport.dart) — so
+  /// this reflects Telegram credentials, not any URL.
+  static bool get isEnabled => telegramDirectPlayConfigured;
 
-  static const String _cApiBaseUrl = String.fromEnvironment('SUSHI_API_BASE_URL', defaultValue: '');
   static const String _cTelegramApiId = String.fromEnvironment('TELEGRAM_API_ID', defaultValue: '');
   static const String _cTelegramApiHash = String.fromEnvironment('TELEGRAM_API_HASH', defaultValue: '');
   static const String _cTelegramWebAppShortName =
@@ -25,14 +26,6 @@ abstract final class SushiEnv {
     }
     return '';
   }
-
-  static String? get apiBaseUrl {
-    final t = _pick(['SUSHI_API_BASE_URL', 'SUSHI_API_BASE'], _cApiBaseUrl);
-    if (t.isEmpty) return null;
-    return t.endsWith('/') ? t.substring(0, t.length - 1) : t;
-  }
-
-  static String? get effectiveMediaServerUrl => apiBaseUrl;
 
   static String? get botUsername {
     final h = SushiConfig.mainBotUsername;

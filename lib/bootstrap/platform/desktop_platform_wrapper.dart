@@ -64,7 +64,7 @@ class _DesktopAppWrapperState extends BaseAppWrapperState<DesktopAppWrapper> wit
 
   @override
   void onWindowClose() {
-    ref.read(videoPlayerProvider).stop();
+    ref.read(videoPlayerProvider).stop(leavingPlayer: true);
     ref.read(clientSettingsProvider.notifier).closeDirectory();
     super.onWindowClose();
   }

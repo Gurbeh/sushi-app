@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/settings/home_settings_model.dart';
 import 'package:fladder/models/views_model.dart';
-import 'package:fladder/sushi/providers/sushi_watchlist_dashboard.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/widgets/sushi_skeleton_box.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/theme.dart';
@@ -58,12 +56,7 @@ bool sushiHomeDashboardFullyReady({
   required ViewsModel views,
   required HomeModel dashboard,
 }) {
-  
-    return dashboard.loaded && !dashboard.loading;
-  
-  if (!sushiHomeDashboardDataReady(views: views, dashboard: dashboard)) return false;
-  
-  return ref.watch(sushiWatchlistFeedHandledProvider);
+  return dashboard.loaded && !dashboard.loading;
 }
 
 bool sushiShowHomeListSkeleton({

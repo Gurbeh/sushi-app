@@ -18,7 +18,6 @@ import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_prefs_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_subtitle_transport.dart';
-import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_bridge_queue.dart';
 import 'package:fladder/sushi/subtitles/sushi_gemini.dart';
 import 'package:fladder/sushi/subtitles/sushi_opensubtitles.dart';
@@ -61,13 +60,14 @@ void sushiClearActiveSubtitle(WidgetRef ref) =>
     ref.read(sushiActiveSubtitleProvider.notifier).state = null;
 
 /// Prototype ranking. For a TV [episode] the season match dominates (wrong-season packs sink);
-/// then a matching year, then packs that carry release names. The full heuristic (release-token
-/// overlap, fps) is doc 15 §4.
+/// then release-token overlap with the playing file's `qualityLabel` (doc 15 §4). DVDRip/XviD
+/// against a 720p/1080p WEB-ish label is how Friends S3E12 got the wrong-episode cues.
 List<SubplusPack> rankSubplusPacks(
   List<SubplusPack> packs, {
   String? query,
   String? year,
   SushiEpisodeRef? episode,
+  String? sourceLabel,
 }) {
   final sorted = sushiFilterSubplusPacks(
     packs,
@@ -87,6 +87,7 @@ List<SubplusPack> rankSubplusPacks(
           s -= 20;
         }
       }
+      s -= sushiSubtitleSourceMatchScore(p, sourceLabel);
       if (year != null && year.isNotEmpty && p.year == year) s -= 2;
       if (p.releases.isNotEmpty) s -= 1;
       return s;
@@ -95,6 +96,16 @@ List<SubplusPack> rankSubplusPacks(
     return score(a).compareTo(score(b));
   });
   return sorted;
+}
+
+/// Automatic (and English translate-source) try this many ranked packs when a ZIP has no
+/// `.srt`/`.ass` (live miss: SubDL returned a pack whose zip was idx/sub or empty). Matches
+/// the Online sheet's "top ~3" (doc 15 §7). Each miss is one `/subtitle_file` (R-UI-15).
+const sushiAutoSubtitlePackAttempts = 3;
+
+List<T> sushiSubtitlePackAttemptWindow<T>(List<T> ranked) {
+  if (ranked.length <= sushiAutoSubtitlePackAttempts) return ranked;
+  return ranked.sublist(0, sushiAutoSubtitlePackAttempts);
 }
 
 class SushiSubtitleOpResult {
@@ -182,6 +193,7 @@ Future<List<SubplusPack>> sushiSearchOnlinePacks(Object src) async {
       query: title,
       year: sushiPlayingYear(src),
       episode: sushiPlayingEpisode(src),
+      sourceLabel: sushiPlayingSourceLabel(src),
     );
     _log('search_done', {'packs': packs.length});
     return packs;
@@ -243,12 +255,29 @@ Future<SushiSubtitleOpResult> sushiRunAutoLoad(Object src, {MediaControlsWrapper
     return SushiSubtitleOpResult.busy;
   }
   _subtitleJobBusy = true;
+  final startedFor = _subtitleSessionItemId;
   try {
+    // Skip-through: wait out a hop before touching gomobile. FetchSmallDocument holding the
+    // JNI gate during UploadGetFile + a gotd FileReference alias crashed with
+    // `bulkBarrierPreWrite: unaligned arguments` (Friends S3, 2026-09-21).
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (startedFor != _subtitleSessionItemId) {
+      _log('auto_stale_before_fetch');
+      return SushiSubtitleOpResult.stale;
+    }
     final p = sushiPlayer(src, player: player);
     // subdl is the production path (doc 15 §7). sub-plus.ir is a prototype with no SLA (doc 15
     // §6) and has been returning HTTP 500 — try it only after subdl misses.
     var pick = await _fetchSubdlFile(src, lang: 'persian');
+    if (startedFor != _subtitleSessionItemId) {
+      _log('auto_stale_after_fetch');
+      return SushiSubtitleOpResult.stale;
+    }
     pick ??= await _fetchSubplusFile(src, lang: 'persian');
+    if (startedFor != _subtitleSessionItemId) {
+      _log('auto_stale_after_fetch');
+      return SushiSubtitleOpResult.stale;
+    }
     if (pick == null) {
       _log('auto_no_results');
       return SushiSubtitleOpResult.noResults;
@@ -266,7 +295,7 @@ Future<SushiSubtitleOpResult> sushiRunAutoLoad(Object src, {MediaControlsWrapper
 }
 
 /// Playback-start chain: Automatic (online) → AI (if Gemini key) → muxed Farsi soft.
-/// Hard-sub callers pass [allowAiFallback] false and [hasPersianSoft] false so only Automatic runs.
+/// Hard-sub callers must not enter this pipeline (choice is Off).
 Future<SushiSubtitleOpResult> sushiRunStartSubtitlePipeline(
   Object src, {
   MediaControlsWrapper? player,
@@ -549,26 +578,47 @@ Future<({SubplusSubFile file, String label})?> _fetchSubplusFile(Object src, {re
   try {
     _log('subplus_fetch', {'lang': lang, 'title': title, 'year': year ?? ''});
     final raw = await client.search(title, lang: lang);
-    final packs = rankSubplusPacks(raw, query: title, year: year, episode: episode);
+    final packs = rankSubplusPacks(
+      raw,
+      query: title,
+      year: year,
+      episode: episode,
+      sourceLabel: sushiPlayingSourceLabel(src),
+    );
     if (packs.isEmpty) {
       _log('subplus_fetch_empty', {'lang': lang, 'title': title, 'year': year ?? '', 'raw': raw.length});
       return null;
     }
-    final pack = packs.first;
-    final subs = await client.fetchSubs(pack.tag);
-    _packFiles[pack.tag] = subs;
-    final pick = episode == null
-        ? pickMovieSubFile(subs)
-        : pickEpisodeFile(subs, episode.season, episode.episode);
-    if (pick == null) return null;
-    _log('subplus_pick', {
-      'lang': lang,
-      'pack': pack.title,
-      'packYear': pack.year,
-      'imdb': pack.imdb,
-      'file': pick.name,
-    });
-    return (file: pick, label: '${pack.title} · ${pick.name}');
+    final attempts = sushiSubtitlePackAttemptWindow(packs);
+    for (var i = 0; i < attempts.length; i++) {
+      final pack = attempts[i];
+      final List<SubplusSubFile> subs;
+      try {
+        subs = await client.fetchSubs(pack.tag);
+      } catch (e) {
+        _log('subplus_try_miss', {'i': i, 'pack': pack.title, 'error': e.toString()});
+        continue;
+      }
+      _packFiles[pack.tag] = subs;
+      final pick = episode == null
+          ? pickMovieSubFile(subs)
+          : pickEpisodeFile(subs, episode.season, episode.episode);
+      if (pick == null) {
+        _log('subplus_try_miss', {'i': i, 'pack': pack.title, 'reason': 'no_srt'});
+        continue;
+      }
+      _log('subplus_pick', {
+        'lang': lang,
+        'pack': pack.title,
+        'packYear': pack.year,
+        'imdb': pack.imdb,
+        'file': pick.name,
+        'attempt': i,
+      });
+      return (file: pick, label: '${pack.title} · ${pick.name}');
+    }
+    _log('subplus_fetch_empty', {'lang': lang, 'title': title, 'reason': 'all_packs_empty'});
+    return null;
   } catch (e, st) {
     _log('subplus_fetch_error', {
       'lang': lang,
@@ -582,11 +632,10 @@ Future<({SubplusSubFile file, String label})?> _fetchSubplusFile(Object src, {re
 }
 
 /// Second subtitle provider (doc 15 §7), server-proxied so subdl's key never reaches this device.
-/// Same return shape as [_fetchSubplusFile] so callers can try either interchangeably: subdl
-/// matches by tmdb_id directly (no title-text search step), and each result is already a single
-/// file (no multi-file ZIP pack to pick within), so this skips straight from a ranked pack to
-/// `sushiFetchSubtitleFile`. `tag` is prefixed `subdl:` so a later fetch of the same pick (were it
-/// ever cached like subplus's `_packFiles`) can tell providers apart.
+/// Same return shape as [_fetchSubplusFile]. Search matches tmdb_id; each hit is a ZIP that
+/// *should* contain one .srt/.ass. Empty zips (`zip has no .srt/.ass files`) are an ERR, so
+/// Automatic walks the top [sushiAutoSubtitlePackAttempts] ranked tags. `tag` is prefixed
+/// `subdl:` so a later fetch of the same pick can tell providers apart.
 Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {required String lang}) async {
   final tmdbId = sushiPlayingTmdbId(src);
   if (tmdbId == null) return null;
@@ -622,13 +671,16 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
     // guarantee subplus's fuzzy multi-title search doesn't have. Re-applying the substring
     // title filter here only risks dropping every pack when a release name (a raw scene
     // filename, e.g. "Ride.or.Die.2021.1080p...") doesn't happen to contain the query text.
-    final ranked = rankSubplusPacks(packs, episode: episode);
+    final ranked = rankSubplusPacks(
+      packs,
+      episode: episode,
+      sourceLabel: sushiPlayingSourceLabel(src),
+    );
     if (ranked.isEmpty) {
       _log('subdl_fetch_empty', {'lang': lang, 'title': title ?? '', 'reason': 'no_rank_match'});
       return null;
     }
-    final top = ranked.first;
-    final rawTag = top.tag.substring('subdl:'.length);
+    final attempts = sushiSubtitlePackAttemptWindow(ranked);
     final kind = episode != null ? 2 : 1;
     final seasonNo = episode?.season ?? 0;
     final episodeNo = episode?.episode ?? 0;
@@ -637,36 +689,44 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
     // *before* triggering the copy below, same ordering sushi_tdlib_playback_resolver.dart uses
     // for video, so the live push can never land before something is listening for it.
     final locator = 'sub_${tmdbId}_${kind}_${seasonNo}_${episodeNo}_$subdlLang';
-    final controller = SushiTdlibBridgeController.instance();
     await sushiArmDeliveryWaiter(locator);
-    final fileRes = await sushiFetchSubtitleFile(tag: rawTag);
-    if (fileRes == null) {
-      _log('subdl_fetch_error', {'lang': lang, 'reason': 'no_delivery_ref'});
-      return null;
+    for (var i = 0; i < attempts.length; i++) {
+      final top = attempts[i];
+      final rawTag = top.tag.startsWith('subdl:') ? top.tag.substring('subdl:'.length) : top.tag;
+      _log('subdl_try', {'lang': lang, 'i': i, 'n': attempts.length, 'pack': top.title});
+      final fileRes = await sushiFetchSubtitleFile(tag: rawTag);
+      if (fileRes == null) {
+        _log('subdl_try_miss', {'i': i, 'reason': 'no_delivery_ref'});
+        continue;
+      }
+      // The server placed a fresh copy in this session's own chat, round-robinned across delivery
+      // bots — the reference alone (doc 15 §7) never carries the text, since a real subtitle
+      // routinely exceeds the wire protocol's per-message size limit. fileRes.messageId is the
+      // Bot API's own chat-scoped counter, NOT this reader account's MTProto message-id space, so
+      // it cannot be looked up directly (that mismatch is what produced OX_DM_STALE / wrong-file
+      // reads before this fix) — fetchSmallDocument resolves the real id from the live push instead,
+      // exactly like a fresh (0/0) video delivery does.
+      final text = await sushiFetchSmallDocument(
+        botId: fileRes.botId,
+        messageId: fileRes.messageId,
+        locator: locator,
+      );
+      if (text.isEmpty) {
+        _log('subdl_try_miss', {'i': i, 'reason': 'empty_document'});
+        continue;
+      }
+      _log('subdl_pick', {'lang': lang, 'pack': top.title, 'attempt': i});
+      return (
+        file: SubplusSubFile(
+          name: top.title,
+          ext: fileRes.ext.isNotEmpty ? fileRes.ext : '.srt',
+          text: text,
+        ),
+        label: top.title,
+      );
     }
-    // The server placed a fresh copy in this session's own chat, round-robinned across delivery
-    // bots — the reference alone (doc 15 §7) never carries the text, since a real subtitle
-    // routinely exceeds the wire protocol's per-message size limit. fileRes.messageId is the
-    // Bot API's own chat-scoped counter, NOT this reader account's MTProto message-id space, so
-    // it cannot be looked up directly (that mismatch is what produced OX_DM_STALE / wrong-file
-    // reads before this fix) — fetchSmallDocument resolves the real id from the live push instead,
-    // exactly like a fresh (0/0) video delivery does.
-    final text = await SushiTdlibBridgeController.instance().fetchSmallDocument(
-      botId: fileRes.botId,
-      messageId: fileRes.messageId,
-      locator: locator,
-    );
-    if (text.isEmpty) {
-      _log('subdl_fetch_error', {'lang': lang, 'reason': 'empty_document'});
-      return null;
-    }
-    _log('subdl_pick', {'lang': lang, 'pack': top.title});
-    final file = SubplusSubFile(
-      name: top.title,
-      ext: fileRes.ext.isNotEmpty ? fileRes.ext : '.srt',
-      text: text,
-    );
-    return (file: file, label: top.title);
+    _log('subdl_fetch_error', {'lang': lang, 'reason': 'all_packs_empty', 'tried': attempts.length});
+    return null;
   } catch (e, st) {
     _log('subdl_fetch_error', {
       'lang': lang,
@@ -716,6 +776,12 @@ Future<SushiAiKeySetupInfo> sushiAiKeySetupInfo() async {
 
 String? sushiPlayingTitle(Object src) {
   final name = sushiRead(src, playBackModel)?.item.title.trim() ?? '';
+  return name.isEmpty ? null : name;
+}
+
+/// Playing file's `qualityLabel` (VersionStream.name). Empty when nothing is up.
+String? sushiPlayingSourceLabel(Object src) {
+  final name = sushiRead(src, playBackModel)?.mediaStreams?.currentVersionStream?.name.trim() ?? '';
   return name.isEmpty ? null : name;
 }
 

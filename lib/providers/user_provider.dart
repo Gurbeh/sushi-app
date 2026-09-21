@@ -16,12 +16,9 @@ import 'package:fladder/models/library_filters_model.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/providers/api_provider.dart';
-import 'package:fladder/providers/image_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
-import 'package:fladder/providers/sync_provider.dart';
 import 'package:fladder/providers/video_player_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_local_account.dart';
 
 part 'user_provider.g.dart';
@@ -29,9 +26,6 @@ part 'user_provider.g.dart';
 @riverpod
 bool showSyncButtonProvider(Ref ref) {
   return true;
-  final userCanSync = ref.watch(userProvider.select((value) => value?.canDownload ?? false));
-  final hasSyncedItems = ref.watch(syncProvider.select((value) => value.items.isNotEmpty));
-  return userCanSync || hasSyncedItems;
 }
 
 @Riverpod(keepAlive: true)
@@ -51,36 +45,9 @@ class User extends _$User {
 
   Future<Response<bool>> quickConnect(String pin) async => api.quickConnect(pin);
 
-  Future<Response<AccountModel>?> updateInformation() async {
-    if (state == null) return null;
-    var response = await api.usersMeGet();
-    var quickConnectStatus = await api.quickConnectEnabled();
-    var systemConfiguration = await api.systemConfigurationGet();
-
-    final customConfig = await api.getCustomConfig();
-
-    var imageUrl = ref.read(imageUtilityProvider).getUserImageUrl(response.body?.id ?? "");
-
-    final user = response.body;
-    if (user == null) return null;
-
-    if (response.isSuccessful && response.body != null) {
-      userState = state?.copyWith(
-        name: user.name ?? state?.name ?? "",
-        policy: user.policy,
-        avatar: imageUrl,
-        serverConfiguration: systemConfiguration.body,
-        userConfiguration: user.configuration,
-        quickConnectState: quickConnectStatus.body ?? false,
-        latestItemsExcludes: user.configuration?.latestItemsExcludes ?? [],
-        userSettings: customConfig.body,
-        hasConfiguredPassword: user.hasConfiguredPassword ?? false,
-        hasPassword: user.hasPassword ?? false,
-      );
-      return response.copyWith(body: state);
-    }
-    return null;
-  }
+  // Sushi has no HTTP backend (R-API-4) — there is no Jellyfin server to pull user
+  // configuration/policy/avatar from, so this is a no-op.
+  Future<Response<AccountModel>?> updateInformation() async => null;
 
   void setRememberAudioSelections() async {
     final newUserConfiguration = await api.updateRememberAudioSelections();
@@ -186,13 +153,23 @@ class User extends _$User {
     return Response(response.base, UserData.fromDto(response.body));
   }
 
-  Future<Response<UserData>?> markAsPlayed(bool enable, String itemId) async {
+  /// Client-owned flags only. Skip Jellyfin — bulk season mark used to wait
+  /// on 24 serial POSTs that time out, so the UI never painted.
+  Future<void> markManyPlayed(bool enable, List<String> itemIds) async {
+    final ids = [for (final id in itemIds) if (id.isNotEmpty) id];
+    if (ids.isEmpty) return;
     final flags = ref.read(sushiCatalogItemFlagsProvider.notifier);
-    await flags.setPlayed(itemId, enable);
+    await flags.setPlayedMany(ids, enable);
     if (enable) {
-      flags.setWatchlisted(itemId, false);
-      unawaited(sushiContinueForgetEpisode(itemId));
+      for (final id in ids) {
+        flags.setWatchlisted(id, false);
+        unawaited(sushiContinueForgetEpisode(id));
+      }
     }
+  }
+
+  Future<Response<UserData>?> markAsPlayed(bool enable, String itemId) async {
+    await markManyPlayed(enable, [itemId]);
     try {
       final response = await (enable
           ? api.usersUserIdPlayedItemsItemIdPost(
@@ -204,7 +181,7 @@ class User extends _$User {
             ));
       if (response.isSuccessful) {
         // Merge, do not replace — GET /me/item-flags may omit sushi_ep_* ids.
-        unawaited(flags.load());
+        unawaited(ref.read(sushiCatalogItemFlagsProvider.notifier).load());
       }
       return Response(response.base, UserData.fromDto(response.body));
     } catch (_) {
@@ -247,7 +224,7 @@ class User extends _$User {
   }
 
   Future<void> logoutUser() async {
-    await ref.read(videoPlayerProvider).stop();
+    await ref.read(videoPlayerProvider).stop(leavingPlayer: true);
     if (state == null) return;
     userState = null;
   }

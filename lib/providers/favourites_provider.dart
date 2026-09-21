@@ -1,14 +1,7 @@
-import 'package:chopper/chopper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/jellyfin/jellyfin_open_api.swagger.dart';
 import 'package:fladder/models/favourites_model.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/models/view_model.dart';
-import 'package:fladder/sushi/sushi_favourites_feed.dart';
-import 'package:fladder/providers/api_provider.dart';
-import 'package:fladder/providers/views_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_list_pb.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -23,98 +16,18 @@ class FavouritesNotifier extends StateNotifier<FavouritesModel> {
 
   final Ref ref;
 
-  late final api = ref.read(jellyApiProvider);
-
   Future<void> fetchFavourites() async {
     if (state.loading) return;
 
     state = state.copyWith(loading: true);
 
-    
-      final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
-      final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
-      state = state.copyWith(
-        favourites: items.groupedItems,
-        people: const [],
-        loading: false,
-      );
-      return;
-    
-
-    
-      final feed = await SushiFavoritesFeed.fetch(ref);
-      if (feed != null) {
-        state = state.copyWith(
-          favourites: feed.favourites,
-          people: feed.people,
-          loading: false,
-        );
-        return;
-      }
-    
-
-    await _fetchMoviesAndSeries();
-    await _fetchPeople();
-    state = state.copyWith(loading: false);
-  }
-
-  Future<void> _fetchMoviesAndSeries() async {
-    final views = ref.read(viewsProvider);
-
-    final mappedList = await Future.wait(views.dashboardViews.map((viewModel) => _loadLibrary(viewModel: viewModel)));
-
+    final res = await sushiFetchList(scope: SushiListScope.favorites, sort: SushiListSort.name);
+    final items = res?.rows.map(sushiRowToItemBaseModel).toList() ?? const <ItemBaseModel>[];
     state = state.copyWith(
-        favourites: (mappedList
-                .expand((innerList) => innerList ?? [])
-                .where((item) => item != null)
-                .cast<ItemBaseModel>()
-                .toList())
-            .groupedItems);
-  }
-
-  Future<List<ItemBaseModel>?> _loadLibrary({ViewModel? viewModel}) async {
-    final kinds = [
-      BaseItemKind.movie,
-      BaseItemKind.episode,
-      BaseItemKind.series,
-      BaseItemKind.video,
-      BaseItemKind.photo,
-      BaseItemKind.book,
-      BaseItemKind.photoalbum,
-      BaseItemKind.musicalbum,
-      BaseItemKind.audio,
-    ];
-    final futures = kinds.map((kind) => fetchTypes(viewModel?.id, [kind])).toList();
-    final results = await Future.wait(futures);
-    return results.expand((list) => list).toList();
-  }
-
-  Future<List<ItemBaseModel>> fetchTypes(String? id, List<BaseItemKind>? includeItemTypes) async {
-    return (await api.itemsGet(
-          parentId: id,
-          isFavorite: true,
-          recursive: true,
-          limit: 15,
-          fields: [
-            ItemFields.overview,
-            ItemFields.genres,
-          ],
-          includeItemTypes: includeItemTypes,
-          sortOrder: [SortOrder.ascending],
-          sortBy: [ItemSortBy.seriessortname, ItemSortBy.sortname, ItemSortBy.datelastcontentadded],
-        ))
-            .body
-            ?.items ??
-        [];
-  }
-
-  Future<Response<List<ItemBaseModel>>?> _fetchPeople() async {
-    final response = await api.personsGet(
-      limit: 20,
-      isFavorite: true,
+      favourites: items.groupedItems,
+      people: const [],
+      loading: false,
     );
-    state = state.copyWith(people: response.body ?? []);
-    return response;
   }
 
   void setSearch(String value) {

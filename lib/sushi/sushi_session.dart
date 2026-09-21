@@ -67,14 +67,7 @@ Future<bool> _restoreSession(SushiRead read, AccountModel incoming) async {
   SushiImageAuth.syncFromAccount(account);
 
   if (account.credentials.url.trim().isEmpty) {
-    final fallback = SushiEnv.apiBaseUrl;
-    if (fallback == null || fallback.isEmpty) {
-      return false;
-    }
-    account = account.copyWith(
-      credentials: account.credentials.copyWith(url: fallback),
-    );
-    read(userProvider.notifier).updateUser(account);
+    return false;
   } else {
     final migrated = _rewriteLegacyDomain(account.credentials.url);
     if (migrated != account.credentials.url) {

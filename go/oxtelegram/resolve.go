@@ -254,11 +254,38 @@ func videoRefMatchingLocator(c *Client, msgs []tg.MessageClass, locator string) 
 	return nil
 }
 
+func cloneBytes(b []byte) []byte {
+	if b == nil {
+		return nil
+	}
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
+}
+
+// clonePushedDocument copies fields we keep past the update handler. gotd reuses the decode
+// buffer; aliasing FileReference into pushArrived made GC hit `bulkBarrierPreWrite: unaligned
+// arguments` after a subtitle UploadGetFile -503 (Friends hop, 2026-09-21).
+func clonePushedDocument(doc *tg.Document) *tg.Document {
+	if doc == nil {
+		return nil
+	}
+	cp := *doc
+	cp.FileReference = cloneBytes(doc.FileReference)
+	if len(doc.Attributes) > 0 {
+		cp.Attributes = append([]tg.DocumentAttributeClass(nil), doc.Attributes...)
+	}
+	if len(doc.Thumbs) > 0 {
+		cp.Thumbs = append([]tg.PhotoSizeClass(nil), doc.Thumbs...)
+	}
+	return &cp
+}
+
 func videoFileRefFromDocument(doc *tg.Document, providerBotID int64) *VideoFileRef {
 	return &VideoFileRef{
 		DocumentID:    doc.ID,
 		AccessHash:    doc.AccessHash,
-		FileReference: doc.FileReference,
+		FileReference: cloneBytes(doc.FileReference),
 		MimeType:      doc.MimeType,
 		Size:          doc.Size,
 		DCID:          int32(doc.DCID),

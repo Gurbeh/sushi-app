@@ -234,23 +234,35 @@ void main() {
     );
   });
 
-  test('English hardsub still runs Automatic only; no AI or soft stack', () {
+  test('English hardsub stays Off; audio language does not reopen Automatic', () {
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: true),
-      SushiStartSubtitle.automaticOnline,
+      SushiStartSubtitle.off,
     );
     expect(
       sushiStartSubtitleSteps(
         hardSub: true,
         hasPersianSoft: true,
         aiSet: true,
-        isEnglishAudio: true,
       ),
-      [SushiStartSubtitleStep.automaticOnline],
+      isEmpty,
     );
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: false, isEnglishAudio: false),
       SushiStartSubtitle.off,
+    );
+  });
+
+  test('bare 720p label is unknown, not hardsub', () {
+    expect(sushiMediaSourceLooksHardSub('720p'), isFalse);
+  });
+
+  test('HDTS filename is treated as hardsub', () {
+    expect(
+      sushiMediaSourceLooksHardSub(
+        'Spider_Man_Brand_New_Day_2026_720P_Hdts_MyMoviz_video_converter.mp4',
+      ),
+      isTrue,
     );
   });
 

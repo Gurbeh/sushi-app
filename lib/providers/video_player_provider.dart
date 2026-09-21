@@ -21,6 +21,7 @@ import 'package:fladder/sushi/sushi_native_playback.dart';
 import 'package:fladder/sushi/sushi_playback_repair.dart';
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/sushi/sushi_playback_telemetry.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/settings/video_player_settings_provider.dart';
 import 'package:fladder/wrappers/media_control_wrapper.dart';
@@ -193,6 +194,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     bool preserveSelection = false,
   }) async {
     if (SushiEnv.isEnabled) {
+      ref.read(sushiCatalogControllerProvider).cancelPrefetch();
       SushiStreamLog.event('player_load_start', fields: {
         'itemId': model.item.id,
         'hasMedia': model.media != null,
@@ -213,7 +215,7 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
     }
 
     ref.read(playBackModel)?.dispose();
-    await state.stop();
+    await state.stop(leavingPlayer: false);
     ref.read(playbackRateProvider.notifier).state = 1.0;
 
     if (SushiEnv.isEnabled && sushiUsesNativePlayerRead(ref)) {

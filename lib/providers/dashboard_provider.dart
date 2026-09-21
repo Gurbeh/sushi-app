@@ -3,20 +3,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fladder/jellyfin/jellyfin_open_api.enums.swagger.dart';
 import 'package:fladder/models/home_model.dart';
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/sushi/sushi_home_feed.dart';
-import 'package:fladder/models/items/channel_model.dart';
-import 'package:fladder/providers/api_provider.dart';
-import 'package:fladder/providers/live_tv_provider.dart';
-import 'package:fladder/providers/service_provider.dart';
-import 'package:fladder/providers/settings/client_settings_provider.dart';
-import 'package:fladder/providers/views_provider.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/providers/sushi_home_rails_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_app_update.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
@@ -36,8 +27,6 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   bool _sushiHomeQueued = false;
   bool _sushiHomeQueuedForce = false;
   bool _sushiHomeInFlight = false;
-
-  late final JellyService api = ref.read(jellyApiProvider);
 
   Future<void> fetchNextUpAndResume({bool force = false}) async {
     // Each call is a real Telegram bot round-trip, not a cheap HTTP GET — never let two
@@ -63,54 +52,6 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
       _sushiHomeInFlight = false;
       state = state.copyWith(loading: false, loaded: true);
     }
-  }
-
-  Future<List<ItemBaseModel>> _fetchActivePrograms(int limit) async {
-    var channels = (await api.liveTvChannelsGet(limit: limit))
-            .body
-            ?.items
-            ?.map((e) => ChannelModel.fromBaseDto(e, ref))
-            .toList() ??
-        <ChannelModel>[];
-
-    channels = await Future.wait(
-      channels.map(
-        (e) async {
-          final programs = await ref.read(liveTvProvider.notifier).fetchProgramsForChannel(e);
-          return e.copyChannelWith(programs: programs);
-        },
-      ),
-    );
-
-    return channels;
-  }
-
-  Future<List<ItemBaseModel>> _fetchNextUp(Set<ItemFields> fieldsToFetch) async {
-    final response = await api.showsNextUpGet(
-      nextUpDateCutoff: DateTime.now().subtract(
-        ref.read(clientSettingsProvider.select((value) => value.nextUpDateCutoff ?? const Duration(days: 28))),
-      ),
-      fields: fieldsToFetch.toList(),
-    );
-
-    return response.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? const [];
-  }
-
-  Future<List<ItemBaseModel>> _fetchResumeItems({
-    required List<MediaType> mediaTypes,
-    required List<ImageType> imagesToFetch,
-    required Set<ItemFields> fieldsToFetch,
-    required int limit,
-  }) async {
-    final response = await api.usersUserIdItemsResumeGet(
-      enableImageTypes: imagesToFetch,
-      fields: fieldsToFetch.toList(),
-      mediaTypes: mediaTypes,
-      enableTotalRecordCount: false,
-      limit: limit,
-    );
-
-    return response.body?.items?.map((e) => ItemBaseModel.fromBaseDto(e, ref)).toList() ?? const [];
   }
 
   /// Sushi: paint cache first, then `/home` only when stale or forced (docs/11 §3).
@@ -189,15 +130,6 @@ class DashboardNotifier extends StateNotifier<HomeModel> {
   /// Driven by the poster menu's "Add / Remove Continue Watching" toggle on the home rows.
   Future<void> reloadSushiContinue() async {
     state = state.copyWith(resumeVideo: await sushiContinueLoad());
-  }
-
-  void applySushiHomeFeed(SushiHomeFeedDashboard feed) {
-    state = state.copyWith(
-      nextUp: feed.nextUp,
-      resumeVideo: feed.resumeVideo,
-      loading: false,
-      loaded: true,
-    );
   }
 
   void clear() {

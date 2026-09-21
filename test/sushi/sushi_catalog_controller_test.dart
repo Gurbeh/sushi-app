@@ -501,7 +501,7 @@ void main() {
     expect(calls, 2);
   });
 
-  test('empty session owner wipes leftover home and files', () async {
+  test('empty session owner with stored stamp keeps catalog', () async {
     final store = _MemStore();
     store.home = _cachedHome(slider: [_row(1084244)]);
     store.files = (files: [_file(23699)], fetchedAt: DateTime(2026, 1, 1));
@@ -512,10 +512,27 @@ void main() {
       readPersistedOwner: () async => persisted,
       persistOwner: (owner) async => persisted = owner,
     );
+    final home = await catalog.peekHome();
+    expect(home, isNotNull);
+    expect(home!.slider, hasLength(1));
+    expect(store.files, isNotNull);
+    expect(persisted, 'old-binding');
+  });
+
+  test('empty session owner with no stamp wipes leftover home and files', () async {
+    final store = _MemStore();
+    store.home = _cachedHome(slider: [_row(1084244)]);
+    store.files = (files: [_file(23699)], fetchedAt: DateTime(2026, 1, 1));
+    var persisted = '';
+    final catalog = SushiCatalogController(
+      store,
+      sessionOwner: () async => '',
+      readPersistedOwner: () async => persisted,
+      persistOwner: (owner) async => persisted = owner,
+    );
     expect(await catalog.peekHome(), isNull);
     expect(store.home, isNull);
     expect(store.files, isNull);
-    expect(persisted, isEmpty);
   });
 
   test('same session owner keeps cached home', () async {

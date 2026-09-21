@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/theme.dart';
 
 /// First login screen: pick Telegram-account (phone) vs personal-bot.
@@ -25,8 +24,7 @@ class SushiLoginMethodChooser extends StatelessWidget {
   Widget build(BuildContext context) {
     final fa = Localizations.localeOf(context).languageCode == 'fa';
     final theme = Theme.of(context);
-    final sushi = true;
-    final accent = sushi ? _salmon : theme.colorScheme.primary;
+    final accent = _salmon;
 
     final phoneCard = _MethodCard(
       key: const Key('login-method-phone'),

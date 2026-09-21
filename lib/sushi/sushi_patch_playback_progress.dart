@@ -3,13 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/movie_model.dart';
-import 'package:fladder/sushi/sushi_home_refresh.dart';
 import 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/items/episode_details_provider.dart';
 import 'package:fladder/providers/items/movies_details_provider.dart';
 import 'package:fladder/providers/items/series_details_provider.dart';
-import 'package:fladder/sushi/sushi_config.dart';
 
 export 'package:fladder/sushi/sushi_playback_user_data_derive.dart';
 
@@ -66,10 +64,6 @@ void sushiPatchDetailProvidersPlaybackProgress(
 /// Soft-refresh home shelves after playback (Continue Watching / Next Up).
 Future<void> sushiRefreshHomeAfterPlayback(WidgetRef ref) async {
   try {
-    
-      await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
-      return;
-    
-    await SushiHomeRefresh.refresh(ref);
+    await ref.read(dashboardProvider.notifier).fetchNextUpAndResume();
   } catch (_) {}
 }

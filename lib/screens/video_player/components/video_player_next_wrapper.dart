@@ -126,7 +126,7 @@ class _VideoPlayerNextWrapperState extends ConsumerState<VideoPlayerNextWrapper>
   Future<void> closePlayer() async {
     log('[sushi-progress] VideoPlayerNextWrapper.closePlayer() tapped');
     clearOverlaySettings();
-    ref.read(videoPlayerProvider).stop();
+    ref.read(videoPlayerProvider).stop(leavingPlayer: true);
     Navigator.of(context).pop();
   }
 

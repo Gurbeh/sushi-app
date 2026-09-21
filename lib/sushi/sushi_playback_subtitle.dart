@@ -17,7 +17,9 @@ bool sushiMediaSourceLooksHardSub(String? mediaSourceName, {List<SubStreamModel>
       blob.contains('hardsub') ||
       blob.contains('burned') ||
       blob.contains('هاردساب') ||
-      blob.contains('هارد ساب');
+      blob.contains('هارد ساب') ||
+      RegExp(r'(^|[^a-z])hdts([^a-z]|$)').hasMatch(blob) ||
+      blob.contains('hdcam');
   if (explicit) return true;
   final claimed = blob.contains('چسبیده') || blob.contains('زیرنویس') || blob.contains('سافت');
   return claimed && !sushiHasPlayableSub(subStreams);
@@ -102,8 +104,9 @@ bool sushiHasPersianSoftSub(List<SubStreamModel>? subStreams) {
 /// What to apply at playback start. Previous title's AI / Automatic pick must not carry over.
 enum SushiStartSubtitle { persianSoft, automaticOnline, off }
 
-/// Ordered start pipeline for a non-hard-sub item. Hard-sub is empty (Off) except English-audio
-/// hardsub, which still runs Automatic only — burn-in must not get AI or muxed Farsi stacked on top.
+/// Ordered start pipeline for a non-hard-sub item. Hard-sub is always empty (Off) —
+/// burn-in must not get Automatic / AI / muxed Farsi stacked on top, including English-audio
+/// prints (doc 15 §7: Persian-scene hardsub of an English movie already has Farsi on screen).
 enum SushiStartSubtitleStep { automaticOnline, aiTranslate, persianSoft }
 
 /// True when a track's language/title codes read as English ('en', 'eng', 'en-*', or a title
@@ -114,16 +117,13 @@ bool sushiIsEnglishLanguage(String? language) {
 }
 
 /// Default: Automatic (online). If that finds nothing and the user has a Gemini key, AI translate.
-/// Muxed Farsi soft is last. Hard-sub skips the chain (Off) unless the audio is English.
+/// Muxed Farsi soft is last. Hard-sub skips the chain (Off). English audio does not reopen it.
 List<SushiStartSubtitleStep> sushiStartSubtitleSteps({
   required bool hardSub,
   required bool hasPersianSoft,
   required bool aiSet,
-  bool isEnglishAudio = false,
 }) {
-  if (hardSub) {
-    return isEnglishAudio ? const [SushiStartSubtitleStep.automaticOnline] : const [];
-  }
+  if (hardSub) return const [];
   return [
     SushiStartSubtitleStep.automaticOnline,
     if (aiSet) SushiStartSubtitleStep.aiTranslate,
@@ -132,8 +132,7 @@ List<SushiStartSubtitleStep> sushiStartSubtitleSteps({
 }
 
 /// First step of [sushiStartSubtitleSteps]. Hardsub sources default to Off (stacking soft Persian
-/// on top of burn-in duplicates the subtitle on Android ExoPlayer) — except an English hardsub
-/// print, which still has no Persian on screen, so Automatic (online) still runs.
+/// on top of burn-in duplicates the subtitle). English audio does not change that (doc 15 §7).
 ///
 /// Iranian content is skipped entirely: it's already Persian, so auto subtitle search has
 /// nothing useful to look for.
@@ -149,7 +148,6 @@ SushiStartSubtitle sushiStartSubtitleChoice({
     hardSub: hardSub,
     hasPersianSoft: hasPersianSoft,
     aiSet: false,
-    isEnglishAudio: isEnglishAudio,
   );
   if (steps.isEmpty) return SushiStartSubtitle.off;
   return SushiStartSubtitle.automaticOnline;

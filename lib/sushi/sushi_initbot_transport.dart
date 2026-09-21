@@ -128,6 +128,17 @@ class SushiAssignment {
     add(apiBotUsername);
     return out;
   }
+
+  /// True when protocol DMs have a send target (docs/02 §1).
+  bool get usable => !pending && apiSendTargets.isNotEmpty;
+}
+
+/// Keep a live assignment when `/initbot` returns ERR/pending. Saving that pending
+/// blob used to wipe catalog (`_bindSession` empty owner) and skip `/home`.
+SushiAssignment sushiCoalesceAssignment(SushiAssignment incoming, SushiAssignment? previous) {
+  if (incoming.usable) return incoming;
+  if (previous != null && previous.usable) return previous;
+  return incoming;
 }
 
 int _apiBotCursor = 0;
@@ -238,7 +249,7 @@ Future<SushiAssignment> _sushiRunInitbotAfterTdlibReadyBody() async {
 /// Phone/QR login must not enter Home with a pending assignment — leftover catalog
 /// would then paint Play while `/play` skips.
 void sushiEnsureAssignmentReady(SushiAssignment assignment) {
-  if (!assignment.pending && assignment.apiSendTargets.isNotEmpty) return;
+  if (assignment.usable) return;
   final blob = assignment.rawReply.toLowerCase();
   if (blob.contains('user_is_bot') || blob.contains("can't send messages to other bots")) {
     throw StateError(
@@ -270,7 +281,23 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
       text: cmd,
       timeoutMs: 30000,
     );
-    final assignment = sushiParseInitbotReply(reply, expectedCorrBase36: corr);
+    var parsed = sushiParseInitbotReply(reply, expectedCorrBase36: corr);
+    debugPrint('[sushi] initbot reply type=${parsed.msgType} pending=${parsed.pending} len=${reply.length}');
+    for (var attempt = 2; attempt <= 3 && !parsed.usable; attempt++) {
+      debugPrint('[sushi] initbot retry $attempt after type=${parsed.msgType}');
+      await Future<void>.delayed(Duration(milliseconds: 400 * (attempt - 1)));
+      final corrN = sushiNewCorrBase36();
+      final replyN = await sushiSendTextAndWaitReply(
+        username: bot,
+        text: '/initbot $corrN',
+        timeoutMs: 30000,
+      );
+      parsed = sushiParseInitbotReply(replyN, expectedCorrBase36: corrN);
+    }
+    final assignment = sushiCoalesceAssignment(parsed, await SushiAssignmentStore.load());
+    if (!parsed.usable && assignment.usable) {
+      debugPrint('[sushi] initbot kept previous after type=${parsed.msgType}');
+    }
     await SushiAssignmentStore.save(assignment);
     debugPrint(
       '[sushi] initbot ok pending=${assignment.pending} type=${assignment.msgType} '
@@ -305,9 +332,7 @@ Future<SushiAssignment> sushiRefreshInitbot() async {
     // Keep a working assignment. USER_IS_BOT (bot session DMing an API bot) used to overwrite
     // it with stubPending, after which home skipped fetch entirely ("no assignment yet").
     final previous = await SushiAssignmentStore.load();
-    if (previous != null &&
-        !previous.pending &&
-        previous.apiSendTargets.isNotEmpty) {
+    if (previous != null && previous.usable) {
       return previous;
     }
     final pending = SushiAssignment.stubPending(reason: e.toString());

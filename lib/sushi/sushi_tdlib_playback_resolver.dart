@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
-import 'package:fladder/sushi/sushi_telegram_delivery_api.dart';
 import 'package:fladder/src/tdlib_bridge.g.dart';
 
 /// Single dedicated tag for the whole native-playback (TDLib) resolve path — filter logcat on
@@ -198,8 +197,7 @@ Future<String> _sushiResolveTdlibPlaybackUrlInner(
     _oxplayTdlibLog(
         'startPlaybackSession FAILED providerBotId=${source.providerBotId} messageId=${source.messageId} error=$e');
     if (sushiIsTelegramDmStaleError(e)) {
-      _oxplayTdlibLog('delivery stale for ${parsed.locator} — forgetting server-side mapping');
-      await SushiTelegramDeliveryApi.forget(locator: parsed.locator);
+      _oxplayTdlibLog('delivery stale for ${parsed.locator} — forcing re-delivery');
     }
     if (sushiIsTelegramDeliveryWaitTimeoutError(e)) {
       final landed = await controller.deliveryRefForLocator(parsed.locator);
@@ -241,27 +239,14 @@ Future<SushiTdlibDeliveryRef?> waitForTdlibDeliveryRef(
   return controller.deliveryRefForLocator(locator);
 }
 
-/// Reports where the native session actually read this file, so the NEXT play is answered from the
-/// backend's delivery table with no Telegram copy at all.
-///
-/// Best-effort: a failure here costs one redundant copy next time, never a broken playback. Both
-/// numbers have to come from the receiving side — private-chat message ids are numbered per side,
-/// and the server does not know which of its round-robin senders actually won.
+/// No-op: this used to report the delivery back to the backend's HTTP delivery table so the NEXT
+/// play could skip re-copying. Sushi has no HTTP backend, so every play re-copies via Telegram —
+/// a redundant copy, never a broken playback (same trade-off the old best-effort report already
+/// tolerated on failure).
 Future<void> sushiReportTelegramDelivery(
   SushiTdlibBridgeController controller, {
   required String locator,
-}) async {
-  if (locator.isEmpty) return;
-  final ref = await controller.deliveryRefForLocator(locator);
-  if (ref == null || ref.messageId <= 0 || ref.providerBotId <= 0) return;
-  _oxplayTdlibLog(
-      'reporting delivery locator=$locator messageId=${ref.messageId} providerBotId=${ref.providerBotId}');
-  await SushiTelegramDeliveryApi.report(
-    locator: locator,
-    messageId: ref.messageId,
-    providerBotId: ref.providerBotId,
-  );
-}
+}) async {}
 
 /// True when the native bridge reported that a remembered DM message id is no longer usable — it
 /// was deleted, the chat was cleared, or it now holds a different file. Distinct from a network or

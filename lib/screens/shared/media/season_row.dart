@@ -6,7 +6,6 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
 import 'package:fladder/sushi/sushi_season_availability.dart';
-import 'package:fladder/sushi/sushi_season_playable.dart';
 import 'package:fladder/sushi/sushi_season_watch_actions.dart';
 import 'package:fladder/sushi/sushi_config.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
@@ -24,12 +23,11 @@ import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 import 'package:fladder/widgets/shared/status_card.dart';
 
 /// Season card long-press/right-click menu: bulk mark-watched up front, then the generic
-/// actions. Without this, the generic "Mark as watched" action marks the season's own
-/// synthetic id — which nothing else reads — instead of the episodes inside it.
+/// actions with Fladder's single-id mark excluded. Lite `/item` often leaves
+/// `season.episodes` empty (ADR 0028); [sushiSeasonMarkPlayed] loads `/episodes`
+/// and writes `sushi_ep_*`. The generic action used to write `sushi_season_*`,
+/// which posters never paint.
 List<ItemAction> _sushiSeasonMenuActions(BuildContext context, WidgetRef ref, SeasonModel season) {
-  if (!sushiSeasonHasPlayableEpisodes(season)) {
-    return season.generateActions(context, ref);
-  }
   final played = sushiSeasonShowWatchedTick(season);
   return [
     ItemActionButton(
@@ -38,7 +36,10 @@ List<ItemAction> _sushiSeasonMenuActions(BuildContext context, WidgetRef ref, Se
       action: () => sushiSeasonMarkPlayed(ref, season, !played),
     ),
     ItemActionDivider(),
-    ...season.generateActions(context, ref),
+    ...season.generateActions(context, ref, exclude: {
+      ItemActions.markPlayed,
+      ItemActions.markUnplayed,
+    }),
   ];
 }
 

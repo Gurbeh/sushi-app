@@ -81,7 +81,9 @@ SushiStreamDelivery _deliveryFromLabel(String blob, VersionStreamModel stream) {
       blob.contains('hardsub') ||
       blob.contains('هاردساب') ||
       blob.contains('هارد ساب') ||
-      blob.contains('burned')) {
+      blob.contains('burned') ||
+      RegExp(r'(^|[^a-z])hdts([^a-z]|$)').hasMatch(blob) ||
+      blob.contains('hdcam')) {
     return SushiStreamDelivery.hardSub;
   }
   if (RegExp(r'(?:^|[^a-z0-9])(?:dub(?:bed)?|duble)(?:$|[^a-z0-9])').hasMatch(blob) ||

@@ -2,9 +2,18 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:fladder/sushi/sushi_stream_log.dart';
 import 'package:fladder/sushi/sushi_telegram_windows_ffi.dart';
+
+/// Android stream_cb `dlopen`s `liboxtelegramstream.so`, a second Go runtime next to
+/// gomobile's `libgojni.so`. Two Go runtimes in one process crash playback with
+/// `fatal error: bulkBarrierPreWrite: unaligned arguments` (Pixel, 2026-09-21).
+/// Kotlin `OX_TELEGRAM_STREAM_CB_ENABLED` is already false; do not load that .so
+/// until the flag is on and the hang is fixed.
+bool sushiTelegramStreamCbSupported(TargetPlatform platform) =>
+    platform == TargetPlatform.windows;
 
 /// C typedef: int (*)(mpv_handle*, const char*, void*, mpv_stream_cb_open_ro_fn)
 typedef _MpvStreamCbAddRoNative = Int32 Function(
@@ -31,12 +40,10 @@ typedef _MpvStreamCbAddRoDart = int Function(
 /// `incomingPlayer` — missing either one leaves that specific player's `gotdstream://` loads
 /// failing with MPV_ERROR_LOADING_FAILED while looking otherwise fine.
 ///
-/// Registration itself (this file) is the same on Android and Windows — media_kit's `Player.handle`
-/// and libmpv access work identically cross-platform via Dart FFI. What differs per platform is
-/// only which native library exports `ox_stream_open_fn`: `oxtelegram.dll` on Windows,
-/// `liboxtelegramstream.so` on Android (go/oxtelegram/cshared_android) — and, on Android, whether
-/// the *caller* (TdlibBridgeObject.SUSHI_TELEGRAM_STREAM_CB_ENABLED, currently off by default) even
-/// hands out a `gotdstream://` uri yet, since that JNI-backed path is unvalidated on-device.
+/// Registration itself is Windows-only today. media_kit's `Player.handle` works the same on
+/// Android, but loading `liboxtelegramstream.so` starts a second Go runtime next to gomobile
+/// (`sushiTelegramStreamCbSupported`). Re-enable Android only with `OX_TELEGRAM_STREAM_CB_ENABLED`
+/// after that hang is fixed.
 class SushiTelegramStreamCb {
   static const _protocol = 'gotdstream';
   static const _kMpvStreamCbAddRoSymbol = 'mpv_stream_cb_add_ro';
@@ -90,11 +97,10 @@ class SushiTelegramStreamCb {
     if (Platform.isWindows) {
       address = SushiTelegramNative.instance().streamOpenFnAddress;
     } else {
-      // liboxtelegramstream.so is bundled under jniLibs/{abi}/ (see
-      // go/oxtelegram/cshared_android/build.ps1) — Android's dynamic linker resolves the bare
-      // name the same way System.loadLibrary would, no full path needed.
-      final lib = DynamicLibrary.open('liboxtelegramstream.so');
-      address = lib.lookup<NativeFunction<SushiStreamOpenFnNative>>('ox_stream_open_fn');
+      throw StateError(
+        'SushiTelegramStreamCb: ox_stream_open_fn is Windows-only (R-UI-16). '
+        'Android must not dlopen liboxtelegramstream.so next to gomobile.',
+      );
     }
     _openFnAddress = address;
     return address;
@@ -110,7 +116,7 @@ class SushiTelegramStreamCb {
       'isWindows': Platform.isWindows,
       'isAndroid': Platform.isAndroid,
     });
-    if (!Platform.isWindows && !Platform.isAndroid) return;
+    if (!Platform.isWindows) return;
     try {
       final addRo = _resolveMpvStreamCbAddRo();
       final openFnAddress = _resolveOpenFnAddress();

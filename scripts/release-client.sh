@@ -24,7 +24,7 @@ Options:
 
 Example:
   bash scripts/release-client.sh -y "Android login retry"
-  # Both repos: from sushi → npm run release:all -- -y "…"
+  # Nightly (no tag): bash scripts/release-client-nightly.sh -y
 EOF
 }
 

@@ -45,6 +45,18 @@ void main() {
     expect(d.scheduleRestore, isFalse);
   });
 
+  test('next episode at zero is not previous-episode restore', () {
+    final d = sushiMpvPositionDecision(
+      previous: const Duration(minutes: 28),
+      next: Duration.zero,
+      pendingSeek: Duration.zero,
+      completed: false,
+      sinceOpen: const Duration(seconds: 3),
+    );
+    expect(d.acceptIncoming, isTrue);
+    expect(d.scheduleRestore, isFalse);
+  });
+
   test('normal playback advance is accepted', () {
     final d = sushiMpvPositionDecision(
       previous: const Duration(minutes: 10),

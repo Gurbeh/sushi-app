@@ -494,14 +494,20 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
                     ),
                   ),
                 if (item != null) ...{
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Text(
-                        item.streamModel?.mediaInfoTag ?? "",
+                  if ((playbackModel?.mediaStreams?.mediaInfoTag ?? item.streamModel?.mediaInfoTag)
+                          ?.trim()
+                          .isNotEmpty ==
+                      true)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Text(
+                          playbackModel?.mediaStreams?.mediaInfoTag ??
+                              item.streamModel?.mediaInfoTag ??
+                              "",
+                        ),
                       ),
                     ),
-                  ),
                 },
               ].addPadding(const EdgeInsets.symmetric(horizontal: 4)),
             ),
@@ -759,7 +765,7 @@ class _DesktopControlsState extends ConsumerState<DesktopControls> {
   Future<void> closePlayer() async {
     log('[sushi-progress] closePlayer() tapped');
     clearOverlaySettings();
-    ref.read(videoPlayerProvider).stop();
+    ref.read(videoPlayerProvider).stop(leavingPlayer: true);
     Navigator.of(context).pop();
   }
 

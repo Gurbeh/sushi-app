@@ -102,6 +102,11 @@ type Client struct {
 	// carry no '!' framing and so cannot use textWaiters/deliverTextReply.
 	msgMu      sync.Mutex
 	msgWaiters map[int64]chan *tg.Message
+
+	// getFileMu serializes upload.getFile / CDN fetches across all DownloadSessions. Video
+	// HTTP ensureAvailable and subtitle FetchSmallDocument share one MTProto client; overlapping
+	// getFile after a -503 Timeout is the other half of the bulkBarrierPreWrite crash class.
+	getFileMu sync.Mutex
 }
 
 // pushedMessage is one live-pushed document, the id it landed on in THIS session's DM, and the bot
@@ -197,7 +202,7 @@ func (c *Client) deliverPushedDoc(locator string, doc *tg.Document, messageID, p
 	c.pushMu.Lock()
 	defer c.pushMu.Unlock()
 	c.pruneStalePushesLocked()
-	msg := &pushedMessage{doc: doc, messageID: messageID, providerBotID: providerBotID}
+	msg := &pushedMessage{doc: clonePushedDocument(doc), messageID: messageID, providerBotID: providerBotID}
 	if ch, ok := c.pushWaiters[locator]; ok {
 		select {
 		case ch <- msg:

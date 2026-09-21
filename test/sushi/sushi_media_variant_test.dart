@@ -127,10 +127,19 @@ void main() {
     test('چسبیده without a muxed track is not hardsub on the picker', () {
       final meta = sushiClassifyVersionStream(_stream(
         index: 0,
-        name: '720p HDTS زیرنویس_فارسی_چسبیده',
+        name: '720p زیرنویس_فارسی_چسبیده',
         height: 720,
       ));
       expect(meta.delivery, isNot(SushiStreamDelivery.hardSub));
+    });
+
+    test('HDTS filename is hardsub on the picker', () {
+      final meta = sushiClassifyVersionStream(_stream(
+        index: 0,
+        name: 'Spider_Man_Brand_New_Day_2026_720P_Hdts_MyMoviz_video_converter.mp4',
+        height: 720,
+      ));
+      expect(meta.delivery, SushiStreamDelivery.hardSub);
     });
 
     test('catalog sub_langs make چسبیده a soft sub', () {

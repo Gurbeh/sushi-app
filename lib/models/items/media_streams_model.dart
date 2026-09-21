@@ -70,7 +70,15 @@ class MediaStreamsModel {
     return "${stream.width}x${stream.height}";
   }
 
-  String? get mediaInfoTag => '${displayProfile?.value} ${resolution?.value}';
+  String? get mediaInfoTag {
+    final name = currentVersionStream?.name.trim() ?? '';
+    if (name.isNotEmpty) return name;
+    final profile = displayProfile?.value;
+    final res = resolution?.value;
+    if (profile == null && res == null) return null;
+    if (profile != null && res != null) return '$profile $res';
+    return profile ?? res;
+  }
 
   Widget? audioIcon(
     BuildContext context,

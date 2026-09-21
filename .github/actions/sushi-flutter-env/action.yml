@@ -39,8 +39,6 @@ runs:
         keys = {
             "SUSHI_MAIN_BOT": main_bot,
             "SUSHI_INIT_BOT": init_bot,
-            "SUSHI_API_BASE_URL": env_first("SUSHI_API_BASE_URL"),
-            "SUSHI_API_BASE_IRAN": env_first("SUSHI_API_BASE_IRAN") or "https://api.sushi.ir",
             "TELEGRAM_API_ID": env_first("TELEGRAM_API_ID"),
             "TELEGRAM_API_HASH": env_first("TELEGRAM_API_HASH"),
         }

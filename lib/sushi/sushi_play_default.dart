@@ -138,6 +138,9 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
   SyncNotifier? sync,
   Set<String> playedIds = const {},
 }) async {
+  // R-SCHED-3: play leaves home. Also keeps `/item` prefetch off the gomobile JNI
+  // while HTTP ensureAvailable is in flight (bulkBarrierPreWrite, 2026-09-21).
+  catalog.cancelPrefetch();
   var item = itemModel;
   if (item is SeriesModel ||
       (item is MovieModel &&
@@ -199,9 +202,14 @@ Future<SushiPlaybackModel?> sushiBuildPlaybackModel(
           files.files,
           lastFileId: files.lastFileId,
         ),
-        userData: (overlay != null && item.userData.playbackPositionTicks == 0 && !item.userData.played)
-            ? overlay
-            : item.userData,
+        mediaStreams: streams,
+        // Queue stubs can carry the previous episode's resume ticks. Drop position
+        // here; sushiOverlayResumeOnEpisode reapplies it only when this episode matches.
+        userData: overlay ??
+            item.userData.copyWith(
+              playbackPositionTicks: 0,
+              progress: 0,
+            ),
       );
     }
   }

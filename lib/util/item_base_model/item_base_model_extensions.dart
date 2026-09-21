@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
@@ -13,12 +12,9 @@ import 'package:fladder/models/items/audio_model.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/items/movie_model.dart';
+import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/items/series_model.dart';
-import 'package:fladder/sushi/sushi_follow_action.dart';
 import 'package:fladder/sushi/sushi_playback_user_data.dart';
-import 'package:fladder/sushi/sushi_watchlist_action.dart';
-import 'package:fladder/sushi/sushi_media_issue_action.dart';
-import 'package:fladder/sushi/sushi_share_action.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/providers/dashboard_provider.dart';
 import 'package:fladder/providers/sync_provider.dart';
@@ -26,13 +22,11 @@ import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
+import 'package:fladder/sushi/sushi_season_availability.dart';
+import 'package:fladder/sushi/sushi_season_watch_actions.dart';
 import 'package:fladder/sushi/sushi_playable.dart';
-import 'package:fladder/routes/auto_router.gr.dart';
-import 'package:fladder/screens/collections/add_to_collection.dart';
-import 'package:fladder/screens/metadata/edit_item.dart';
 import 'package:fladder/screens/metadata/identifty_screen.dart';
 import 'package:fladder/screens/metadata/info_screen.dart';
-import 'package:fladder/screens/metadata/refresh_metadata.dart';
 import 'package:fladder/screens/playlists/add_to_playlists.dart';
 import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
 import 'package:fladder/screens/syncing/sync_button.dart';
@@ -149,7 +143,9 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     };
     final sushiEnabled = true;
     final sushiMarkId = sushiMarkPlayedItemId(this);
-    final sushiPlayed = ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(sushiMarkId)));
+    final sushiPlayed = this is SeasonModel
+        ? sushiSeasonShowWatchedTick(this as SeasonModel)
+        : ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(sushiMarkId)));
     final sushiShowBothMarkActions = sushiEnabled &&
         (sushiIsActivePlaybackItem(ref, id) || (userData.progress > 0 && !userData.played));
     void applyMarkUserData(UserData? newData) {
@@ -253,18 +249,6 @@ extension ItemBaseModelExtensions on ItemBaseModel {
                 : context.localized.playFromStart(subTextShort(context.localized) ?? name)),
           ),
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.addCollection) && false)
-        if (type != FladderItemType.boxset)
-          ItemActionButton(
-            icon: const Icon(IconsaxPlusLinear.archive_add),
-            action: () async {
-              await addItemToCollection(context, [this]);
-              if (context.mounted) {
-                context.refreshData();
-              }
-            },
-            label: Text(context.localized.addToCollection),
-          ),
       if (!exclude.contains(ItemActions.addPlaylist))
         if (type != FladderItemType.playlist)
           ItemActionButton(
@@ -284,7 +268,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             icon: const Icon(IconsaxPlusLinear.eye),
             action: () async {
               try {
-                await ref.read(userProvider.notifier).markAsPlayed(true, sushiMarkPlayedItemId(this));
+                await _sushiMarkPlayedAction(ref, this, true);
                 applyMarkUserData(const UserData(played: true, progress: 0, playbackPositionTicks: 0));
               } finally {
                 context.refreshData();
@@ -299,7 +283,7 @@ extension ItemBaseModelExtensions on ItemBaseModel {
             label: Text(context.localized.markAsUnwatched),
             action: () async {
               try {
-                await ref.read(userProvider.notifier).markAsPlayed(false, sushiMarkPlayedItemId(this));
+                await _sushiMarkPlayedAction(ref, this, false);
                 applyMarkUserData(const UserData(played: false, progress: 0, playbackPositionTicks: 0));
               } finally {
                 context.refreshData();
@@ -347,25 +331,6 @@ extension ItemBaseModelExtensions on ItemBaseModel {
         ),
       ...otherActions,
       ItemActionDivider(),
-      if (!exclude.contains(ItemActions.editMetaData) && false)
-        ItemActionButton(
-          icon: const Icon(IconsaxPlusLinear.edit),
-          action: () async {
-            final newItem = await showEditItemPopup(context, id);
-            if (newItem != null) {
-              onItemUpdated?.call(newItem);
-            }
-          },
-          label: Text(context.localized.editMetadata),
-        ),
-      if (!exclude.contains(ItemActions.refreshMetaData) && false)
-        ItemActionButton(
-          icon: const Icon(IconsaxPlusLinear.global_refresh),
-          action: () async {
-            showRefreshPopup(context, id, detailedName(context.localized) ?? name);
-          },
-          label: Text(context.localized.refreshMetadata),
-        ),
       if (!exclude.contains(ItemActions.download) && downloadEnabled) ...[
         if (!kIsWeb)
           ItemActionButton(
@@ -480,4 +445,12 @@ extension ItemBaseModelExtensions on ItemBaseModel {
     final parsed = int.tryParse(value.toString());
     return parsed;
   }
+}
+
+Future<void> _sushiMarkPlayedAction(WidgetRef ref, ItemBaseModel item, bool played) async {
+  if (item is SeasonModel) {
+    await sushiSeasonMarkPlayed(ref, item, played);
+    return;
+  }
+  await ref.read(userProvider.notifier).markAsPlayed(played, sushiMarkPlayedItemId(item));
 }

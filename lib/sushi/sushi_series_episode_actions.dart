@@ -90,9 +90,16 @@ EpisodeModel? sushiSeriesDetailPlayTarget(SeriesModel? series) {
 /// Id to send to [markAsPlayed]. Series posters use the catalog TMDB id;
 /// next-up reads episode ids (`sushi_ep_*`), so the series page must mark
 /// the current play-target episode.
+///
+/// Seasons never have a single flag id — [sushiSeasonMarkPlayed] writes every
+/// `sushi_ep_*`. Returning the synthetic `sushi_season_*` id is a no-op for
+/// posters (ADR 0028).
 String sushiMarkPlayedItemId(ItemBaseModel item) {
   if (item is SeriesModel) {
     return sushiSeriesDetailPlayTarget(item)?.id ?? item.id;
+  }
+  if (item is SeasonModel) {
+    return '';
   }
   return item.id;
 }

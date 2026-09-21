@@ -432,7 +432,7 @@ func (d *DownloadSession) location() *tg.InputDocumentFileLocation {
 	return &tg.InputDocumentFileLocation{
 		ID:            d.ref.DocumentID,
 		AccessHash:    d.ref.AccessHash,
-		FileReference: d.ref.FileReference,
+		FileReference: cloneBytes(d.ref.FileReference),
 	}
 }
 
@@ -475,6 +475,7 @@ func (d *DownloadSession) uploadGetFileWithRetry(
 ) (tg.UploadFileClass, error) {
 	refRefreshed := false
 	floodAttempts := 0
+	timeoutAttempts := 0
 	for {
 		res, err := invoke(ctx, req)
 		if err == nil {
@@ -489,6 +490,16 @@ func (d *DownloadSession) uploadGetFileWithRetry(
 			req.Location = d.location()
 			continue
 		}
+		if timeoutAttempts < maxFloodRetries && isUploadGetFileTimeout(err) {
+			timeoutAttempts++
+			log.Printf("oxtelegram: UploadGetFile -503 Timeout, retry %d/%d", timeoutAttempts, maxFloodRetries)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(400 * time.Millisecond):
+			}
+			continue
+		}
 		if floodAttempts >= maxFloodRetries {
 			return nil, err
 		}
@@ -501,6 +512,10 @@ func (d *DownloadSession) uploadGetFileWithRetry(
 }
 
 func (d *DownloadSession) fetchChunk(ctx context.Context, offset, limit int64) ([]byte, error) {
+	if d.client != nil {
+		d.client.getFileMu.Lock()
+		defer d.client.getFileMu.Unlock()
+	}
 	d.mu.Lock()
 	cdn := d.cdnRedirect
 	conn := d.dcConn
@@ -627,6 +642,10 @@ func floodRetry(ctx context.Context, fn func() error) error {
 // `if waitErr != nil { return waitErr }` treated a finished wait as a hard fail, so
 // mpv's next stream_cb read got -1, ffmpeg logged "partial file", and playback jumped
 // to the start of the file.
+func isUploadGetFileTimeout(err error) bool {
+	return tgerr.IsCode(err, 503) || tgerr.Is(err, "Timeout")
+}
+
 func floodWaitAllowsRetry(ctx context.Context, err error) (retry bool, fatal error) {
 	if err == nil {
 		return false, nil

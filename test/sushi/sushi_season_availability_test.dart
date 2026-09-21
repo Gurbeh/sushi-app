@@ -122,4 +122,14 @@ void main() {
     final season = _season(watched, episodeCount: 2);
     expect(sushiSeasonShowWatchedTick(season), isTrue);
   });
+
+  test('lite /item play-target is not a complete season list', () {
+    final season = _season([_episode(1)], episodeCount: 24);
+    expect(sushiSeasonEpisodeListComplete(season), isFalse);
+  });
+
+  test('loaded season matching TMDB count is complete', () {
+    final season = _season([_episode(1), _episode(2)], episodeCount: 2);
+    expect(sushiSeasonEpisodeListComplete(season), isTrue);
+  });
 }

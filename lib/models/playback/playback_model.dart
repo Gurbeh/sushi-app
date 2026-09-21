@@ -87,7 +87,7 @@ extension PlaybackModelExtension on PlaybackModel? {
         TranscodePlaybackModel _ => PlaybackType.transcode.name(context),
         OfflinePlaybackModel _ => PlaybackType.offline.name(context),
         TvPlaybackModel _ => PlaybackType.tv.name(context),
-        _ => context.localized.unknown,
+        _ => this?.playerKindLabel(context) ?? context.localized.unknown,
       };
 }
 
@@ -131,6 +131,10 @@ class PlaybackModel {
   }
 
   Future<Duration>? startDuration() async => isAudioPlayback ? Duration.zero : item.userData.playBackPosition;
+
+  /// [SushiPlaybackModel] is direct Telegram play; the extension `_` arm used to show
+  /// localized "unknown" on the bottom-panel chip.
+  String? playerKindLabel(BuildContext context) => null;
 
   PlaybackModel? updateUserData(UserData userData) => throw UnimplementedError();
 

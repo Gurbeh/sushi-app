@@ -257,6 +257,7 @@ class VideoPlayerImplementation(
             // line above is what proved that, and is worth re-adding for a day if it recurs.
             // See [clearSession].
             playbackData.value = playableData
+            savedPositionMs = playableData.startPosition.coerceAtLeast(0L)
             callback(Result.success(true))
             return
         } catch (e: Exception) {

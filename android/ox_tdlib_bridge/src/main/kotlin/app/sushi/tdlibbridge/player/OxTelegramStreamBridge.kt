@@ -52,16 +52,27 @@ private const val TAG = "OXPLAY_TDLIB"
  * other Go runtime is never entered while the gomobile mutex is held.
  */
 object OxTelegramStreamBridge {
-    init {
-        try {
-            System.loadLibrary("oxtelegramstream")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "OxTelegramStreamBridge: failed to load liboxtelegramstream.so", e)
-        }
-    }
-
     private val sessions = ConcurrentHashMap<Int, PlaybackSession>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile private var nativeLoaded = false
+
+    /// Load only when stream_cb is actually used. `init { System.loadLibrary }` ran a second Go
+    /// runtime (`liboxtelegramstream.so`) next to gomobile on any class reference — including
+    /// [unregisterSession] from every HTTP-bridge teardown — and crashed playback with
+    /// `bulkBarrierPreWrite: unaligned arguments`.
+    private fun ensureNativeLoaded() {
+        if (nativeLoaded) return
+        synchronized(this) {
+            if (nativeLoaded) return
+            try {
+                System.loadLibrary("oxtelegramstream")
+                nativeLoaded = true
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "OxTelegramStreamBridge: failed to load liboxtelegramstream.so", e)
+            }
+        }
+    }
 
     /** Registers [session] under the caller-supplied [id] — callers must pass the *same* id used
      *  to build the "gotdstream://{id}" uri handed to mpv (TdlibBridgeObject's own
@@ -69,6 +80,7 @@ object OxTelegramStreamBridge {
      *  reached from closeAfterPlayback's existing fileId-based cleanup without a second id space
      *  to keep in sync. Mirrors TdlibHttpBridgeServer.Register(fileId, source)'s exact shape. */
     fun registerSession(id: Int, session: PlaybackSession) {
+        ensureNativeLoaded()
         sessions[id] = session
         Log.i(TAG, "OxTelegramStreamBridge.registerSession id=$id")
     }

@@ -138,6 +138,26 @@ void main() {
       )),
     );
   });
+
+  test('sushiCoalesceAssignment keeps a live assignment over ERR', () {
+    const live = SushiAssignment(
+      apiBotUsername: 'OXStreamer31bot',
+      pool: ['OXStreamer31bot'],
+      providerId: 1,
+      bindingToken: 'tok',
+      epoch: 4,
+    );
+    final err = SushiAssignment.stubPending(reason: 'type 14');
+    final kept = sushiCoalesceAssignment(err, live);
+    expect(kept.usable, isTrue);
+    expect(kept.epoch, 4);
+    expect(kept.apiBotUsername, 'OXStreamer31bot');
+  });
+
+  test('sushiCoalesceAssignment keeps first-install pending', () {
+    final err = SushiAssignment.stubPending(reason: 'type 14');
+    expect(sushiCoalesceAssignment(err, null).pending, isTrue);
+  });
 }
 
 List<int> _uvarint(int n) {

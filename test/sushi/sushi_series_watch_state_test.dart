@@ -142,4 +142,24 @@ void main() {
     expect(painted.userData.progress, closeTo(25, 0.1));
     expect(painted.userData.playbackPositionTicks, 10 * 60 * 1000 * 10000);
   });
+
+  test('sushiOverlayResumeOnEpisode does not copy resume onto a different episode', () {
+    const resume = SushiContinueEntry(
+      tmdbId: 1,
+      kind: SushiKind.series,
+      title: 'Show',
+      year: 2020,
+      rating: 80,
+      poster: 'p',
+      positionMs: 28 * 60 * 1000,
+      durationMs: 40 * 60 * 1000,
+      atMs: 1,
+      episodeItemId: 'sushi_ep_13',
+      season: 3,
+      episode: 13,
+    );
+    final next = sushiOverlayResumeOnEpisode(_episode(id: 'sushi_ep_14', season: 3, episode: 14), resume);
+    expect(next.userData.playbackPositionTicks, 0);
+    expect(next.userData.progress, 0);
+  });
 }

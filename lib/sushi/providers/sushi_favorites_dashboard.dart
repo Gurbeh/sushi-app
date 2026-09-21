@@ -1,9 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fladder/models/item_base_model.dart';
-import 'package:fladder/sushi/sushi_favourites_feed.dart';
-
-const _dashboardFavoritesLimit = 16;
 
 class SushiFavoritesDashboardData {
   const SushiFavoritesDashboardData({this.items = const []});
@@ -29,17 +26,7 @@ void sushiResetFavoritesHomeFeedRef(Ref ref) {
   ref.read(sushiFavoritesFeedHandledProvider.notifier).state = false;
 }
 
-/// Fallback when Home/Feed omits Favorites (older API).
+/// No HTTP backend to fall back to — favorites come from the `/home` bot feed only.
 final sushiFavoritesDashboardProvider = FutureProvider<SushiFavoritesDashboardData>((ref) async {
-  
-
-  final feed = await SushiFavoritesFeed.fetch(ref);
-  if (feed == null) return SushiFavoritesDashboardData.empty;
-
-  final items = feed.favourites.values
-      .expand((list) => list)
-      .take(_dashboardFavoritesLimit)
-      .toList();
-  if (items.isEmpty) return SushiFavoritesDashboardData.empty;
-  return SushiFavoritesDashboardData(items: items);
+  return SushiFavoritesDashboardData.empty;
 });

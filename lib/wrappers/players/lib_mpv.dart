@@ -413,8 +413,7 @@ class LibMPV extends BasePlayer {
       'targetPlatform': defaultTargetPlatform.name,
       'isNativePlayer': player.platform is mpv.NativePlayer,
     });
-    if (!SushiEnv.isEnabled ||
-        (defaultTargetPlatform != TargetPlatform.windows && defaultTargetPlatform != TargetPlatform.android)) {
+    if (!SushiEnv.isEnabled || !sushiTelegramStreamCbSupported(defaultTargetPlatform)) {
       return;
     }
     if (player.platform is! mpv.NativePlayer) return;
@@ -523,8 +522,12 @@ class LibMPV extends BasePlayer {
     _externalSubtitleLoadGen++;
     _externalSubtitleCache.clear();
     _progressiveTelegram = SushiEnv.isEnabled && sushiIsTelegramDirectPlayUrl(url);
-    _pendingSeek = startPosition > Duration.zero ? startPosition : null;
-    _acceptedPosition = Duration.zero;
+    // Include Duration.zero: next-episode open at 0 must not look like a demuxer
+    // reset of the previous file (pending null + lastState still at 70% restored
+    // that offset — Friends S3E13→E14, 2026-09-21).
+    _pendingSeek = startPosition;
+    _acceptedPosition = startPosition;
+    setState(lastState.update(position: startPosition, completed: false));
     _loadOpenedAt = DateTime.now();
     _spuriousZeroRestores = 0;
     _restoreInFlight = false;
@@ -901,14 +904,13 @@ class LibMPV extends BasePlayer {
     try {
       await native.setProperty('sub-ass', 'no');
       // OX: hide mpv soft OSD; Flutter `_VideoSubtitles` paints sized text.
-      const hideMpvOsd = true;
-      await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
+      await native.setProperty('sub-visibility', 'no');
       SushiStreamLog.event('subtitle_mpv_text_path', fields: {
           'codec': codec,
           'subAss': 'no',
-          'subVisibility': hideMpvOsd ? 'no' : 'yes',
+          'subVisibility': 'no',
           'flutterOverlay': 'expected',
-          'mpvOsd': hideMpvOsd ? 'hidden' : 'visible',
+          'mpvOsd': 'hidden',
         });
     } catch (_) {}
   }
@@ -1206,13 +1208,12 @@ class LibMPV extends BasePlayer {
       }
       if (!_isAssSubtitleCodec(_currentSubtitleCodec)) {
         await native.setProperty('sub-ass', 'no');
-        const hideMpvOsd = true;
-        await native.setProperty('sub-visibility', hideMpvOsd ? 'no' : 'yes');
+        await native.setProperty('sub-visibility', 'no');
         SushiStreamLog.event('subtitle_mpv_style_sync', fields: {
           'path': 'flutter_text',
           'codec': _currentSubtitleCodec,
-          'subVisibility': hideMpvOsd ? 'no' : 'yes',
-          'mpvOsd': hideMpvOsd ? 'hidden' : 'visible',
+          'subVisibility': 'no',
+          'mpvOsd': 'hidden',
         });
         return;
       }

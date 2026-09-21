@@ -47,3 +47,23 @@ func TestDeliverPushedDocKeepsArmedWaiterForLaterResolve(t *testing.T) {
 		t.Fatal("armed waiter was deleted on send; 0/0 resolve would wait on a new empty channel")
 	}
 }
+
+func TestVideoFileRefFromDocumentClonesFileReference(t *testing.T) {
+	orig := []byte{1, 2, 3, 4}
+	doc := &tg.Document{ID: 9, FileReference: orig, Size: 12, MimeType: "text/plain"}
+	ref := videoFileRefFromDocument(doc, 1)
+	orig[0] = 99
+	if ref.FileReference[0] != 1 {
+		t.Fatalf("FileReference aliased gotd buffer: %v", ref.FileReference)
+	}
+}
+
+func TestClonePushedDocumentOwnsFileReference(t *testing.T) {
+	orig := []byte{9, 8, 7}
+	doc := &tg.Document{ID: 3, FileReference: orig}
+	cp := clonePushedDocument(doc)
+	orig[0] = 0
+	if cp.FileReference[0] != 9 {
+		t.Fatalf("pushed Document aliased gotd buffer: %v", cp.FileReference)
+	}
+}

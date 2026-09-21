@@ -137,6 +137,11 @@ void main() {
     expect(sushiMarkPlayedItemId(series), 'sushi_ep_2');
   });
 
+  test('sushiMarkPlayedItemId on a season is empty — never sushi_season_*', () {
+    final season = _season(season: 1, episodeCount: 24);
+    expect(sushiMarkPlayedItemId(season), '');
+  });
+
   test('sushiSeriesPickerSeasons groups episodes by season', () {
     final ep1 = _episode(id: 'ep-1', episode: 1);
     final ep2 = _episode(id: 'ep-2', episode: 1).copyWith(season: 2);

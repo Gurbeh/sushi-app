@@ -401,12 +401,14 @@ class _TvPlayerControlsState extends ConsumerState<TvPlayerControls> {
                       ),
                     ),
                   ),
-                if (item?.streamModel?.mediaInfoTag != null) ...{
+                if ((playbackModel?.mediaStreams?.mediaInfoTag ?? item?.streamModel?.mediaInfoTag) != null) ...{
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       child: Text(
-                        item?.streamModel?.mediaInfoTag ?? "",
+                        playbackModel?.mediaStreams?.mediaInfoTag ??
+                            item?.streamModel?.mediaInfoTag ??
+                            "",
                       ),
                     ),
                   ),
@@ -650,7 +652,7 @@ class _TvPlayerControlsState extends ConsumerState<TvPlayerControls> {
   Future<void> closePlayer() async {
     log('[sushi-progress] TvPlayerControls.closePlayer() tapped');
     clearOverlaySettings();
-    ref.read(videoPlayerProvider).stop();
+    ref.read(videoPlayerProvider).stop(leavingPlayer: true);
     Navigator.of(context).pop();
   }
 

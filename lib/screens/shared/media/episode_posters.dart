@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fladder/models/items/episode_model.dart';
 import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/models/syncing/sync_item.dart';
+import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_episode_poster_image.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
 import 'package:fladder/providers/sync/sync_provider_helpers.dart';
@@ -258,6 +259,8 @@ class EpisodePoster extends ConsumerWidget {
       child: const Icon(Icons.local_movies_outlined),
     );
     bool episodeAvailable = episode.status == EpisodeStatus.available;
+    final played = episode.userData.played ||
+        ref.watch(sushiCatalogItemFlagsProvider.select((s) => s.isPlayed(episode.id)));
     final syncedDetails = ref.watch(syncedItemProvider(episode));
     final sushiImage = sushiEpisodePosterImage(episode, episodeAvailable);
     final displayImage = sushiImage ??
@@ -346,7 +349,7 @@ class EpisodePoster extends ConsumerWidget {
                             Icons.favorite_rounded,
                           ),
                         ),
-                      if (episode.userData.played)
+                      if (played)
                         StatusCard(
                           color: Theme.of(context).colorScheme.primary,
                           child: const Icon(

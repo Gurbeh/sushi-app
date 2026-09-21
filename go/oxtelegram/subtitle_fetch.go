@@ -6,6 +6,11 @@ import (
 	"os"
 )
 
+// Subtitle documents are extracted SRT/ASS text (doc 15 §7). A season-pack ZIP slipping
+// through would be megabytes crossing gomobile as a Java String — NULs in that path are a
+// JNI crash class. Cap well above a real episode file, well below a pack.
+const maxSmallDocumentBytes = 8 << 20
+
 // FetchSmallDocument downloads a whole small document (a subtitle file, doc 15 §7) freshly copied
 // into this session's own chat with a bot -- the SubtitleFile delivery step's reader-DM copy.
 //
@@ -22,6 +27,9 @@ func (c *Client) FetchSmallDocument(ctx context.Context, botID, messageID int64,
 	ref, err := c.resolveVideoFileByPush(ctx, locator)
 	if err != nil {
 		return "", fmt.Errorf("fetch document: %w", err)
+	}
+	if ref.Size > maxSmallDocumentBytes {
+		return "", fmt.Errorf("fetch document: %d bytes exceeds %d cap", ref.Size, maxSmallDocumentBytes)
 	}
 	session, err := c.OpenDownload(ref, 0, locator, cacheDir)
 	if err != nil {
@@ -40,5 +48,7 @@ func (c *Client) FetchSmallDocument(ctx context.Context, botID, messageID int64,
 	if err != nil {
 		return "", fmt.Errorf("fetch document: read: %w", err)
 	}
-	return string(data), nil
+	owned := make([]byte, len(data))
+	copy(owned, data)
+	return string(owned), nil
 }

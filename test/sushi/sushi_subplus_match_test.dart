@@ -126,6 +126,31 @@ void main() {
       expect(got, hasLength(1));
       expect(got.single.title, 'The Breadwinner (2017)');
     });
+
+    test('drops a named other-episode pack in the same season', () {
+      SubplusPack pack(String title) => SubplusPack(
+            tag: title,
+            title: title,
+            imdb: '',
+            year: '1994',
+            series: true,
+            translator: '',
+            releases: const [],
+            poster: '',
+          );
+      final got = sushiFilterSubplusPacks(
+        [
+          pack('friends s03 e12 UNCUT.DVDRip.XviD'),
+          pack('Friends Season 3 Complete'),
+          pack('friends.s03e13.720p.web'),
+        ],
+        episode: (season: 3, episode: 13),
+      );
+      expect(got.map((p) => p.title), [
+        'Friends Season 3 Complete',
+        'friends.s03e13.720p.web',
+      ]);
+    });
   });
 
   group('pickMovieSubFile', () {
@@ -142,6 +167,25 @@ void main() {
         pickMovieSubFile([f('The.Breadwinner.2026.en[sdh].srt')])!.name,
         'The.Breadwinner.2026.en[sdh].srt',
       );
+    });
+  });
+
+  group('sushiSubtitleSourceMatchScore', () {
+    SubplusPack pack(String title) => SubplusPack(
+          tag: 't',
+          title: title,
+          imdb: '',
+          year: '',
+          series: true,
+          translator: '',
+          releases: [title],
+          poster: '',
+        );
+
+    test('DVDRip/XviD loses to 720p WEB on a 720p file', () {
+      final dvd = pack('friends s03 e12 UNCUT.DVDRip.XviD');
+      final web = pack('Friends.S03E12.720p.WEB');
+      expect(sushiSubtitleSourceMatchScore(dvd, '720p'), lessThan(sushiSubtitleSourceMatchScore(web, '720p')));
     });
   });
 }

@@ -326,9 +326,13 @@ class SushiCatalogController {
       final owner = await getOwner();
       final stored = readPersistedOwner != null ? await readPersistedOwner!() : '';
       if (owner.isEmpty) {
-        // No usable assignment — leftover rows from the previous identity must not paint Play.
+        // Logout clears the stamp first. A transient `/initbot` ERR must not
+        // wipe rails while the previous identity's stamp is still on disk.
+        if (stored.isNotEmpty) {
+          debugPrint('[sushi] catalog bind: empty owner, keep stored rows');
+          return;
+        }
         await _wipeCatalogRows();
-        if (stored.isNotEmpty) await persistOwner?.call('');
         return;
       }
       if (owner == stored) return;

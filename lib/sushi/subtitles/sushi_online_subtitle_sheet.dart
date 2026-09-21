@@ -408,7 +408,13 @@ class _OnlineSubtitleDialogState extends ConsumerState<_OnlineSubtitleDialog> {
       _log('search_done', {'packs': packs.length});
       if (!mounted) return;
       setState(() {
-        _packs = rankSubplusPacks(packs, query: _query.text, year: _year, episode: _episode);
+        _packs = rankSubplusPacks(
+          packs,
+          query: _query.text,
+          year: _year,
+          episode: _episode,
+          sourceLabel: sushiPlayingSourceLabel(ref),
+        );
         _loading = false;
       });
     } catch (e, st) {

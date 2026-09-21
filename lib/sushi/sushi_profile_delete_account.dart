@@ -1,20 +1,14 @@
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:fladder/sushi/sushi_account_delete_api.dart';
 import 'package:fladder/sushi/sushi_env.dart';
-import 'package:fladder/sushi/sushi_navigation.dart';
-import 'package:fladder/providers/auth_provider.dart';
-import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/screens/settings/settings_list_tile.dart';
 import 'package:fladder/screens/settings/widgets/settings_label_divider.dart';
 import 'package:fladder/screens/settings/widgets/settings_list_group.dart';
 import 'package:fladder/util/localization_helper.dart';
 
 /// OX-only profile section: delete server account (Settings → Profile).
-List<Widget> sushiProfileDeleteAccountGroup(BuildContext context, WidgetRef ref) {
+List<Widget> sushiProfileDeleteAccountGroup(BuildContext context) {
   return settingsListGroup(
     context,
     SettingsLabelDivider(label: context.localized.sushiDeleteAccountSection),
@@ -25,13 +19,15 @@ List<Widget> sushiProfileDeleteAccountGroup(BuildContext context, WidgetRef ref)
           style: TextStyle(color: Theme.of(context).colorScheme.error),
         ),
         subLabel: Text(context.localized.sushiDeleteAccountSubtitle),
-        onTap: () => _confirmDeleteAccount(context, ref),
+        onTap: () => _confirmDeleteAccount(context),
       ),
     ],
   );
 }
 
-Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+/// Account deletion happens in a conversation with the main bot over Telegram — Sushi has no
+/// HTTP backend of its own to call. This just confirms, then hands off to Telegram.
+Future<void> _confirmDeleteAccount(BuildContext context) async {
   final loc = context.localized;
   final confirmed = await showDialog<bool>(
     context: context,
@@ -54,44 +50,20 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
       ],
     ),
   );
-  if (confirmed != !context.mounted) return;
+  if (confirmed != true) return;
 
-  final account = ref.read(userProvider);
-  final token = account?.credentials.token;
-  if (account == null || token == null || token.isEmpty) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.sushiDeleteAccountFailed)),
-    );
-    return;
-  }
-
-  try {
-    await SushiAccountDeleteApi().deleteAccount(accessToken: token);
-  } on SushiAccountDeleteException catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    return;
-  } catch (_) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.sushiDeleteAccountFailed)),
-    );
-    return;
-  }
-
-  await ref.read(authProvider.notifier).logOutUser();
-  if (!context.mounted) return;
-  await context.router.replaceAll(sushiSignOutRouteList());
-  await ref.read(authProvider.notifier).initModel();
+  final opened = await sushiOpenBotDeleteAccountLink();
+  if (opened || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(loc.sushiDeleteAccountFailed)),
+  );
 }
 
-/// Opens the main-bot delete-account deep link (privacy policy fallback).
-Future<void> sushiOpenBotDeleteAccountLink() async {
+/// Opens the main-bot delete-account deep link.
+Future<bool> sushiOpenBotDeleteAccountLink() async {
   final link = SushiEnv.telegramBotDeleteAccountLink;
-  if (link == null) return;
+  if (link == null) return false;
   final uri = Uri.parse(link);
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  if (!await canLaunchUrl(uri)) return false;
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
 }

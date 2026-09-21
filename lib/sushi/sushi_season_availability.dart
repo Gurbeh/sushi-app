@@ -17,6 +17,13 @@ int sushiSeasonAvailableEpisodeCount(SeasonModel season) {
   return season.episodes.where((episode) => episode.status == EpisodeStatus.available).length;
 }
 
+/// ADR 0028 lite `/item` attaches one play-target. That is not the season.
+bool sushiSeasonEpisodeListComplete(SeasonModel season) {
+  if (season.episodes.isEmpty) return false;
+  if (season.episodeCount <= 0) return true;
+  return season.episodes.length >= season.episodeCount;
+}
+
 /// True when every on-disk episode in the season is marked played (Fladder check icon).
 bool sushiSeasonShowWatchedTick(SeasonModel season) {
   final total = sushiSeasonTotalEpisodeCount(season);

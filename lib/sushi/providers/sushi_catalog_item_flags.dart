@@ -158,12 +158,21 @@ class SushiCatalogItemFlags extends _$SushiCatalogItemFlags {
 
   Future<void> setPlayed(String id, bool value) async {
     if (id.isEmpty) return;
+    await setPlayedMany([id], value);
+  }
+
+  Future<void> setPlayedMany(Iterable<String> ids, bool value) async {
     final next = {...state.playedIds};
-    if (value) {
-      next.add(id);
-    } else {
-      next.remove(id);
+    var changed = false;
+    for (final id in ids) {
+      if (id.isEmpty) continue;
+      if (value) {
+        changed = next.add(id) || changed;
+      } else {
+        changed = next.remove(id) || changed;
+      }
     }
+    if (!changed) return;
     state = state.copyWith(playedIds: next);
     await _writeLocalPlayed(next);
   }

@@ -158,10 +158,27 @@ List<SubplusPack> sushiFilterSubplusPacks(
   }
   if (year != null && year.isNotEmpty) {
     final hits = [for (final p in list) if (p.year == year) p];
-    if (hits.isNotEmpty) return hits;
-    list = [for (final p in list) if (p.year.isEmpty) p];
+    if (hits.isNotEmpty) {
+      list = hits;
+    } else {
+      list = [for (final p in list) if (p.year.isEmpty) p];
+    }
+  }
+  if (episode != null) {
+    list = [for (final p in list) if (!_packWrongEpisode(p, episode.season, episode.episode)) p];
   }
   return list;
+}
+
+/// Pack title/releases name a different episode in this season (Friends S3E12 pack while
+/// playing E13). Season-complete dumps with no episode number stay.
+bool _packWrongEpisode(SubplusPack pack, int season, int episode) {
+  for (final t in [pack.title, ...pack.releases]) {
+    final se = parseSeasonEpisode(t);
+    if (se.episode == null || se.episode == episode) continue;
+    if (se.season == null || se.season == season) return true;
+  }
+  return false;
 }
 
 /// How well a pack matches a target [season] (0 = unknown, positive = match, negative = mismatch).
@@ -178,6 +195,63 @@ int seasonMatchScore(SubplusPack pack, int season) {
     if (s != null) best = -1;
   }
   return best;
+}
+
+const _subtitleSourceTokens = {
+  '480p',
+  '720p',
+  '1080p',
+  '2160p',
+  '4k',
+  'web',
+  'webdl',
+  'webrip',
+  'bluray',
+  'bdrip',
+  'brrip',
+  'hdtv',
+  'dvdrip',
+  'dvd',
+  'xvid',
+  'divx',
+  'x264',
+  'h264',
+  'x265',
+  'h265',
+  'hevc',
+};
+
+Set<String> sushiSubtitleHintTokens(String raw) {
+  final s = raw.toLowerCase().replaceAll(RegExp(r'[._-]+'), ' ');
+  final out = <String>{};
+  for (final tok in _subtitleSourceTokens) {
+    if (s.contains(tok)) out.add(tok);
+  }
+  return out;
+}
+
+/// Shared scene-release tokens with the playing file, plus a DVDRip/XviD penalty against a
+/// modern 720p/1080p label (Friends S3E12: Automatic took UNCUT.DVDRip.XviD first).
+int sushiSubtitleSourceMatchScore(SubplusPack pack, String? sourceLabel) {
+  if (sourceLabel == null || sourceLabel.trim().isEmpty) return 0;
+  final src = sushiSubtitleHintTokens(sourceLabel);
+  if (src.isEmpty) return 0;
+  final blob = '${pack.title} ${pack.releases.join(' ')}';
+  final packTok = sushiSubtitleHintTokens(blob);
+  var shared = 0;
+  for (final t in src) {
+    if (packTok.contains(t)) shared++;
+  }
+  final srcModern = src.contains('720p') ||
+      src.contains('1080p') ||
+      src.contains('2160p') ||
+      src.contains('web') ||
+      src.contains('webdl') ||
+      src.contains('webrip');
+  final srcDisc = src.contains('dvdrip') || src.contains('dvd') || src.contains('bluray') || src.contains('bdrip');
+  final packDisc = packTok.contains('dvdrip') || packTok.contains('xvid') || packTok.contains('divx');
+  if (srcModern && !srcDisc && packDisc) return shared - 8;
+  return shared;
 }
 
 class SubplusException implements Exception {

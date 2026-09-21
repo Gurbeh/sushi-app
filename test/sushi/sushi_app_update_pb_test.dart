@@ -61,10 +61,16 @@ void main() {
     expect(sushiMsgTypeAppUpdateRes, 31);
   });
 
-  test('sushiIsNewerApp compares semver and ignores nightly suffix', () {
+  test('sushiIsNewerApp treats same-number nightly as newer than stable', () {
     expect(sushiIsNewerApp('1.1.150', '1.2.0'), isTrue);
     expect(sushiIsNewerApp('1.2.0', '1.2.0'), isFalse);
+    expect(sushiIsNewerApp('1.2.0', '1.2.0-nightly'), isTrue);
     expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0'), isFalse);
+    expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0-nightly'), isFalse);
+    expect(sushiIsNewerApp('1.2.0-nightly.10', '1.2.0-nightly.11'), isTrue);
+    expect(sushiIsNewerApp('1.2.0-nightly.11', '1.2.0-nightly.10'), isFalse);
+    expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0-nightly.5'), isTrue);
+    expect(sushiIsNewerApp('1.2.0-nightly', '1.2.1'), isTrue);
     expect(SushiSemver.parse('1.1.150-nightly')?.patch, 150);
   });
 

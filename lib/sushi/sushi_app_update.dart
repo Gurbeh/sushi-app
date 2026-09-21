@@ -122,10 +122,29 @@ Future<void> sushiClearPersistedLatestApp() async {
   } catch (_) {}
 }
 
+final RegExp _nightlySerial = RegExp(r'-nightly(?:\.(\d+))?$', caseSensitive: false);
+
+/// Null when [raw] is a stable version. `0` for a bare `-nightly`. The trailing integer is the
+/// CI version code (`1.2.0-nightly.15234`), so a later nightly of the same semver still prompts.
+int? sushiNightlySerial(String raw) {
+  final match = _nightlySerial.firstMatch(raw.trim().split('+').first);
+  if (match == null) return null;
+  final digits = match.group(1);
+  if (digits == null) return 0;
+  return int.tryParse(digits);
+}
+
 bool sushiIsNewerApp(String currentVersion, String latestVersion) {
   final current = SushiSemver.parse(currentVersion) ?? const SushiSemver(major: 0, minor: 0, patch: 0);
   final latest = SushiSemver.parse(latestVersion);
-  return latest != null && latest.isNewerThan(current);
+  if (latest == null) return false;
+  if (latest.isNewerThan(current)) return true;
+  if (current.isNewerThan(latest)) return false;
+  final latestNightly = sushiNightlySerial(latestVersion);
+  final currentNightly = sushiNightlySerial(currentVersion);
+  if (latestNightly == null) return false;
+  if (currentNightly == null) return true;
+  return latestNightly > currentNightly;
 }
 
 Future<bool> sushiShouldOfferUpdate({

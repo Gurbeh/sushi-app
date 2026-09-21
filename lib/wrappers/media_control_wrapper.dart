@@ -28,7 +28,7 @@ import 'package:fladder/sushi/subtitles/sushi_srt.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
-import 'package:fladder/screens/shared/fladder_notification_overlay.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/live_tv_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
@@ -523,10 +523,13 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop({bool leavingPlayer = true}) async {
     final playbackModel = ref.read(playBackModel);
     log('[sushi-progress] stop() entered playbackModel=${playbackModel == null ? "NULL (early return, nothing will be saved)" : playbackModel.item.id}');
-    if (playbackModel == null) return;
+    if (playbackModel == null) {
+      if (leavingPlayer) _resumeCatalogPrefetch();
+      return;
+    }
 
     // mpv/mdk path only: ExoPlayer's own Activity teardown closes its session natively
     // (VideoPlayerImplementation.clearSession) — this player runs inside the normal Flutter
@@ -593,7 +596,13 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
         controls: [],
       ),
     );
+    if (leavingPlayer) _resumeCatalogPrefetch();
     return super.stop();
+  }
+
+  void _resumeCatalogPrefetch() {
+    if (!SushiEnv.isEnabled) return;
+    ref.read(sushiCatalogControllerProvider).resumePrefetch();
   }
 
   Future<void> playOrPause() async {
@@ -859,9 +868,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   }
 
   /// Non-hard-sub: Automatic (online) → AI if Gemini key set → muxed Farsi soft last.
-  /// Hardsub → Off, unless the audio is English (no Persian burned in, so Automatic still runs —
-  /// no AI / soft stack on burn-in). Catalog-only `sub_langs=fa` stubs are not playable.
-  /// Iranian items are skipped entirely — the content is already Persian.
+  /// Hardsub → Off. English audio does not reopen Automatic (doc 15 §7). Catalog-only
+  /// `sub_langs=fa` stubs are not playable. Iranian items are skipped entirely.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
     final hardSub = sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams);
@@ -899,11 +907,8 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       model: model,
     );
     log('sushi_sub_auto_result ok=${r.ok} error=${r.errorCode} label=${r.label}', name: 'sushi.subs');
-    // This pipeline is otherwise entirely silent (auto-attempt, quiet fallback by design) —
-    // 'busy'/'stale' are internal races, not real failures worth surfacing.
-    if (sushiSubtitleOpShouldFallback(r)) {
-      FladderSnack.show('Online subtitle unavailable (${r.errorCode})');
-    }
+    // Auto-start is silent: a miss (empty SubDL zip, no pack) is not a user-facing failure.
+    // Manual Automatic / Online sheet still surfaces errors from sushiRunAutoLoad.
   }
 
   @override

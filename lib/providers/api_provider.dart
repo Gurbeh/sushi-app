@@ -32,7 +32,7 @@ final serverUrlProvider = StateProvider<String?>((ref) {
   if (localUrlAvailable && userCredentials?.localUrl?.isNotEmpty == true) {
     newUrl = userCredentials?.localUrl;
   } else {
-    newUrl = userCredentials?.url ?? tempUrl ?? SushiEnv.apiBaseUrl;
+    newUrl = userCredentials?.url ?? tempUrl;
   }
 
   return normalizeUrl(newUrl ?? "");
