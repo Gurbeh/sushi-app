@@ -23,6 +23,7 @@ import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_iran_content.dart';
 import 'package:fladder/sushi/subtitles/sushi_srt.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
@@ -860,11 +861,18 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   /// Non-hard-sub: Automatic (online) → AI if Gemini key set → muxed Farsi soft last.
   /// Hardsub → Off, unless the audio is English (no Persian burned in, so Automatic still runs —
   /// no AI / soft stack on burn-in). Catalog-only `sub_langs=fa` stubs are not playable.
+  /// Iranian items are skipped entirely — the content is already Persian.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
     final hardSub = sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams);
     final hasPersianSoft = sushiHasPersianSoftSub(model.subStreams);
     final isEnglishAudio = sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language);
+    final isIranian = SushiIranContent.isIranian(
+      tags: model.item.overview.tags,
+      genres: model.item.overview.genreItems,
+      name: model.item.name,
+      mediaStreams: model.mediaStreams,
+    );
     final resolved = sushiResolveSubtitleStreamIndex(
       selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
       serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
@@ -875,10 +883,11 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
       hardSub: hardSub,
       hasPersianSoft: hasPersianSoft,
       isEnglishAudio: isEnglishAudio,
+      isIranian: isIranian,
     );
     log(
       'sushi_sub_start_choice choice=${choice.name} hardSub=$hardSub '
-      'hasPersianSoft=$hasPersianSoft isEnglishAudio=$isEnglishAudio resolved=$resolved',
+      'hasPersianSoft=$hasPersianSoft isEnglishAudio=$isEnglishAudio isIranian=$isIranian resolved=$resolved',
       name: 'sushi.subs',
     );
     if (choice != SushiStartSubtitle.automaticOnline) return;

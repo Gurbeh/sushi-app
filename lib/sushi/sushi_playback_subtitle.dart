@@ -134,12 +134,17 @@ List<SushiStartSubtitleStep> sushiStartSubtitleSteps({
 /// First step of [sushiStartSubtitleSteps]. Hardsub sources default to Off (stacking soft Persian
 /// on top of burn-in duplicates the subtitle on Android ExoPlayer) — except an English hardsub
 /// print, which still has no Persian on screen, so Automatic (online) still runs.
+///
+/// Iranian content is skipped entirely: it's already Persian, so auto subtitle search has
+/// nothing useful to look for.
 SushiStartSubtitle sushiStartSubtitleChoice({
   required bool hardSub,
   required bool hasPersianSoft,
   bool subtitleOff = false,
   bool isEnglishAudio = false,
+  bool isIranian = false,
 }) {
+  if (isIranian) return SushiStartSubtitle.off;
   final steps = sushiStartSubtitleSteps(
     hardSub: hardSub,
     hasPersianSoft: hasPersianSoft,

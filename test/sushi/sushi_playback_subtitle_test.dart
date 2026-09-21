@@ -254,6 +254,17 @@ void main() {
     );
   });
 
+  test('Iranian content skips auto subtitle entirely, even with hardsub off', () {
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: false, isIranian: true),
+      SushiStartSubtitle.off,
+    );
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true, isEnglishAudio: true, isIranian: true),
+      SushiStartSubtitle.off,
+    );
+  });
+
   test('sushiIsEnglishLanguage matches en/eng/en-* only', () {
     expect(sushiIsEnglishLanguage('en'), isTrue);
     expect(sushiIsEnglishLanguage('eng'), isTrue);
