@@ -149,14 +149,16 @@ class SushiSubtitleFileRes {
   }
 }
 
-/// Encodes a `sushi.v1.SubtitleReq`: tmdb_id (1, varint), kind (2, varint), season_no (3, varint),
-/// episode_no (4, varint), lang (5, string).
+/// Encodes a `sushi.v1.SubtitleReq`: tmdb_id (1), kind (2), season_no (3), episode_no (4),
+/// lang (5), duration_min (6), source_label (7).
 Uint8List sushiEncodeSubtitleReq({
   required int tmdbId,
   required int kind,
   int seasonNo = 0,
   int episodeNo = 0,
   String lang = '',
+  int durationMin = 0,
+  String sourceLabel = '',
 }) {
   final out = BytesBuilder();
   void writeTag(int field, int wire) => out.add(sushiUvarint((field << 3) | wire));
@@ -179,6 +181,16 @@ Uint8List sushiEncodeSubtitleReq({
   if (lang.isNotEmpty) {
     writeTag(5, 2);
     final b = utf8.encode(lang);
+    out.add(sushiUvarint(b.length));
+    out.add(b);
+  }
+  if (durationMin > 0) {
+    writeTag(6, 0);
+    out.add(sushiUvarint(durationMin));
+  }
+  if (sourceLabel.isNotEmpty) {
+    writeTag(7, 2);
+    final b = utf8.encode(sourceLabel);
     out.add(sushiUvarint(b.length));
     out.add(b);
   }

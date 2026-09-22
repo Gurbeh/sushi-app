@@ -631,6 +631,76 @@ Future<({SubplusSubFile file, String label})?> _fetchSubplusFile(Object src, {re
   }
 }
 
+/// Release family named by a quality label or a subtitle release name. A source word
+/// (dvd / web / bluray / hdtv) wins over softsub/hardsub. Empty when the label doesn't say.
+String sushiSubtitleCutType(String label) {
+  final s = label.toLowerCase();
+  if (s.contains('dvd')) return 'dvd';
+  if (s.contains('webrip') || s.contains('web-dl') || s.contains('webdl') || s.contains('web.dl')) {
+    return 'web';
+  }
+  if (s.contains('bluray') || s.contains('blu-ray') || s.contains('bdrip') || s.contains('brrip')) {
+    return 'bluray';
+  }
+  if (s.contains('hdtv')) return 'hdtv';
+  if (s.contains('softsub') || s.contains('soft sub') || s.contains('سافت')) return 'softsub';
+  if (s.contains('hardsub') || s.contains('hard sub') || s.contains('هارد')) return 'hardsub';
+  return '';
+}
+
+/// Packs whose cut matches [wantType] come first. No match leaves [ranked] unchanged so a
+/// SoftSub file can still try the closest BluRay/WEB timeline.
+List<SubplusPack> sushiPreferSubtitleCut(List<SubplusPack> ranked, String wantType) {
+  if (wantType.isEmpty || ranked.length < 2) return ranked;
+  final same = <SubplusPack>[];
+  final rest = <SubplusPack>[];
+  for (final p in ranked) {
+    final blob = '${p.title} ${p.releases.join(' ')}';
+    if (sushiSubtitleCutType(blob) == wantType) {
+      same.add(p);
+    } else {
+      rest.add(p);
+    }
+  }
+  if (same.isEmpty) return ranked;
+  return [...same, ...rest];
+}
+
+/// End of the last cue, in seconds. 0 when [text] has no SRT/ASS timestamp.
+int sushiSubtitleTimelineSeconds(String text) {
+  final re = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})');
+  var maxEnd = 0;
+  for (final line in text.split('\n')) {
+    final low = line.toLowerCase();
+    if (!line.contains('-->') && !low.contains('dialogue:')) continue;
+    final matches = re.allMatches(line).toList();
+    if (matches.isEmpty) continue;
+    final m = matches.last;
+    final h = int.parse(m.group(1)!);
+    final min = int.parse(m.group(2)!);
+    final sec = int.parse(m.group(3)!);
+    var frac = m.group(4)!;
+    while (frac.length < 3) {
+      frac = '${frac}0';
+    }
+    final ms = int.parse(frac.substring(0, 3));
+    final end = h * 3600 + min * 60 + sec;
+    final whole = ms >= 500 ? end + 1 : end;
+    if (whole > maxEnd) maxEnd = whole;
+  }
+  return maxEnd;
+}
+
+int sushiPlayingDurationSeconds(Object src) {
+  try {
+    final d = sushiRead(src, mediaPlaybackProvider).duration;
+    if (d > Duration.zero) return d.inSeconds;
+  } catch (_) {}
+  final rt = sushiRead(src, playBackModel)?.item.overview.runTime;
+  if (rt != null && rt > Duration.zero) return rt.inSeconds;
+  return 0;
+}
+
 /// Second subtitle provider (doc 15 §7), server-proxied so subdl's key never reaches this device.
 /// Same return shape as [_fetchSubplusFile]. Search matches tmdb_id; each hit is a ZIP that
 /// *should* contain one .srt/.ass. Empty zips (`zip has no .srt/.ass files`) are an ERR, so
@@ -643,13 +713,24 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
   final episode = sushiPlayingEpisode(src);
   final subdlLang = lang == 'persian' ? 'FA' : 'EN';
   try {
-    _log('subdl_fetch', {'lang': lang, 'title': title ?? '', 'tmdbId': tmdbId});
+    final sourceLabel = sushiPlayingSourceLabel(src) ?? '';
+    final wantSeconds = sushiPlayingDurationSeconds(src);
+    final wantMin = wantSeconds <= 0 ? 0 : (wantSeconds / 60).round();
+    _log('subdl_fetch', {
+      'lang': lang,
+      'title': title ?? '',
+      'tmdbId': tmdbId,
+      'durationMin': wantMin,
+      'source': sourceLabel,
+    });
     final res = await sushiFetchSubtitles(
       tmdbId: tmdbId,
       kind: episode != null ? 2 : 1,
       seasonNo: episode?.season ?? 0,
       episodeNo: episode?.episode ?? 0,
       lang: subdlLang,
+      durationMin: wantMin,
+      sourceLabel: sourceLabel,
     );
     if (res == null || res.packs.isEmpty) {
       _log('subdl_fetch_empty', {'lang': lang, 'title': title ?? ''});
@@ -674,13 +755,15 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
     final ranked = rankSubplusPacks(
       packs,
       episode: episode,
-      sourceLabel: sushiPlayingSourceLabel(src),
+      sourceLabel: sourceLabel,
     );
     if (ranked.isEmpty) {
       _log('subdl_fetch_empty', {'lang': lang, 'title': title ?? '', 'reason': 'no_rank_match'});
       return null;
     }
-    final attempts = sushiSubtitlePackAttemptWindow(ranked);
+    final attempts = sushiSubtitlePackAttemptWindow(
+      sushiPreferSubtitleCut(ranked, sushiSubtitleCutType(sourceLabel)),
+    );
     final kind = episode != null ? 2 : 1;
     final seasonNo = episode?.season ?? 0;
     final episodeNo = episode?.episode ?? 0;
@@ -690,6 +773,10 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
     // for video, so the live push can never land before something is listening for it.
     final locator = 'sub_${tmdbId}_${kind}_${seasonNo}_${episodeNo}_$subdlLang';
     await sushiArmDeliveryWaiter(locator);
+    var bestText = '';
+    var bestLabel = '';
+    var bestExt = '.srt';
+    var bestDelta = 1 << 30;
     for (var i = 0; i < attempts.length; i++) {
       final top = attempts[i];
       final rawTag = top.tag.startsWith('subdl:') ? top.tag.substring('subdl:'.length) : top.tag;
@@ -715,18 +802,25 @@ Future<({SubplusSubFile file, String label})?> _fetchSubdlFile(Object src, {requ
         _log('subdl_try_miss', {'i': i, 'reason': 'empty_document'});
         continue;
       }
-      _log('subdl_pick', {'lang': lang, 'pack': top.title, 'attempt': i});
-      return (
-        file: SubplusSubFile(
-          name: top.title,
-          ext: fileRes.ext.isNotEmpty ? fileRes.ext : '.srt',
-          text: text,
-        ),
-        label: top.title,
-      );
+      final cueSeconds = sushiSubtitleTimelineSeconds(text);
+      final delta = wantSeconds <= 0 || cueSeconds <= 0 ? 0 : (cueSeconds - wantSeconds).abs();
+      _log('subdl_try_len', {'i': i, 'cueSec': cueSeconds, 'wantSec': wantSeconds, 'delta': delta});
+      if (bestText.isEmpty || delta < bestDelta) {
+        bestText = text;
+        bestLabel = top.title;
+        bestExt = fileRes.ext.isNotEmpty ? fileRes.ext : '.srt';
+        bestDelta = delta;
+      }
     }
-    _log('subdl_fetch_error', {'lang': lang, 'reason': 'all_packs_empty', 'tried': attempts.length});
-    return null;
+    if (bestText.isEmpty) {
+      _log('subdl_fetch_error', {'lang': lang, 'reason': 'all_packs_empty', 'tried': attempts.length});
+      return null;
+    }
+    _log('subdl_pick', {'lang': lang, 'pack': bestLabel, 'deltaSec': bestDelta});
+    return (
+      file: SubplusSubFile(name: bestLabel, ext: bestExt, text: bestText),
+      label: bestLabel,
+    );
   } catch (e, st) {
     _log('subdl_fetch_error', {
       'lang': lang,

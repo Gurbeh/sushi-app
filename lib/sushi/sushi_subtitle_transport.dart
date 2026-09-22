@@ -16,6 +16,8 @@ Future<SushiSubtitleRes?> sushiFetchSubtitles({
   int seasonNo = 0,
   int episodeNo = 0,
   String lang = '',
+  int durationMin = 0,
+  String sourceLabel = '',
 }) async {
   if (tmdbId == 0) return null;
 
@@ -29,7 +31,15 @@ Future<SushiSubtitleRes?> sushiFetchSubtitles({
   final requestText = sushiEncodeRequestText(
     'subtitle',
     corr,
-    sushiEncodeSubtitleReq(tmdbId: tmdbId, kind: kind, seasonNo: seasonNo, episodeNo: episodeNo, lang: lang),
+    sushiEncodeSubtitleReq(
+      tmdbId: tmdbId,
+      kind: kind,
+      seasonNo: seasonNo,
+      episodeNo: episodeNo,
+      lang: lang,
+      durationMin: durationMin,
+      sourceLabel: sourceLabel,
+    ),
   );
 
   try {
