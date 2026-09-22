@@ -36,6 +36,20 @@ def minor = pubspecVersionMatcher.group(2).toInteger()
 def patch = pubspecVersionMatcher.group(3).toInteger()
 def semanticVersionName = "${major}.${minor}.${patch}"
 def computedVersionCode = (major * 100000) + (minor * 1000) + patch
+
+// CI passes --build-name=M.m.p-nightly.<code>. Keep that string as versionName so the
+// installed app matches the shelf. versionCode stays the semver formula: the CI run number
+// is smaller than major*100000 and Android would refuse the update as a downgrade.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
+}
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+def versionNameForApk = semanticVersionName
+if (flutterVersionName != null && flutterVersionName.contains('-nightly')) {
+    versionNameForApk = flutterVersionName
+}
 if (computedVersionCode < 100001) {
     throw new GradleException(
             "computedVersionCode ${computedVersionCode} is below minimum 100001. " +
@@ -86,7 +100,7 @@ android {
         minSdkVersion flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = computedVersionCode
-        versionName = semanticVersionName
+        versionName = versionNameForApk
 
         // Do NOT set ndk.abiFilters here: `flutter build apk --split-per-abi` (CI) already
         // configures splits.abi (armeabi-v7a, arm64-v8a, x86_64) and Gradle fails if both exist.

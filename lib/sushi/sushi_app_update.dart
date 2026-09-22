@@ -140,10 +140,13 @@ bool sushiIsNewerApp(String currentVersion, String latestVersion) {
   if (latest == null) return false;
   if (latest.isNewerThan(current)) return true;
   if (current.isNewerThan(latest)) return false;
+  // Same numbers. Android's versionName is the plain semver (build.gradle), while the shelf
+  // version is `M.m.p-nightly.<code>`. Treating that suffix as newer loops the prompt forever
+  // after the tester installs the build. A later nightly bumps the patch, so it still prompts.
+  // Two nightlies that both carry a serial still compare those serials.
   final latestNightly = sushiNightlySerial(latestVersion);
   final currentNightly = sushiNightlySerial(currentVersion);
-  if (latestNightly == null) return false;
-  if (currentNightly == null) return true;
+  if (latestNightly == null || currentNightly == null) return false;
   return latestNightly > currentNightly;
 }
 

@@ -61,10 +61,12 @@ void main() {
     expect(sushiMsgTypeAppUpdateRes, 31);
   });
 
-  test('sushiIsNewerApp treats same-number nightly as newer than stable', () {
+  test('sushiIsNewerApp does not nag a same-number nightly over the installed semver', () {
     expect(sushiIsNewerApp('1.1.150', '1.2.0'), isTrue);
+    expect(sushiIsNewerApp('1.1.200', '1.1.201-nightly.15234'), isTrue);
     expect(sushiIsNewerApp('1.2.0', '1.2.0'), isFalse);
-    expect(sushiIsNewerApp('1.2.0', '1.2.0-nightly'), isTrue);
+    expect(sushiIsNewerApp('1.2.0', '1.2.0-nightly'), isFalse);
+    expect(sushiIsNewerApp('1.2.0', '1.2.0-nightly.15234'), isFalse);
     expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0'), isFalse);
     expect(sushiIsNewerApp('1.2.0-nightly', '1.2.0-nightly'), isFalse);
     expect(sushiIsNewerApp('1.2.0-nightly.10', '1.2.0-nightly.11'), isTrue);
