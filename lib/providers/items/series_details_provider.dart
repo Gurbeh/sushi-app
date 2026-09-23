@@ -19,6 +19,7 @@ import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
 import 'package:fladder/sushi/sushi_screen_telemetry.dart';
+import 'package:fladder/sushi/sushi_season_availability.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
 import 'package:fladder/sushi/sushi_variant_preference_store.dart';
 
@@ -132,6 +133,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       if (loadGen == _loadGeneration && filesKnown) {
         ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
       }
+      unawaited(_loadIncompleteSeasons(loadGen));
     } catch (e, s) {
       log('[sushi] series details: refresh failed tmdbId=$tmdbId: $e', stackTrace: s);
     }
@@ -183,6 +185,38 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     return loaded;
   }
 
+  Future<SeriesModel> _attachCachedSeasons(SeriesModel series) async {
+    final tmdbId = sushiTmdbIdFromItemId(series.id);
+    if (tmdbId == null) return series;
+    final catalog = ref.read(sushiCatalogControllerProvider);
+    var next = series;
+    for (final season in series.seasons ?? const []) {
+      if (sushiSeasonEpisodeListComplete(
+        next.seasons?.firstWhereOrNull((s) => s.season == season.season) ?? season,
+      )) {
+        continue;
+      }
+      final wire = await catalog.peekSeason(
+        tmdbId: tmdbId,
+        kind: SushiKind.series,
+        seasonNo: season.season,
+      );
+      if (wire == null || wire.isEmpty) continue;
+      next = sushiMergeSeasonEpisodes(next, season.season, sushiEpisodesFromWire(next, wire));
+    }
+    return next;
+  }
+
+  /// Lite `/item` omits the episode list (ADR 0028). Watched ticks need every
+  /// episode, so fill any season the cache did not already have.
+  Future<void> _loadIncompleteSeasons(int loadGen) async {
+    final seasons = [...?state?.seasons];
+    for (final season in seasons) {
+      if (!mounted || loadGen != _loadGeneration) return;
+      await loadSeason(season.season);
+    }
+  }
+
   Future<SeriesModel> _paintWatchState(
     SeriesModel series, {
     SushiFilesRes? files,
@@ -192,12 +226,28 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     final resume = tmdbId == null
         ? null
         : await sushiContinueFind(tmdbId: tmdbId, kind: SushiKind.series);
+    final withSeasons = await _attachCachedSeasons(series);
+    final extra = await _playedIdsFromMirror(withSeasons);
+    if (extra.isNotEmpty) {
+      unawaited(ref.read(sushiCatalogItemFlagsProvider.notifier).setPlayedMany(extra, true));
+    }
     return sushiPaintSeriesWatchState(
-      series,
-      playedIds: ref.read(sushiCatalogItemFlagsProvider).playedIds,
+      withSeasons,
+      playedIds: {...ref.read(sushiCatalogItemFlagsProvider).playedIds, ...extra},
       resume: resume,
       files: files,
       filesEpisodeId: filesEpisodeId,
     );
+  }
+
+  Future<Set<String>> _playedIdsFromMirror(SeriesModel series) async {
+    final catalog = ref.read(sushiCatalogControllerProvider);
+    final ids = <String>{};
+    for (final episode in series.availableEpisodes ?? const []) {
+      final episodeId = sushiEpisodeIdFromItemId(episode.id);
+      if (episodeId == null || episodeId <= 0) continue;
+      if (await catalog.isEpisodeWatched(episodeId)) ids.add(episode.id);
+    }
+    return ids;
   }
 }

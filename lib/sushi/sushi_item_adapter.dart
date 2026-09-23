@@ -75,6 +75,8 @@ int? sushiEpisodeIdFromItemId(String itemId) {
   return int.tryParse(itemId.substring(_sushiEpisodeIdPrefix.length));
 }
 
+String sushiEpisodeItemId(int episodeId) => '$_sushiEpisodeIdPrefix$episodeId';
+
 /// Builds the [MediaStreamsModel] Fladder's play button / quality picker read
 /// (`sushiMovieHasPlayableMedia`/`sushiShowMediaStreamHelper` both just check
 /// `versionStreams.isNotEmpty`) from Sushi's compact [SushiFile] pick-list. Each file becomes one

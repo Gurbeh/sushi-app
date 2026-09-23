@@ -177,6 +177,24 @@ class SushiCatalogItemFlags extends _$SushiCatalogItemFlags {
     await _writeLocalPlayed(next);
   }
 
+  /// Cross-device sync delta (docs/11 §6.1). [ids] are `sushi_ep_<n>`.
+  Future<void> applyWatchedIds(Map<String, bool> marks) async {
+    if (marks.isEmpty) return;
+    final next = {...state.playedIds};
+    var changed = false;
+    for (final entry in marks.entries) {
+      if (entry.key.isEmpty) continue;
+      if (entry.value) {
+        changed = next.add(entry.key) || changed;
+      } else {
+        changed = next.remove(entry.key) || changed;
+      }
+    }
+    if (!changed) return;
+    state = state.copyWith(playedIds: next);
+    await _writeLocalPlayed(next);
+  }
+
   void setWatchlisted(String id, bool value) {
     if (id.isEmpty) return;
     final next = {...state.watchlistIds};

@@ -11,6 +11,9 @@ import 'package:fladder/util/humanize_duration.dart';
 import 'package:fladder/util/item_base_model/item_base_model_extensions.dart';
 import 'package:fladder/util/list_padding.dart';
 import 'package:fladder/util/localization_helper.dart';
+import 'package:fladder/util/refresh_state.dart';
+import 'package:fladder/widgets/shared/item_actions.dart';
+import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 
 enum EpisodeDetailsViewType {
   list(icon: IconsaxPlusBold.grid_6),
@@ -54,11 +57,12 @@ class EpisodeDetailsList extends ConsumerWidget {
               List<Widget> children = [
                 Flexible(
                   flex: 1,
-                  child: EpisodePoster(
+                  child:                     EpisodePoster(
                     episode: episode,
                     showLabel: false,
                     actions: episode.generateActions(context, ref),
                     onTap: () => episode.navigateTo(context),
+                    onLongPress: () => _openEpisodeActions(context, ref, episode),
                     isCurrentEpisode: false,
                   ),
                 ),
@@ -144,6 +148,7 @@ class EpisodeDetailsList extends ConsumerWidget {
                 episode: episode,
                 actions: episode.generateActions(context, ref),
                 onTap: () => episode.navigateTo(context),
+                onLongPress: () => _openEpisodeActions(context, ref, episode),
                 isCurrentEpisode: false,
               );
             },
@@ -151,4 +156,20 @@ class EpisodeDetailsList extends ConsumerWidget {
       },
     );
   }
+}
+
+void _openEpisodeActions(BuildContext context, WidgetRef ref, EpisodeModel episode) {
+  showBottomSheetPill(
+    context: context,
+    item: episode,
+    content: (context, scrollController) {
+      return ListView(
+        shrinkWrap: true,
+        controller: scrollController,
+        children: episode.generateActions(context, ref).listTileItems(context, useIcons: true).toList(),
+      );
+    },
+  ).then((_) {
+    if (context.mounted) context.refreshData();
+  });
 }

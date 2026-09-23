@@ -26,8 +26,10 @@ List<String> sushiSeasonPlayedFlagIds(Iterable<EpisodeModel> episodes) {
 /// **one** play-target — that is not the season. Always `loadSeason` /
 /// `openSeason` when the list is short of `episodeCount`. Never write `season.id`.
 ///
-/// Do not `fetchDetails` the series after: thin `/item` wipes the loaded
-/// season list. Merge locally; posters paint from `playedIds`.
+/// `markManyPlayed` paints locally and sends `WatchedEvent` so `user_episode_state`
+/// survives refresh, logout, and another device. Do not `fetchDetails` the series
+/// after: thin `/item` wipes the loaded season list. Merge locally; posters paint
+/// from `playedIds`.
 Future<void> sushiSeasonMarkPlayed(WidgetRef ref, SeasonModel season, bool played) async {
   final episodes = await sushiSeasonEpisodesForWatch(ref, season);
   final episodeIds = sushiSeasonPlayedFlagIds(episodes);

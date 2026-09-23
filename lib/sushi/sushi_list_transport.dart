@@ -139,6 +139,53 @@ Future<void> sushiSendProgEvent({
   await _sendEvent(eventField: 4, inner: inner.toBytes());
 }
 
+/// WatchedEvent { episode_id = 1; bool done = 2; } — manual mark, one `ev` batch.
+/// Season mark sends every catalog episode in one message (R-WRITE-3).
+Future<void> sushiSendWatchedMarks(List<({int episodeId, bool done})> marks) async {
+  final pending = [for (final mark in marks) if (mark.episodeId > 0) mark];
+  if (pending.isEmpty) return;
+  const chunk = 80;
+  for (var i = 0; i < pending.length; i += chunk) {
+    final end = i + chunk > pending.length ? pending.length : i + chunk;
+    await _sendWatchedChunk(pending.sublist(i, end));
+  }
+}
+
+Future<void> _sendWatchedChunk(List<({int episodeId, bool done})> marks) async {
+  final assignment = await SushiAssignmentStore.load();
+  if (assignment == null || assignment.pending || assignment.apiSendTargets.isEmpty) {
+    return;
+  }
+  final events = BytesBuilder();
+  _writeTag(events, 1, 0);
+  events.add(sushiUvarint(DateTime.now().millisecondsSinceEpoch & 0x3fffffff));
+  for (final mark in marks) {
+    final inner = BytesBuilder();
+    _writeTag(inner, 1, 0);
+    inner.add(sushiUvarint(mark.episodeId));
+    if (mark.done) {
+      _writeTag(inner, 2, 0);
+      inner.add(sushiUvarint(1));
+    }
+    final innerBytes = inner.toBytes();
+    final event = BytesBuilder();
+    _writeTag(event, 5, 2);
+    event.add(sushiUvarint(innerBytes.length));
+    event.add(innerBytes);
+    final evBytes = event.toBytes();
+    _writeTag(events, 2, 2);
+    events.add(sushiUvarint(evBytes.length));
+    events.add(evBytes);
+  }
+  final corr = sushiNewCorrBase36();
+  final requestText = sushiEncodeRequestText('ev', corr, events.toBytes());
+  try {
+    await sushiSendTextFireAndForget(username: sushiNextApiBot(assignment), text: requestText);
+  } catch (e) {
+    debugPrint('[sushi] ev watched failed: $e');
+  }
+}
+
 void _writeTag(BytesBuilder b, int field, int wire) =>
     b.add(sushiUvarint((field << 3) | wire));
 

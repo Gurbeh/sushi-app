@@ -166,19 +166,22 @@ class SushiCatalogController {
   /// `user_episode_state.seq` and merges it into the local mirror. Loops while the reply says
   /// more is waiting (capped so a bad server reply cannot spin forever), same pattern as
   /// [openSeason]'s page loop.
-  Future<void> refreshWatchedState() {
+  Future<List<SushiWatchedState>> refreshWatchedState() {
     return _exclusiveRead(() async {
+      final applied = <SushiWatchedState>[];
       var loops = 0;
       while (loops < 50) {
         loops++;
         final watermark = await _store.readWatchedWatermark();
         final res = await _fetchSync(watchedWatermark: watermark);
-        if (res == null) return;
+        if (res == null) return applied;
         if (res.watched.isNotEmpty || res.watchedWatermark != watermark) {
           await _store.applyWatchedDelta(res.watched, res.watchedWatermark);
+          applied.addAll(res.watched);
         }
-        if (!res.watchedMore) return;
+        if (!res.watchedMore) return applied;
       }
+      return applied;
     });
   }
 

@@ -13,8 +13,11 @@ import 'package:fladder/models/api_result.dart';
 import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/items/item_shared_models.dart';
 import 'package:fladder/models/library_filters_model.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
+import 'package:fladder/sushi/sushi_item_adapter.dart';
+import 'package:fladder/sushi/sushi_list_transport.dart';
 import 'package:fladder/providers/api_provider.dart';
 import 'package:fladder/providers/service_provider.dart';
 import 'package:fladder/providers/shared_provider.dart';
@@ -153,8 +156,10 @@ class User extends _$User {
     return Response(response.base, UserData.fromDto(response.body));
   }
 
-  /// Client-owned flags only. Skip Jellyfin — bulk season mark used to wait
-  /// on 24 serial POSTs that time out, so the UI never painted.
+  /// Local flags paint immediately. Catalog episode ids also persist on
+  /// `user_episode_state` (WatchedEvent) so refresh, logout, and other devices
+  /// see the same mark. Skip Jellyfin — bulk season mark used to wait on 24
+  /// serial POSTs that time out, so the UI never painted.
   Future<void> markManyPlayed(bool enable, List<String> itemIds) async {
     final ids = [for (final id in itemIds) if (id.isNotEmpty) id];
     if (ids.isEmpty) return;
@@ -166,6 +171,19 @@ class User extends _$User {
         unawaited(sushiContinueForgetEpisode(id));
       }
     }
+    final episodeIds = <int>[
+      for (final id in ids)
+        if (sushiEpisodeIdFromItemId(id) case final episodeId?)
+          if (episodeId > 0) episodeId,
+    ];
+    if (episodeIds.isEmpty) return;
+    final catalog = ref.read(sushiCatalogControllerProvider);
+    for (final episodeId in episodeIds) {
+      unawaited(catalog.markEpisodeWatchedLocally(episodeId, enable));
+    }
+    unawaited(sushiSendWatchedMarks([
+      for (final episodeId in episodeIds) (episodeId: episodeId, done: enable),
+    ]));
   }
 
   Future<Response<UserData>?> markAsPlayed(bool enable, String itemId) async {
