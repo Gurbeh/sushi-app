@@ -18,6 +18,7 @@ import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/sushi_movie_watch_state.dart';
+import 'package:fladder/sushi/providers/sushi_trailer_provider.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -58,6 +59,8 @@ class MovieDetails extends _$MovieDetails {
         final catalog = ref.read(sushiCatalogControllerProvider);
         final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.movie);
         if (cached?.page != null) {
+          // Drop a trailer result locked in before this page had a key.
+          ref.invalidate(sushiTrailerStateProvider((itemId: item.id, kind: SushiKind.movie)));
           final localPreference = await _localVariantPreference(enrichBase);
           var painted = sushiEnrichMovieModel(
             enrichBase,
@@ -99,6 +102,9 @@ class MovieDetails extends _$MovieDetails {
         log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
         return;
       }
+      // openTitle may have just written trailerKey. The button peeks once and
+      // keeps that result, so reread after the page lands.
+      ref.invalidate(sushiTrailerStateProvider((itemId: item.id, kind: SushiKind.movie)));
       final enrichBase = state ?? item;
       final localPreference = await _localVariantPreference(enrichBase);
       var next = sushiEnrichMovieModel(

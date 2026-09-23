@@ -14,6 +14,7 @@ import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/providers/sushi_trailer_provider.dart';
 import 'package:fladder/sushi/sushi_play_warmup.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
@@ -51,6 +52,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         final catalog = ref.read(sushiCatalogControllerProvider);
         final cached = await catalog.peekTitle(tmdbId: tmdbId, kind: SushiKind.series);
         if (cached?.page != null) {
+          ref.invalidate(sushiTrailerStateProvider((itemId: seriesModel.id, kind: SushiKind.series)));
           var painted = sushiEnrichSeriesModel(seriesModel, cached!.page!);
           final cachedFilesEpisodeId = cached.page!.episodes.firstOrNull?.episodeId;
           painted = await _paintWatchState(
@@ -98,6 +100,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
         log('[sushi] series details: itemRes null tmdbId=$tmdbId');
         return;
       }
+      ref.invalidate(sushiTrailerStateProvider((itemId: seriesModel.id, kind: SushiKind.series)));
       var next = sushiEnrichSeriesModel(seriesModel, snap.page!);
       // Resume stub (E13) must land before we pick whose `/files` to fetch. `/item` only
       // wires the first episode (ADR 0028); nextUp before paint is always that row.
