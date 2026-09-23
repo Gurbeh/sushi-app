@@ -10,6 +10,10 @@ const kSushiHttpUserAgent =
 /// sub-plus.ir (keyless Persian subtitle API; ZIP may be plain HTTP),
 /// generativelanguage.googleapis.com (user-owned Gemini key, not ours),
 /// and OpenSubtitles.com (anonymous 5 downloads/day English fallback for AI translate).
+///
+/// www.youtube-nocookie.com (ADR 0031): the in-app trailer player's WebView navigates here only,
+/// never www.youtube.com -- the privacy-enhanced embed domain, same host apps commonly use to
+/// avoid YouTube's tracking cookies on a page the viewer never asked to visit YouTube itself for.
 bool sushiHttpUriAllowed(Uri uri) {
   final host = uri.host.toLowerCase();
   if (host == 'sub-plus.ir') {
@@ -17,6 +21,7 @@ bool sushiHttpUriAllowed(Uri uri) {
   }
   if (uri.scheme != 'https') return false;
   if (host == 'image.tmdb.org') return true;
+  if (host == 'www.youtube-nocookie.com') return true;
   if (host == 'generativelanguage.googleapis.com') return true;
   if (_openSubtitlesHost(host)) return true;
   if (uri.host == 't.me' && uri.path == '/s/${SushiConfig.loginChannelUsername}') {

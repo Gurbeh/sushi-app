@@ -85,7 +85,7 @@ class OxTelegramClient(
         cacheDir: String,
         locator: String,
     ): PlaybackSession =
-        GomobileCallGate.enter {
+        GomobileCallGate.enter("startPlayback") {
             native.startPlaybackSession(providerBotId, messageId, cacheDir, locator)
         }
 
@@ -94,7 +94,7 @@ class OxTelegramClient(
      * path. Still a real MTProto call, so it belongs on Dispatchers.IO.
      */
     suspend fun warmDelivery(providerBotId: Long, messageId: Long, locator: String) =
-        GomobileCallGate.enter { native.warmDelivery(providerBotId, messageId, locator) }
+        GomobileCallGate.enter("warmDelivery") { native.warmDelivery(providerBotId, messageId, locator) }
 
     /**
      * Starts, mutes and archives every delivery sender. [botsJson] is
@@ -109,12 +109,13 @@ class OxTelegramClient(
      * returning before the JNI runs is safe: Go already buffers an early push (pushArrived).
      */
     fun armDeliveryWaiter(locator: String) {
-        GomobileCallGate.enqueue { native.armDeliveryWaiter(locator) }
+        GomobileCallGate.enqueue("armWaiter") { native.armDeliveryWaiter(locator) }
     }
 
     /** Message id + sending bot this session read for [locator], or zeros. */
     fun deliveryRef(locator: String): Pair<Long, Long> =
         GomobileCallGate.tryEnterBlocking(
+            op = "deliveryRef",
             ifBusy = { deliveryRefCache[locator] ?: (0L to 0L) },
         ) {
             val id = native.deliveryMessageIDForLocator(locator)
@@ -141,7 +142,7 @@ class OxTelegramClient(
 
     /** DMs [username] with [text]; returns next '!' framed reply (Sushi /initbot). */
     suspend fun sendTextAndWaitReply(username: String, text: String, timeoutMs: Int): String =
-        GomobileCallGate.enter { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
+        GomobileCallGate.enter("sendText") { native.sendTextAndWaitReply(username, text, timeoutMs.toLong()) }
 
     /** Whole subtitle document from this session's chat (doc 15 §7 live-push resolve). */
     suspend fun fetchSmallDocument(
@@ -150,14 +151,14 @@ class OxTelegramClient(
         locator: String,
         timeoutMs: Int,
         cacheDir: String,
-    ): String = GomobileCallGate.enter {
+    ): String = GomobileCallGate.enter("fetchSmall") {
         native.fetchSmallDocument(botId, messageId, locator, timeoutMs.toLong(), cacheDir)
     }
 
     /** DMs [username] with [text] without waiting for a reply (Sushi `/ack`, future watch-progress
      *  reports) — see mobile.Client.SendTextFireAndForget. */
     suspend fun sendTextFireAndForget(username: String, text: String) =
-        GomobileCallGate.enter { native.sendTextFireAndForget(username, text) }
+        GomobileCallGate.enter("sendFire") { native.sendTextFireAndForget(username, text) }
 
     /** Clicks a session account through main-bot's onboarding conversation (Sushi /initbot). */
     suspend fun ensureMainBotOnboarded(username: String, timeoutMs: Int) =

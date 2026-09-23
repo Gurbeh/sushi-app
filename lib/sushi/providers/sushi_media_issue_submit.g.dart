@@ -7,7 +7,7 @@ part of 'sushi_media_issue_submit.dart';
 // **************************************************************************
 
 String _$sushiMediaIssueSubmitHash() =>
-    r'c275c67f1dc0cc49cbf9f3e44b247d5e569be3af';
+    r'a0e02d67454c20c4ef4e78f3d32ad501441fd9cd';
 
 /// See also [SushiMediaIssueSubmit].
 @ProviderFor(SushiMediaIssueSubmit)

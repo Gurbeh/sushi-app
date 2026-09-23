@@ -355,7 +355,7 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
                 val fileId = playbackIdCounter.incrementAndGet()
                 fetchers[fileId] = OxTelegramFileFetcher(session)
                 currentPlaybackFileId = fileId
-                val (size, mime) = GomobileCallGate.enter {
+                val (size, mime) = GomobileCallGate.enter("sessionMeta") {
                     session.size() to session.mimeType()
                 }
                 Log.i("OXPLAY_TDLIB", "startPlaybackSession resolved fileId=$fileId size=$size mime=$mime")

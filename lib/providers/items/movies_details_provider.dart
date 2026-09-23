@@ -88,6 +88,7 @@ class MovieDetails extends _$MovieDetails {
   }
 
   Future<void> _sushiRefreshMovie(MovieModel item, int tmdbId, int loadGen) async {
+    var filesKnown = false;
     try {
       final snap = await ref.read(sushiCatalogControllerProvider).openTitle(
             tmdbId: tmdbId,
@@ -110,9 +111,12 @@ class MovieDetails extends _$MovieDetails {
       next = await _paintWatchState(next, files: snap.filesRes);
       if (loadGen != _loadGeneration) return;
       state = next;
+      filesKnown = snap.filesKnown;
       sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
     } finally {
-      if (loadGen == _loadGeneration) {
+      // A timed-out /files is not "no file". Home rows are playable; Request waits
+      // until the file list actually arrived.
+      if (loadGen == _loadGeneration && filesKnown) {
         ref.read(sushiTitleResolvedProvider.notifier).markResolved(item.id);
       }
     }

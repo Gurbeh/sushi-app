@@ -7,7 +7,7 @@ part of 'sushi_watchlist_dashboard.dart';
 // **************************************************************************
 
 String _$sushiWatchlistDashboardHash() =>
-    r'5cbc9da4cc5466aa86ffbfa9fce57f239fc95ba0';
+    r'259d6704412b9413bccc7f4d6ff393a05be5f010';
 
 /// See also [sushiWatchlistDashboard].
 @ProviderFor(sushiWatchlistDashboard)

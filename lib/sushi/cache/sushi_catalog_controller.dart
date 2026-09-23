@@ -9,6 +9,8 @@ import 'package:fladder/sushi/sushi_home_unique.dart';
 import 'package:fladder/sushi/sushi_home_transport.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
 import 'package:fladder/sushi/sushi_item_transport.dart';
+import 'package:fladder/sushi/sushi_sync_pb.dart';
+import 'package:fladder/sushi/sushi_sync_transport.dart';
 
 export 'package:fladder/sushi/cache/sushi_catalog_store.dart';
 
@@ -49,6 +51,7 @@ typedef SushiEpisodesFetcher = Future<SushiEpisodesRes?> Function({
   int page,
 });
 typedef SushiHomeFetcher = Future<SushiHomeRes?> Function({required int tab});
+typedef SushiSyncFetcher = Future<SushiSyncRes?> Function({required int watchedWatermark});
 typedef SushiCatalogSessionOwner = Future<String> Function();
 typedef SushiCatalogOwnerRead = Future<String> Function();
 typedef SushiCatalogOwnerWrite = Future<void> Function(String owner);
@@ -64,6 +67,7 @@ class SushiCatalogController {
     SushiFilesFetcher fetchFiles = sushiFetchFiles,
     SushiEpisodesFetcher fetchEpisodes = sushiFetchEpisodes,
     SushiHomeFetcher fetchHome = sushiFetchHome,
+    SushiSyncFetcher fetchSync = sushiFetchSync,
     DateTime Function()? clock,
     Duration prefetchGap = sushiPrefetchGap,
     Future<void> Function(Duration duration)? sleep,
@@ -74,6 +78,7 @@ class SushiCatalogController {
         _fetchFiles = fetchFiles,
         _fetchEpisodes = fetchEpisodes,
         _fetchHome = fetchHome,
+        _fetchSync = fetchSync,
         _clock = clock ?? DateTime.now,
         _prefetchGap = prefetchGap,
         _sleep = sleep ?? Future<void>.delayed;
@@ -92,6 +97,7 @@ class SushiCatalogController {
   final SushiFilesFetcher _fetchFiles;
   final SushiEpisodesFetcher _fetchEpisodes;
   final SushiHomeFetcher _fetchHome;
+  final SushiSyncFetcher _fetchSync;
   final DateTime Function() _clock;
   final Duration _prefetchGap;
   final Future<void> Function(Duration duration) _sleep;
@@ -156,16 +162,53 @@ class SushiCatalogController {
     });
   }
 
+  /// Cross-device watched-state sync (docs/11 §6.1): pulls what changed since the last applied
+  /// `user_episode_state.seq` and merges it into the local mirror. Loops while the reply says
+  /// more is waiting (capped so a bad server reply cannot spin forever), same pattern as
+  /// [openSeason]'s page loop.
+  Future<void> refreshWatchedState() {
+    return _exclusiveRead(() async {
+      var loops = 0;
+      while (loops < 50) {
+        loops++;
+        final watermark = await _store.readWatchedWatermark();
+        final res = await _fetchSync(watchedWatermark: watermark);
+        if (res == null) return;
+        if (res.watched.isNotEmpty || res.watchedWatermark != watermark) {
+          await _store.applyWatchedDelta(res.watched, res.watchedWatermark);
+        }
+        if (!res.watchedMore) return;
+      }
+    });
+  }
+
+  Future<bool> isEpisodeWatched(int episodeId) => _store.isEpisodeWatched(episodeId);
+
+  /// Immediate same-device write, ahead of the next [refreshWatchedState] round trip (docs/11 §6.1).
+  Future<void> markEpisodeWatchedLocally(int episodeId, bool done) =>
+      _store.markEpisodeWatchedLocally(episodeId, done);
+
   Future<SushiTitleSnapshot?> peekTitle({required int tmdbId, required SushiKind kind}) async {
     await _bindSession();
     final page = await _store.readTitle(tmdbId, sushiKindToWire(kind));
     if (page == null) return null;
     final episodeId = page.episodes.firstOrNull?.episodeId;
     var files = const <SushiFile>[];
+    var filesKnown = episodeId == null || episodeId == 0;
     if (episodeId != null && episodeId != 0) {
-      files = (await _store.readFiles(episodeId))?.files ?? const [];
+      final cachedFiles = await _store.readFiles(episodeId);
+      if (cachedFiles != null) {
+        files = cachedFiles.files;
+        filesKnown = true;
+      }
     }
-    return SushiTitleSnapshot(page: page, files: files, fromCache: true, lite: true);
+    return SushiTitleSnapshot(
+      page: page,
+      files: files,
+      fromCache: true,
+      lite: true,
+      filesKnown: filesKnown,
+    );
   }
 
   /// Title page only — home slider overlay. Skips `/files`.
@@ -175,6 +218,10 @@ class SushiCatalogController {
   }
 
   /// Paint from [peekTitle] first. This call does the network update.
+  /// Titles whose cached page has no trailer key. One live `/item` per controller, so a miss
+  /// does not refetch on every open.
+  final Set<String> _trailerProbed = {};
+
   Future<SushiTitleSnapshot> openTitle({
     required int tmdbId,
     required SushiKind kind,
@@ -184,11 +231,16 @@ class SushiCatalogController {
     return _exclusiveRead(() async {
       final cached = await _store.readTitle(tmdbId, sushiKindToWire(kind));
       var page = cached;
-      var lite = cached != null && !force;
+      final trailerStamp = '$tmdbId:${sushiKindToWire(kind)}';
+      final probeTrailer = cached != null &&
+          cached.trailerKey.isEmpty &&
+          !_trailerProbed.contains(trailerStamp);
+      var lite = cached != null && !force && !probeTrailer;
 
-      if (cached == null || force) {
+      if (cached == null || force || probeTrailer) {
         final live = await _fetchItem(tmdbId: tmdbId, kind: sushiKindToWire(kind));
         if (live != null) {
+          _trailerProbed.add(trailerStamp);
           page = live;
           lite = false;
           if (sushiItemResPlayable(live)) {
@@ -203,14 +255,18 @@ class SushiCatalogController {
       var positionS = 0;
       var done = false;
       var lastFileId = 0;
+      var filesKnown = true;
       if (epId != null && epId != 0) {
         final filesRes = await openFiles(episodeId: epId, force: force);
         files = filesRes.files;
         positionS = filesRes.positionS;
         done = filesRes.done;
         lastFileId = filesRes.lastFileId;
+        filesKnown = filesRes.known;
       }
-      debugPrint('[sushi] title tmdb=$tmdbId lite=$lite fromCache=${cached != null} files=${files.length}');
+      debugPrint(
+        '[sushi] title tmdb=$tmdbId lite=$lite fromCache=${cached != null} files=${files.length} filesKnown=$filesKnown',
+      );
       return SushiTitleSnapshot(
         page: page,
         files: files,
@@ -219,6 +275,7 @@ class SushiCatalogController {
         positionS: positionS,
         done: done,
         lastFileId: lastFileId,
+        filesKnown: filesKnown,
       );
     });
   }
@@ -236,7 +293,10 @@ class SushiCatalogController {
         await _store.replaceFiles(episodeId, live.files, _clock());
         return live;
       }
-      return SushiFilesRes(files: cached?.files ?? const []);
+      if (cached != null) {
+        return SushiFilesRes(files: cached.files);
+      }
+      return const SushiFilesRes(files: [], known: false);
     });
   }
 

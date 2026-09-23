@@ -15,10 +15,14 @@ import 'package:fladder/sushi/sushi_media_streams.dart';
 import 'package:fladder/sushi/sushi_media_variant.dart';
 import 'package:fladder/sushi/widgets/sushi_detail_action_layout.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
 import 'package:fladder/sushi/sushi_request_button.dart';
 import 'package:fladder/sushi/sushi_row_adapter.dart';
+import 'package:fladder/sushi/providers/sushi_trailer_provider.dart';
+import 'package:fladder/sushi/widgets/sushi_trailer_action_button.dart';
+import 'package:fladder/sushi/widgets/sushi_trailer_player.dart';
 import 'package:fladder/screens/details_screens/components/media_stream_information.dart';
 import 'package:fladder/screens/details_screens/components/overview_header.dart';
 import 'package:fladder/screens/shared/detail_scaffold.dart';
@@ -106,36 +110,41 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     name: details.name,
                     image: details.images,
                     padding: padding,
-                    mainButton: hasPlayableMedia
-                        ? MediaPlayButton(
-                            item: details,
-                            onLongPressed: (restart) async {
-                              await details.play(
-                                detailsContext,
-                                ref,
-                                showPlaybackOption: true,
-                                startPosition: restart ? Duration.zero : null,
-                              );
-                              // Sushi has no watch-progress endpoint yet — skip refetch.
-                            },
-                            onPressed: (restart) async {
-                              await details.play(
-                                detailsContext,
-                                ref,
-                                startPosition: restart ? Duration.zero : null,
-                              );
-                            },
-                          )
-                        : sushiRequestTmdb != null
-                            ? SushiRequestButton(
-                                tmdbId: sushiRequestTmdb,
-                                kind: 1,
-                                prominent: true,
-                                onAlreadyAvailable: () => ref
-                                    .read(providerInstance.notifier)
-                                    .fetchDetails(widget.item),
-                              )
-                            : null,
+                    mainButton: SushiDetailPrimaryRow(
+                      itemId: details.id,
+                      kind: SushiKind.movie,
+                      title: details.name,
+                      engaged: details.userData.played || details.progress != 0,
+                      primary: hasPlayableMedia
+                          ? MediaPlayButton(
+                              item: details,
+                              onLongPressed: (restart) async {
+                                await details.play(
+                                  detailsContext,
+                                  ref,
+                                  showPlaybackOption: true,
+                                  startPosition: restart ? Duration.zero : null,
+                                );
+                              },
+                              onPressed: (restart) async {
+                                await details.play(
+                                  detailsContext,
+                                  ref,
+                                  startPosition: restart ? Duration.zero : null,
+                                );
+                              },
+                            )
+                          : sushiRequestTmdb != null
+                              ? SushiRequestButton(
+                                  tmdbId: sushiRequestTmdb,
+                                  kind: 1,
+                                  prominent: true,
+                                  onAlreadyAvailable: () => ref
+                                      .read(providerInstance.notifier)
+                                      .fetchDetails(widget.item),
+                                )
+                              : null,
+                    ),
                     centerButtons: SushiDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
@@ -167,20 +176,32 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                         SelectableIconButton(
                           refreshOnEnd: false,
                           onPressed: () async {
+                            final trailer = await ref.read(
+                              sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.movie)).future,
+                            );
+                            if (!detailsContext.mounted) return;
+                            final actions = sushiInsertWatchedTrailer(
+                              details.generateActions(detailsContext, ref, exclude: {
+                                if (!hasPlayableMedia) ...{
+                                  ItemActions.play,
+                                  ItemActions.playFromStart,
+                                  ItemActions.download,
+                                },
+                              }),
+                              state: trailer,
+                              engaged: details.userData.played || details.progress != 0,
+                              onOpen: () => SushiTrailerPlayer.open(
+                                detailsContext,
+                                youtubeKey: trailer.trailerKey,
+                                title: details.name,
+                              ),
+                            );
                             await showBottomSheetPill(
                               context: detailsContext,
                               content: (context, scrollController) => ListView(
                                 controller: scrollController,
                                 shrinkWrap: true,
-                                children: details
-                                    .generateActions(detailsContext, ref, exclude: {
-                                  if (!hasPlayableMedia) ...{
-                                    ItemActions.play,
-                                    ItemActions.playFromStart,
-                                    ItemActions.download,
-                                  },
-                                })
-                                    .listTileItems(context, useIcons: true),
+                                children: actions.listTileItems(context, useIcons: true),
                               ),
                             );
                           },

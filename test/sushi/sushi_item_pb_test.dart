@@ -268,4 +268,14 @@ void main() {
     final res = SushiFilesRes.decode(Uint8List(0));
     expect(res.files, isEmpty);
   });
+
+  test('SushiItemRes decodes trailer_key, defaults to empty', () {
+    final rowBytes = _encodeRow(tmdbId: 603, kind: 1, title: 'The Matrix', year: 1999, rating: 87, poster: 'abc');
+    expect(SushiItemRes.decode(_lenDelim(1, rowBytes)).trailerKey, '');
+
+    final out = BytesBuilder()
+      ..add(_lenDelim(1, rowBytes))
+      ..add(_lenDelim(16, utf8.encode('dQw4w9WgXcQ')));
+    expect(SushiItemRes.decode(out.toBytes()).trailerKey, 'dQw4w9WgXcQ');
+  });
 }

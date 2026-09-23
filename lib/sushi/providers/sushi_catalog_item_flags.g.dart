@@ -6,16 +6,18 @@ part of 'sushi_catalog_item_flags.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sushiCatalogItemFlagsHash() => r'f2491c1d025e52e6950b41b4a57b2f682f9a0a47';
+String _$sushiCatalogItemFlagsHash() =>
+    r'641912d914d05aa8274897e5540a62627feebdd2';
 
 /// See also [SushiCatalogItemFlags].
 @ProviderFor(SushiCatalogItemFlags)
-final sushiCatalogItemFlagsProvider =
-    NotifierProvider<SushiCatalogItemFlags, SushiCatalogItemFlagsState>.internal(
+final sushiCatalogItemFlagsProvider = NotifierProvider<SushiCatalogItemFlags,
+    SushiCatalogItemFlagsState>.internal(
   SushiCatalogItemFlags.new,
   name: r'sushiCatalogItemFlagsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$sushiCatalogItemFlagsHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$sushiCatalogItemFlagsHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

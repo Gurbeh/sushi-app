@@ -9,6 +9,7 @@ import 'package:fladder/sushi/cache/sushi_catalog_store.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_sync_pb.dart';
 
 part 'sushi_catalog.g.dart';
 
@@ -63,12 +64,39 @@ class HomeSnapshots extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [CatalogItems, ItemPages, EpisodeFileLists, SeasonEpisodeLists, HomeSnapshots])
+/// Cross-device watched-state mirror (docs/11 §6.1): local copy of user_episode_state.done.
+class WatchedEpisodes extends Table {
+  IntColumn get episodeId => integer()();
+  BoolColumn get done => boolean()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {episodeId};
+}
+
+/// Singleton row (id=1), same pattern as [HomeSnapshots]: the last applied
+/// user_episode_state.seq, so `sync` only asks for what changed since last launch.
+class SyncState extends Table {
+  IntColumn get id => integer()();
+  IntColumn get watchedWatermark => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [
+  CatalogItems,
+  ItemPages,
+  EpisodeFileLists,
+  SeasonEpisodeLists,
+  HomeSnapshots,
+  WatchedEpisodes,
+  SyncState,
+])
 class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalogStore {
   SushiCatalogDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +104,10 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(seasonEpisodeLists);
+          }
+          if (from < 3) {
+            await m.createTable(watchedEpisodes);
+            await m.createTable(syncState);
           }
         },
       );
@@ -213,6 +245,43 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
   }
 
   @override
+  Future<bool> isEpisodeWatched(int episodeId) async {
+    final row = await (select(watchedEpisodes)..where((t) => t.episodeId.equals(episodeId)))
+        .getSingleOrNull();
+    return row?.done ?? false;
+  }
+
+  @override
+  Future<int> readWatchedWatermark() async {
+    final row = await (select(syncState)..where((t) => t.id.equals(1))).getSingleOrNull();
+    return row?.watchedWatermark ?? 0;
+  }
+
+  @override
+  Future<void> applyWatchedDelta(List<SushiWatchedState> rows, int watermark) async {
+    await transaction(() async {
+      for (final row in rows) {
+        await into(watchedEpisodes).insertOnConflictUpdate(
+          WatchedEpisodesCompanion(
+            episodeId: Value(row.episodeId),
+            done: Value(row.done),
+          ),
+        );
+      }
+      await into(syncState).insertOnConflictUpdate(
+        SyncStateCompanion(id: const Value(1), watchedWatermark: Value(watermark)),
+      );
+    });
+  }
+
+  @override
+  Future<void> markEpisodeWatchedLocally(int episodeId, bool done) async {
+    await into(watchedEpisodes).insertOnConflictUpdate(
+      WatchedEpisodesCompanion(episodeId: Value(episodeId), done: Value(done)),
+    );
+  }
+
+  @override
   Future<void> clearAll() async {
     await transaction(() async {
       await delete(catalogItems).go();
@@ -220,6 +289,8 @@ class SushiCatalogDatabase extends _$SushiCatalogDatabase implements SushiCatalo
       await delete(episodeFileLists).go();
       await delete(seasonEpisodeLists).go();
       await delete(homeSnapshots).go();
+      await delete(watchedEpisodes).go();
+      await delete(syncState).go();
     });
   }
 

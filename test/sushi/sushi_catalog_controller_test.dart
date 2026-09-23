@@ -7,12 +7,15 @@ import 'package:fladder/sushi/cache/sushi_catalog_controller.dart';
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_sync_pb.dart';
 
 class _MemStore implements SushiCatalogStore {
   final Map<String, SushiItemRes> titles = {};
   final Map<String, List<SushiEpisode>> seasons = {};
   ({List<SushiFile> files, DateTime fetchedAt})? files;
   SushiCachedHome? home;
+  final Map<int, bool> watched = {};
+  int watchedWatermark = 0;
 
   String _key(int tmdbId, int kind) => '$tmdbId:$kind';
 
@@ -57,20 +60,48 @@ class _MemStore implements SushiCatalogStore {
   Future<void> writeHome(SushiCachedHome home) async => this.home = home;
 
   @override
+  Future<bool> isEpisodeWatched(int episodeId) async => watched[episodeId] ?? false;
+
+  @override
+  Future<int> readWatchedWatermark() async => watchedWatermark;
+
+  @override
+  Future<void> applyWatchedDelta(List<SushiWatchedState> rows, int watermark) async {
+    for (final row in rows) {
+      watched[row.episodeId] = row.done;
+    }
+    watchedWatermark = watermark;
+  }
+
+  @override
+  Future<void> markEpisodeWatchedLocally(int episodeId, bool done) async {
+    watched[episodeId] = done;
+  }
+
+  @override
   Future<void> clearAll() async {
     titles.clear();
     seasons.clear();
     files = null;
     home = null;
+    watched.clear();
+    watchedWatermark = 0;
   }
 }
 
-SushiItemRes _page({required int tmdbId, required int episodeId, Uint8List? wire, List<SushiEpisode>? episodes}) {
+SushiItemRes _page({
+  required int tmdbId,
+  required int episodeId,
+  Uint8List? wire,
+  List<SushiEpisode>? episodes,
+  String trailerKey = 'has-trailer',
+}) {
   return SushiItemRes(
     row: SushiRow(tmdbId: tmdbId, kind: SushiKind.movie, title: 'Film', year: 2024, rating: 80, poster: 'abc'),
     overview: 'plot',
     releasedOn: 0,
     episodes: episodes ?? [SushiEpisode(episodeId: episodeId, seasonNo: 0, episodeNo: 0, title: 'Film')],
+    trailerKey: trailerKey,
     wire: wire ?? Uint8List.fromList([1, 2, 3]),
   );
 }
@@ -235,6 +266,50 @@ void main() {
     expect(snap.lite, isFalse);
     expect(store.title, isNotNull);
     expect(store.files, isNotNull);
+  });
+
+  test('cached page with no trailer key fetches item once', () async {
+    final store = _MemStore()..title = _page(tmdbId: 10, episodeId: 99, trailerKey: '');
+    var itemCalls = 0;
+    final catalog = SushiCatalogController(
+      store,
+      fetchItem: ({required tmdbId, required kind}) async {
+        itemCalls++;
+        return _page(tmdbId: tmdbId, episodeId: 99, trailerKey: 'ytKey');
+      },
+      fetchFiles: ({required episodeId}) async => SushiFilesRes(files: [_file(1)]),
+    );
+
+    await catalog.openTitle(tmdbId: 10, kind: SushiKind.movie);
+    await catalog.openTitle(tmdbId: 10, kind: SushiKind.movie);
+    expect(itemCalls, 1);
+    expect(store.title?.trailerKey, 'ytKey');
+  });
+
+  test('files timeout is not an empty catalog', () async {
+    final store = _MemStore()..title = _page(tmdbId: 10, episodeId: 99);
+    final catalog = SushiCatalogController(
+      store,
+      fetchItem: ({required tmdbId, required kind}) async => null,
+      fetchFiles: ({required episodeId}) async => null,
+    );
+
+    final snap = await catalog.openTitle(tmdbId: 10, kind: SushiKind.movie);
+    expect(snap.files, isEmpty);
+    expect(snap.filesKnown, isFalse);
+  });
+
+  test('server empty file list is a real miss', () async {
+    final store = _MemStore()..title = _page(tmdbId: 10, episodeId: 99);
+    final catalog = SushiCatalogController(
+      store,
+      fetchItem: ({required tmdbId, required kind}) async => null,
+      fetchFiles: ({required episodeId}) async => const SushiFilesRes(files: []),
+    );
+
+    final snap = await catalog.openTitle(tmdbId: 10, kind: SushiKind.movie);
+    expect(snap.files, isEmpty);
+    expect(snap.filesKnown, isTrue);
   });
 
   test('warm home cache skips both tab fetches', () async {
@@ -564,5 +639,66 @@ void main() {
     expect(await catalog.peekHome(), isNull);
     expect(store.home, isNull);
     expect(persisted, 'token-b');
+  });
+
+  // Cross-device watched-state sync (docs/11 §6.1).
+  test('refreshWatchedState applies the delta and advances the watermark', () async {
+    final store = _MemStore();
+    final catalog = SushiCatalogController(
+      store,
+      fetchSync: ({required watchedWatermark}) async {
+        expect(watchedWatermark, 0);
+        return const SushiSyncRes(
+          watched: [SushiWatchedState(episodeId: 1, done: true)],
+          watchedWatermark: 30,
+          watchedMore: false,
+        );
+      },
+    );
+
+    await catalog.refreshWatchedState();
+    expect(store.watched[1], true);
+    expect(store.watchedWatermark, 30);
+    expect(await catalog.isEpisodeWatched(1), true);
+  });
+
+  test('refreshWatchedState loops while watched_more is true, passing each new watermark', () async {
+    final store = _MemStore();
+    final calls = <int>[];
+    final catalog = SushiCatalogController(
+      store,
+      fetchSync: ({required watchedWatermark}) async {
+        calls.add(watchedWatermark);
+        if (watchedWatermark == 0) {
+          return const SushiSyncRes(
+            watched: [SushiWatchedState(episodeId: 1, done: true)],
+            watchedWatermark: 10,
+            watchedMore: true,
+          );
+        }
+        return const SushiSyncRes(
+          watched: [SushiWatchedState(episodeId: 2, done: true)],
+          watchedWatermark: 20,
+          watchedMore: false,
+        );
+      },
+    );
+
+    await catalog.refreshWatchedState();
+    expect(calls, [0, 10]);
+    expect(store.watched, {1: true, 2: true});
+    expect(store.watchedWatermark, 20);
+  });
+
+  test('refreshWatchedState leaves the store untouched when the fetch fails', () async {
+    final store = _MemStore()..watchedWatermark = 5;
+    final catalog = SushiCatalogController(
+      store,
+      fetchSync: ({required watchedWatermark}) async => null,
+    );
+
+    await catalog.refreshWatchedState();
+    expect(store.watched, isEmpty);
+    expect(store.watchedWatermark, 5);
   });
 }

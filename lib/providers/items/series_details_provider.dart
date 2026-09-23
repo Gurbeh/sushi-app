@@ -105,8 +105,10 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       final playEpisodeId = sushiSeriesPlayFilesEpisodeId(next);
       final firstEpisodeId = snap.page!.episodes.firstOrNull?.episodeId;
       var files = snap.filesRes;
+      var filesKnown = snap.filesKnown;
       if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
         files = await catalog.openFiles(episodeId: playEpisodeId);
+        filesKnown = files.known;
         if (loadGen != _loadGeneration) return;
       }
       next = await _paintWatchState(
@@ -124,7 +126,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       sushiPlayWarmup.scheduleFromStreams(
         (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
       );
-      if (loadGen == _loadGeneration) {
+      if (loadGen == _loadGeneration && filesKnown) {
         ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
       }
     } catch (e, s) {

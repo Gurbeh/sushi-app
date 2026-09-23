@@ -1,6 +1,8 @@
 package app.sushi.tdlibbridge.session
 
+import android.util.Log
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,11 +47,20 @@ object GomobileCallGate {
     val dispatcher = executor.asCoroutineDispatcher()
 
     private val enqueueScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val running = AtomicInteger(0)
 
-    suspend fun <T> enter(block: () -> T): T =
-        mutex.withLock {
-            withContext(dispatcher) { block() }
+    suspend fun <T> enter(op: String = "jni", block: () -> T): T {
+        Log.i("OXPLAY_TDLIB", "jni wait op=$op")
+        return mutex.withLock {
+            val n = running.incrementAndGet()
+            Log.i("OXPLAY_TDLIB", "jni run op=$op running=$n")
+            try {
+                withContext(dispatcher) { block() }
+            } finally {
+                Log.i("OXPLAY_TDLIB", "jni done op=$op running=${running.decrementAndGet()}")
+            }
         }
+    }
 
     /**
      * Sync Pigeon / platform-thread reads. If a long JNI holder already owns the gate, return
@@ -59,20 +70,33 @@ object GomobileCallGate {
      * onto [dispatcher] and then wait for [mutex] — that deadlocks the single ox-gomobile thread
      * against a holder already queued for it.
      */
-    fun <T> tryEnterBlocking(ifBusy: () -> T, block: () -> T): T {
-        if (!mutex.tryLock()) return ifBusy()
+    fun <T> tryEnterBlocking(op: String = "jni", ifBusy: () -> T, block: () -> T): T {
+        if (!mutex.tryLock()) {
+            Log.i("OXPLAY_TDLIB", "jni busy op=$op")
+            return ifBusy()
+        }
+        val n = running.incrementAndGet()
+        Log.i("OXPLAY_TDLIB", "jni run op=$op running=$n")
         return try {
             runBlocking(dispatcher) { block() }
         } finally {
+            Log.i("OXPLAY_TDLIB", "jni done op=$op running=${running.decrementAndGet()}")
             mutex.unlock()
         }
     }
 
     /** Fire-and-forget JNI (armDeliveryWaiter). Same lock order as [enter]. */
-    fun enqueue(block: () -> Unit) {
+    fun enqueue(op: String = "jni", block: () -> Unit) {
+        Log.i("OXPLAY_TDLIB", "jni enqueue op=$op")
         enqueueScope.launch {
             mutex.withLock {
-                withContext(dispatcher) { block() }
+                val n = running.incrementAndGet()
+                Log.i("OXPLAY_TDLIB", "jni run op=$op running=$n")
+                try {
+                    withContext(dispatcher) { block() }
+                } finally {
+                    Log.i("OXPLAY_TDLIB", "jni done op=$op running=${running.decrementAndGet()}")
+                }
             }
         }
     }

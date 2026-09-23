@@ -127,7 +127,7 @@ object OxTelegramStreamBridge {
         }
         scope.launch {
             val success = try {
-                GomobileCallGate.enter { session.ensureAvailable(offset, length) }
+                GomobileCallGate.enter("ensureAvailable") { session.ensureAvailable(offset, length) }
                 true
             } catch (e: Exception) {
                 Log.w(TAG, "OxTelegramStreamBridge.ensureAvailableAsync failed id=$id offset=$offset length=$length: ${e.message}")

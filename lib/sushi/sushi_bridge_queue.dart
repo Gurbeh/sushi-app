@@ -92,6 +92,8 @@ Future<String> sushiSendTextAndWaitReply({
 }) async {
   final controller = SushiTdlibBridgeController.instance();
   sushiRequestCount++;
+  final cmd = text.startsWith('/') ? text.split(' ').first : 'text';
+  debugPrint('[sushi] send start cmd=$cmd bot=$username timeoutMs=$timeoutMs');
   try {
     final reply = await _enqueue(
       () => controller.sendTextAndWaitReply(

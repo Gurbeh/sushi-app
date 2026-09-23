@@ -136,19 +136,20 @@ class SeasonPoster extends ConsumerWidget {
                   if (!context.mounted) return;
                   context.refreshData();
                 },
-                onLongPress: AdaptiveLayout.inputDeviceOf(context) == InputDevice.touch
-                    ? () {
-                        showBottomSheetPill(
-                          context: context,
-                          content: (context, scrollController) => ListView(
-                            shrinkWrap: true,
-                            controller: scrollController,
-                            children:
-                                _sushiSeasonMenuActions(context, ref, season).listTileItems(context, useIcons: true),
-                          ),
-                        );
-                      }
-                    : null,
+                // Leanback stays on dPad and IgnorePointer eats gestures, so hold-Select
+                // only opens this sheet when the callback is set. Touch-only left TV
+                // with no Mark as watched entry (episode posters always wire this).
+                onLongPress: () {
+                  showBottomSheetPill(
+                    context: context,
+                    content: (context, scrollController) => ListView(
+                      shrinkWrap: true,
+                      controller: scrollController,
+                      children:
+                          _sushiSeasonMenuActions(context, ref, season).listTileItems(context, useIcons: true),
+                    ),
+                  );
+                },
                 overlays: [
                   if (season.images?.primary == null)
                     Align(

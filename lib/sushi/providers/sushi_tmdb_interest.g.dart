@@ -6,7 +6,7 @@ part of 'sushi_tmdb_interest.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sushiTmdbInterestHash() => r'1292e8da1741cae24317b627ab4e77ee48859850';
+String _$sushiTmdbInterestHash() => r'e52d403c9160bf5a8922f3bd3f4eac138ef044fc';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -45,7 +45,8 @@ abstract class _$SushiTmdbInterest
 const sushiTmdbInterestProvider = SushiTmdbInterestFamily();
 
 /// See also [SushiTmdbInterest].
-class SushiTmdbInterestFamily extends Family<AsyncValue<SushiTmdbInterestState>> {
+class SushiTmdbInterestFamily
+    extends Family<AsyncValue<SushiTmdbInterestState>> {
   /// See also [SushiTmdbInterest].
   const SushiTmdbInterestFamily();
 
@@ -153,8 +154,8 @@ class SushiTmdbInterestProvider extends AutoDisposeAsyncNotifierProviderImpl<
   }
 
   @override
-  AutoDisposeAsyncNotifierProviderElement<SushiTmdbInterest, SushiTmdbInterestState>
-      createElement() {
+  AutoDisposeAsyncNotifierProviderElement<SushiTmdbInterest,
+      SushiTmdbInterestState> createElement() {
     return _SushiTmdbInterestProviderElement(this);
   }
 
@@ -194,7 +195,8 @@ class _SushiTmdbInterestProviderElement
   @override
   int get tmdbId => (origin as SushiTmdbInterestProvider).tmdbId;
   @override
-  SushiTmdbMediaType get mediaType => (origin as SushiTmdbInterestProvider).mediaType;
+  SushiTmdbMediaType get mediaType =>
+      (origin as SushiTmdbInterestProvider).mediaType;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

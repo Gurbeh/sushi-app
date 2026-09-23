@@ -12,6 +12,7 @@ import 'package:fladder/models/items/media_streams_model.dart';
 import 'package:fladder/models/items/trick_play_model.dart';
 import 'package:fladder/models/playback/playback_model.dart';
 import 'package:fladder/models/playback/playback_queue_state.dart';
+import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/sushi/sushi_continue_store.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_list_transport.dart';
@@ -72,7 +73,7 @@ class SushiPlaybackModel extends PlaybackModel {
 
   @override
   Future<PlaybackModel?> playbackStarted(Duration position, Ref ref) async {
-    _sendProg(position, sushiEffectiveRunTime(player: Duration.zero, catalog: item.overview.runTime));
+    _sendProg(position, sushiEffectiveRunTime(player: Duration.zero, catalog: item.overview.runTime), ref);
     return null;
   }
 
@@ -83,14 +84,14 @@ class SushiPlaybackModel extends PlaybackModel {
       catalog: item.overview.runTime,
     );
     await sushiContinueRemember(item, position, duration, nextItem: nextVideo);
-    _sendProg(position, duration, force: true);
+    _sendProg(position, duration, ref, force: true);
     return null;
   }
 
   @override
   Future<PlaybackModel?> updatePlaybackPosition(Duration position, bool isPlaying, Ref ref) async {
     final runTime = sushiEffectiveRunTime(player: Duration.zero, catalog: item.overview.runTime);
-    if (_sendProg(position, runTime)) {
+    if (_sendProg(position, runTime, ref)) {
       // Piggyback local Continue Watching persistence on the same ~30s throttle as the server
       // /ev ping, so progress survives a killed app or a native teardown that never reaches
       // stop() (see media_control_wrapper.dart's onPlaybackClosed) — not just the final position
@@ -102,7 +103,7 @@ class SushiPlaybackModel extends PlaybackModel {
 
   /// Returns true when the ping actually went out (i.e. wasn't throttled), so callers can
   /// piggyback other periodic work on the same cadence instead of re-deriving it.
-  bool _sendProg(Duration position, Duration duration, {bool force = false}) {
+  bool _sendProg(Duration position, Duration duration, Ref ref, {bool force = false}) {
     final ep = resolvedEpisodeId;
     if (ep == null) return false;
     final now = DateTime.now();
@@ -116,6 +117,12 @@ class SushiPlaybackModel extends PlaybackModel {
       fileId: sushiFileIdFromVersionStreamId(mediaStreams?.currentVersionStream?.id) ?? 0,
       durationS: duration.inSeconds,
     ));
+    // Mirrors the server's ≥90% rule (catalog.EpisodeWatched, be/internal/core/catalog/types.go)
+    // so this device's own watched-state (and the trailer-button gate it feeds) does not wait on
+    // the next cross-device sync round trip (docs/11 §6.1) just to reflect what it did itself.
+    if (duration.inSeconds > 0 && position.inSeconds * 100 >= duration.inSeconds * 90) {
+      unawaited(ref.read(sushiCatalogControllerProvider).markEpisodeWatchedLocally(ep, true));
+    }
     return true;
   }
 

@@ -388,6 +388,7 @@ class SushiItemRes {
     this.collectionName = '',
     this.collection = const [],
     this.seasons = const [],
+    this.trailerKey = '',
     this.wire,
   });
 
@@ -404,6 +405,8 @@ class SushiItemRes {
   final String collectionName;
   final List<SushiRow> collection;
   final List<SushiSeason> seasons;
+  /// YouTube video id for the trailer button (docs/12 §4, ADR 0031). Empty means none.
+  final String trailerKey;
   /// Original protobuf bytes. Needed to persist a title page without a Dart encoder.
   final Uint8List? wire;
 
@@ -421,6 +424,7 @@ class SushiItemRes {
     var collectionName = '';
     final collection = <SushiRow>[];
     final seasons = <SushiSeason>[];
+    var trailerKey = '';
     var i = 0;
     while (i < bytes.length) {
       final tagR = sushiReadVarint(bytes, i);
@@ -491,6 +495,11 @@ class SushiItemRes {
           i = lenR.next;
           seasons.add(SushiSeason.decode(bytes.sublist(i, i + lenR.value)));
           i += lenR.value;
+        case 16:
+          final lenR = sushiReadVarint(bytes, i);
+          i = lenR.next;
+          trailerKey = utf8.decode(bytes.sublist(i, i + lenR.value));
+          i += lenR.value;
         default:
           i = sushiSkipField(bytes, i, wire);
       }
@@ -509,6 +518,7 @@ class SushiItemRes {
       collectionName: collectionName,
       collection: List.unmodifiable(collection),
       seasons: List.unmodifiable(seasons),
+      trailerKey: trailerKey,
       wire: bytes,
     );
   }
@@ -521,12 +531,17 @@ class SushiFilesRes {
     this.positionS = 0,
     this.done = false,
     this.lastFileId = 0,
+    this.known = true,
   });
 
   final List<SushiFile> files;
   final int positionS;
   final bool done;
   final int lastFileId;
+
+  /// False only when neither the network nor the file cache produced a list. An empty
+  /// [files] with [known] true means the server said there is nothing to play.
+  final bool known;
 
   bool get hasProgress => done || positionS > 0;
 

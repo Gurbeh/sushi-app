@@ -7,7 +7,7 @@ part of 'sushi_media_issue_context.dart';
 // **************************************************************************
 
 String _$sushiMediaIssueContextHash() =>
-    r'e6130ef0b991e0b133903c4a238273508ee5304e';
+    r'd9065b65c1baf71f49e50f02b8a238eb51f475f0';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -122,7 +122,8 @@ class SushiMediaIssueContextProvider
 
   @override
   Override overrideWith(
-    FutureOr<SushiMediaIssueContext> Function(SushiMediaIssueContextRef provider)
+    FutureOr<SushiMediaIssueContext> Function(
+            SushiMediaIssueContextRef provider)
         create,
   ) {
     return ProviderOverride(

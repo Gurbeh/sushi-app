@@ -6,7 +6,8 @@ part of 'sushi_catalog_interest.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sushiCatalogInterestHash() => r'bdadab19f50f06411460fdac21bbb7fa20b0ada9';
+String _$sushiCatalogInterestHash() =>
+    r'a0a8cd2022eb6520f649079aa6f7fe7231f5769e';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -146,7 +147,8 @@ class SushiCatalogInterestProvider extends AutoDisposeAsyncNotifierProviderImpl<
 
   @override
   bool operator ==(Object other) {
-    return other is SushiCatalogInterestProvider && other.catalogId == catalogId;
+    return other is SushiCatalogInterestProvider &&
+        other.catalogId == catalogId;
   }
 
   @override

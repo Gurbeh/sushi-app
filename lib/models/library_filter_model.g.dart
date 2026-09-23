@@ -135,6 +135,8 @@ const _$SortingOptionsEnumMap = {
   SortingOptions.releaseDate: 'releaseDate',
   SortingOptions.runTime: 'runTime',
   SortingOptions.random: 'random',
+  SortingOptions.trending: 'trending',
+  SortingOptions.mostWatched: 'mostWatched',
 };
 
 const _$SortingOrderEnumMap = {

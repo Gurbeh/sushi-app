@@ -1,6 +1,7 @@
 import 'package:fladder/sushi/sushi_app_update_pb.dart';
 import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/sushi_item_pb.dart';
+import 'package:fladder/sushi/sushi_sync_pb.dart';
 
 class SushiCachedHome {
   const SushiCachedHome({
@@ -42,12 +43,18 @@ class SushiTitleSnapshot {
     this.positionS = 0,
     this.done = false,
     this.lastFileId = 0,
+    this.filesKnown = true,
   });
 
   final SushiItemRes? page;
   final List<SushiFile> files;
   final bool fromCache;
   final bool lite;
+
+  /// False when a playable episode's file list never arrived. Empty [files] is then
+  /// not "this title has no file" — Home rows are playable, and a timeout must not
+  /// paint Request.
+  final bool filesKnown;
   final int positionS;
   final bool done;
   final int lastFileId;
@@ -57,6 +64,7 @@ class SushiTitleSnapshot {
         positionS: positionS,
         done: done,
         lastFileId: lastFileId,
+        known: filesKnown,
       );
 }
 
@@ -70,6 +78,13 @@ abstract class SushiCatalogStore {
   Future<void> writeSeason(int tmdbId, int kind, int seasonNo, List<SushiEpisode> episodes);
   Future<SushiCachedHome?> readHome();
   Future<void> writeHome(SushiCachedHome home);
+
+  /// Cross-device watched-state mirror (docs/11 §6.1). Local-first: [markEpisodeWatchedLocally]
+  /// writes immediately from this device's own playback, ahead of the next [applyWatchedDelta].
+  Future<bool> isEpisodeWatched(int episodeId);
+  Future<int> readWatchedWatermark();
+  Future<void> applyWatchedDelta(List<SushiWatchedState> rows, int watermark);
+  Future<void> markEpisodeWatchedLocally(int episodeId, bool done);
 
   /// Drops every cached title/home/files row. Logout and session-owner mismatch call this
   /// so a previous Telegram identity cannot paint Play from leftover `/files`.

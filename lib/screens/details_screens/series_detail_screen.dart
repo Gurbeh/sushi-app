@@ -16,7 +16,11 @@ import 'package:fladder/sushi/providers/sushi_catalog_item_flags.dart';
 import 'package:fladder/sushi/sushi_series_episode_actions.dart';
 import 'package:fladder/sushi/sushi_series_watch_state.dart';
 import 'package:fladder/sushi/widgets/sushi_detail_action_layout.dart';
+import 'package:fladder/sushi/sushi_home_pb.dart';
 import 'package:fladder/sushi/widgets/sushi_series_detail_play_buttons.dart';
+import 'package:fladder/sushi/providers/sushi_trailer_provider.dart';
+import 'package:fladder/sushi/widgets/sushi_trailer_action_button.dart';
+import 'package:fladder/sushi/widgets/sushi_trailer_player.dart';
 import 'package:fladder/sushi/sushi_detail_state.dart';
 import 'package:fladder/sushi/sushi_item_adapter.dart';
 import 'package:fladder/sushi/sushi_item_flags.dart';
@@ -107,7 +111,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   OverviewHeader(
                     name: details.name,
                     image: details.images,
-                    mainButton: currentEpisode != null && (sushiHasPlayback || sushiCarried)
+                    mainButton: SushiDetailPrimaryRow(
+                      itemId: details.id,
+                      kind: SushiKind.series,
+                      title: details.name,
+                      engaged: (currentEpisode?.userData.played ?? details.userData.played) ||
+                          (currentEpisode?.progress ?? details.progress) != 0,
+                      primary: currentEpisode != null && (sushiHasPlayback || sushiCarried)
                         ? SushiSeriesDetailPlayButtons(
                             series: details,
                             episode: currentEpisode,
@@ -144,6 +154,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                                     ref.read(providerId.notifier).fetchDetails(widget.item),
                               )
                             : null,
+                    ),
                     centerButtons: SushiDetailActionLayout(
                       alignment: wrapAlignment,
                       children: [
@@ -195,22 +206,37 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                           icon: IconsaxPlusLinear.tick_circle,
                         ),
                         SelectableIconButton(
-                          onPressed: () {
-                            showBottomSheetPill(
+                          onPressed: () async {
+                            final trailer = await ref.read(
+                              sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.series)).future,
+                            );
+                            if (!detailsContext.mounted) return;
+                            final actions = sushiInsertWatchedTrailer(
+                              details.generateActions(detailsContext, ref, exclude: {
+                                ItemActions.openParent,
+                                ItemActions.details,
+                                if (!sushiHasPlayback) ...{
+                                  ItemActions.play,
+                                  ItemActions.playFromStart,
+                                  ItemActions.download,
+                                },
+                              }),
+                              state: trailer,
+                              engaged: (currentEpisode?.userData.played ?? details.userData.played) ||
+                                  (currentEpisode?.progress ?? details.progress) != 0,
+                              onOpen: () => SushiTrailerPlayer.open(
+                                detailsContext,
+                                youtubeKey: trailer.trailerKey,
+                                title: details.name,
+                              ),
+                            );
+                            await showBottomSheetPill(
                               context: detailsContext,
                               item: details,
                               content: (context, scrollController) => ListView(
                                 controller: scrollController,
                                 shrinkWrap: true,
-                                children: details.generateActions(detailsContext, ref, exclude: {
-                                  ItemActions.openParent,
-                                  ItemActions.details,
-                                  if (!sushiHasPlayback) ...{
-                                    ItemActions.play,
-                                    ItemActions.playFromStart,
-                                    ItemActions.download,
-                                  },
-                                }).listTileItems(context, useIcons: true),
+                                children: actions.listTileItems(context, useIcons: true),
                               ),
                             );
                           },

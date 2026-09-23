@@ -48,7 +48,7 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
     }
 
     suspend fun awaitBytesAvailable(fileId: Int, offset: Long, minBytesAvailable: Long): OxFileInfo =
-        GomobileCallGate.enter {
+        GomobileCallGate.enter("awaitBytes") {
             session.ensureAvailable(offset, minBytesAvailable)
             OxFileInfo(
                 localPath = session.localPath(),
@@ -81,6 +81,6 @@ class OxTelegramFileFetcher(private val session: PlaybackSession) {
      * was already downloaded instead of refetching from byte zero.
      */
     suspend fun close() {
-        GomobileCallGate.enter { session.close() }
+        GomobileCallGate.enter("closeSession") { session.close() }
     }
 }

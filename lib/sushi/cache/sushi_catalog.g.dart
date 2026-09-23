@@ -1357,6 +1357,367 @@ class HomeSnapshotsCompanion extends UpdateCompanion<HomeSnapshot> {
   }
 }
 
+class $WatchedEpisodesTable extends WatchedEpisodes
+    with TableInfo<$WatchedEpisodesTable, WatchedEpisode> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WatchedEpisodesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _episodeIdMeta =
+      const VerificationMeta('episodeId');
+  @override
+  late final GeneratedColumn<int> episodeId = GeneratedColumn<int>(
+      'episode_id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+      'done', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("done" IN (0, 1))'));
+  @override
+  List<GeneratedColumn> get $columns => [episodeId, done];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'watched_episodes';
+  @override
+  VerificationContext validateIntegrity(Insertable<WatchedEpisode> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('episode_id')) {
+      context.handle(_episodeIdMeta,
+          episodeId.isAcceptableOrUnknown(data['episode_id']!, _episodeIdMeta));
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+          _doneMeta, done.isAcceptableOrUnknown(data['done']!, _doneMeta));
+    } else if (isInserting) {
+      context.missing(_doneMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {episodeId};
+  @override
+  WatchedEpisode map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WatchedEpisode(
+      episodeId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}episode_id'])!,
+      done: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}done'])!,
+    );
+  }
+
+  @override
+  $WatchedEpisodesTable createAlias(String alias) {
+    return $WatchedEpisodesTable(attachedDatabase, alias);
+  }
+}
+
+class WatchedEpisode extends DataClass implements Insertable<WatchedEpisode> {
+  final int episodeId;
+  final bool done;
+  const WatchedEpisode({required this.episodeId, required this.done});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['episode_id'] = Variable<int>(episodeId);
+    map['done'] = Variable<bool>(done);
+    return map;
+  }
+
+  WatchedEpisodesCompanion toCompanion(bool nullToAbsent) {
+    return WatchedEpisodesCompanion(
+      episodeId: Value(episodeId),
+      done: Value(done),
+    );
+  }
+
+  factory WatchedEpisode.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WatchedEpisode(
+      episodeId: serializer.fromJson<int>(json['episodeId']),
+      done: serializer.fromJson<bool>(json['done']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'episodeId': serializer.toJson<int>(episodeId),
+      'done': serializer.toJson<bool>(done),
+    };
+  }
+
+  WatchedEpisode copyWith({int? episodeId, bool? done}) => WatchedEpisode(
+        episodeId: episodeId ?? this.episodeId,
+        done: done ?? this.done,
+      );
+  WatchedEpisode copyWithCompanion(WatchedEpisodesCompanion data) {
+    return WatchedEpisode(
+      episodeId: data.episodeId.present ? data.episodeId.value : this.episodeId,
+      done: data.done.present ? data.done.value : this.done,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WatchedEpisode(')
+          ..write('episodeId: $episodeId, ')
+          ..write('done: $done')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(episodeId, done);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WatchedEpisode &&
+          other.episodeId == this.episodeId &&
+          other.done == this.done);
+}
+
+class WatchedEpisodesCompanion extends UpdateCompanion<WatchedEpisode> {
+  final Value<int> episodeId;
+  final Value<bool> done;
+  const WatchedEpisodesCompanion({
+    this.episodeId = const Value.absent(),
+    this.done = const Value.absent(),
+  });
+  WatchedEpisodesCompanion.insert({
+    this.episodeId = const Value.absent(),
+    required bool done,
+  }) : done = Value(done);
+  static Insertable<WatchedEpisode> custom({
+    Expression<int>? episodeId,
+    Expression<bool>? done,
+  }) {
+    return RawValuesInsertable({
+      if (episodeId != null) 'episode_id': episodeId,
+      if (done != null) 'done': done,
+    });
+  }
+
+  WatchedEpisodesCompanion copyWith(
+      {Value<int>? episodeId, Value<bool>? done}) {
+    return WatchedEpisodesCompanion(
+      episodeId: episodeId ?? this.episodeId,
+      done: done ?? this.done,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (episodeId.present) {
+      map['episode_id'] = Variable<int>(episodeId.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WatchedEpisodesCompanion(')
+          ..write('episodeId: $episodeId, ')
+          ..write('done: $done')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SyncStateTable extends SyncState
+    with TableInfo<$SyncStateTable, SyncStateData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _watchedWatermarkMeta =
+      const VerificationMeta('watchedWatermark');
+  @override
+  late final GeneratedColumn<int> watchedWatermark = GeneratedColumn<int>(
+      'watched_watermark', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [id, watchedWatermark];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_state';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncStateData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('watched_watermark')) {
+      context.handle(
+          _watchedWatermarkMeta,
+          watchedWatermark.isAcceptableOrUnknown(
+              data['watched_watermark']!, _watchedWatermarkMeta));
+    } else if (isInserting) {
+      context.missing(_watchedWatermarkMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncStateData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncStateData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      watchedWatermark: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}watched_watermark'])!,
+    );
+  }
+
+  @override
+  $SyncStateTable createAlias(String alias) {
+    return $SyncStateTable(attachedDatabase, alias);
+  }
+}
+
+class SyncStateData extends DataClass implements Insertable<SyncStateData> {
+  final int id;
+  final int watchedWatermark;
+  const SyncStateData({required this.id, required this.watchedWatermark});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['watched_watermark'] = Variable<int>(watchedWatermark);
+    return map;
+  }
+
+  SyncStateCompanion toCompanion(bool nullToAbsent) {
+    return SyncStateCompanion(
+      id: Value(id),
+      watchedWatermark: Value(watchedWatermark),
+    );
+  }
+
+  factory SyncStateData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncStateData(
+      id: serializer.fromJson<int>(json['id']),
+      watchedWatermark: serializer.fromJson<int>(json['watchedWatermark']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'watchedWatermark': serializer.toJson<int>(watchedWatermark),
+    };
+  }
+
+  SyncStateData copyWith({int? id, int? watchedWatermark}) => SyncStateData(
+        id: id ?? this.id,
+        watchedWatermark: watchedWatermark ?? this.watchedWatermark,
+      );
+  SyncStateData copyWithCompanion(SyncStateCompanion data) {
+    return SyncStateData(
+      id: data.id.present ? data.id.value : this.id,
+      watchedWatermark: data.watchedWatermark.present
+          ? data.watchedWatermark.value
+          : this.watchedWatermark,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateData(')
+          ..write('id: $id, ')
+          ..write('watchedWatermark: $watchedWatermark')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, watchedWatermark);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncStateData &&
+          other.id == this.id &&
+          other.watchedWatermark == this.watchedWatermark);
+}
+
+class SyncStateCompanion extends UpdateCompanion<SyncStateData> {
+  final Value<int> id;
+  final Value<int> watchedWatermark;
+  const SyncStateCompanion({
+    this.id = const Value.absent(),
+    this.watchedWatermark = const Value.absent(),
+  });
+  SyncStateCompanion.insert({
+    this.id = const Value.absent(),
+    required int watchedWatermark,
+  }) : watchedWatermark = Value(watchedWatermark);
+  static Insertable<SyncStateData> custom({
+    Expression<int>? id,
+    Expression<int>? watchedWatermark,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (watchedWatermark != null) 'watched_watermark': watchedWatermark,
+    });
+  }
+
+  SyncStateCompanion copyWith({Value<int>? id, Value<int>? watchedWatermark}) {
+    return SyncStateCompanion(
+      id: id ?? this.id,
+      watchedWatermark: watchedWatermark ?? this.watchedWatermark,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (watchedWatermark.present) {
+      map['watched_watermark'] = Variable<int>(watchedWatermark.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateCompanion(')
+          ..write('id: $id, ')
+          ..write('watchedWatermark: $watchedWatermark')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$SushiCatalogDatabase extends GeneratedDatabase {
   _$SushiCatalogDatabase(QueryExecutor e) : super(e);
   $SushiCatalogDatabaseManager get managers =>
@@ -1368,6 +1729,9 @@ abstract class _$SushiCatalogDatabase extends GeneratedDatabase {
   late final $SeasonEpisodeListsTable seasonEpisodeLists =
       $SeasonEpisodeListsTable(this);
   late final $HomeSnapshotsTable homeSnapshots = $HomeSnapshotsTable(this);
+  late final $WatchedEpisodesTable watchedEpisodes =
+      $WatchedEpisodesTable(this);
+  late final $SyncStateTable syncState = $SyncStateTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1377,7 +1741,9 @@ abstract class _$SushiCatalogDatabase extends GeneratedDatabase {
         itemPages,
         episodeFileLists,
         seasonEpisodeLists,
-        homeSnapshots
+        homeSnapshots,
+        watchedEpisodes,
+        syncState
       ];
 }
 
@@ -2182,6 +2548,253 @@ typedef $$HomeSnapshotsTableProcessedTableManager = ProcessedTableManager<
     ),
     HomeSnapshot,
     PrefetchHooks Function()>;
+typedef $$WatchedEpisodesTableCreateCompanionBuilder = WatchedEpisodesCompanion
+    Function({
+  Value<int> episodeId,
+  required bool done,
+});
+typedef $$WatchedEpisodesTableUpdateCompanionBuilder = WatchedEpisodesCompanion
+    Function({
+  Value<int> episodeId,
+  Value<bool> done,
+});
+
+class $$WatchedEpisodesTableFilterComposer
+    extends Composer<_$SushiCatalogDatabase, $WatchedEpisodesTable> {
+  $$WatchedEpisodesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get episodeId => $composableBuilder(
+      column: $table.episodeId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get done => $composableBuilder(
+      column: $table.done, builder: (column) => ColumnFilters(column));
+}
+
+class $$WatchedEpisodesTableOrderingComposer
+    extends Composer<_$SushiCatalogDatabase, $WatchedEpisodesTable> {
+  $$WatchedEpisodesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get episodeId => $composableBuilder(
+      column: $table.episodeId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+      column: $table.done, builder: (column) => ColumnOrderings(column));
+}
+
+class $$WatchedEpisodesTableAnnotationComposer
+    extends Composer<_$SushiCatalogDatabase, $WatchedEpisodesTable> {
+  $$WatchedEpisodesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get episodeId =>
+      $composableBuilder(column: $table.episodeId, builder: (column) => column);
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+}
+
+class $$WatchedEpisodesTableTableManager extends RootTableManager<
+    _$SushiCatalogDatabase,
+    $WatchedEpisodesTable,
+    WatchedEpisode,
+    $$WatchedEpisodesTableFilterComposer,
+    $$WatchedEpisodesTableOrderingComposer,
+    $$WatchedEpisodesTableAnnotationComposer,
+    $$WatchedEpisodesTableCreateCompanionBuilder,
+    $$WatchedEpisodesTableUpdateCompanionBuilder,
+    (
+      WatchedEpisode,
+      BaseReferences<_$SushiCatalogDatabase, $WatchedEpisodesTable,
+          WatchedEpisode>
+    ),
+    WatchedEpisode,
+    PrefetchHooks Function()> {
+  $$WatchedEpisodesTableTableManager(
+      _$SushiCatalogDatabase db, $WatchedEpisodesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WatchedEpisodesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WatchedEpisodesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WatchedEpisodesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> episodeId = const Value.absent(),
+            Value<bool> done = const Value.absent(),
+          }) =>
+              WatchedEpisodesCompanion(
+            episodeId: episodeId,
+            done: done,
+          ),
+          createCompanionCallback: ({
+            Value<int> episodeId = const Value.absent(),
+            required bool done,
+          }) =>
+              WatchedEpisodesCompanion.insert(
+            episodeId: episodeId,
+            done: done,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$WatchedEpisodesTableProcessedTableManager = ProcessedTableManager<
+    _$SushiCatalogDatabase,
+    $WatchedEpisodesTable,
+    WatchedEpisode,
+    $$WatchedEpisodesTableFilterComposer,
+    $$WatchedEpisodesTableOrderingComposer,
+    $$WatchedEpisodesTableAnnotationComposer,
+    $$WatchedEpisodesTableCreateCompanionBuilder,
+    $$WatchedEpisodesTableUpdateCompanionBuilder,
+    (
+      WatchedEpisode,
+      BaseReferences<_$SushiCatalogDatabase, $WatchedEpisodesTable,
+          WatchedEpisode>
+    ),
+    WatchedEpisode,
+    PrefetchHooks Function()>;
+typedef $$SyncStateTableCreateCompanionBuilder = SyncStateCompanion Function({
+  Value<int> id,
+  required int watchedWatermark,
+});
+typedef $$SyncStateTableUpdateCompanionBuilder = SyncStateCompanion Function({
+  Value<int> id,
+  Value<int> watchedWatermark,
+});
+
+class $$SyncStateTableFilterComposer
+    extends Composer<_$SushiCatalogDatabase, $SyncStateTable> {
+  $$SyncStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get watchedWatermark => $composableBuilder(
+      column: $table.watchedWatermark,
+      builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncStateTableOrderingComposer
+    extends Composer<_$SushiCatalogDatabase, $SyncStateTable> {
+  $$SyncStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get watchedWatermark => $composableBuilder(
+      column: $table.watchedWatermark,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncStateTableAnnotationComposer
+    extends Composer<_$SushiCatalogDatabase, $SyncStateTable> {
+  $$SyncStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get watchedWatermark => $composableBuilder(
+      column: $table.watchedWatermark, builder: (column) => column);
+}
+
+class $$SyncStateTableTableManager extends RootTableManager<
+    _$SushiCatalogDatabase,
+    $SyncStateTable,
+    SyncStateData,
+    $$SyncStateTableFilterComposer,
+    $$SyncStateTableOrderingComposer,
+    $$SyncStateTableAnnotationComposer,
+    $$SyncStateTableCreateCompanionBuilder,
+    $$SyncStateTableUpdateCompanionBuilder,
+    (
+      SyncStateData,
+      BaseReferences<_$SushiCatalogDatabase, $SyncStateTable, SyncStateData>
+    ),
+    SyncStateData,
+    PrefetchHooks Function()> {
+  $$SyncStateTableTableManager(_$SushiCatalogDatabase db, $SyncStateTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> watchedWatermark = const Value.absent(),
+          }) =>
+              SyncStateCompanion(
+            id: id,
+            watchedWatermark: watchedWatermark,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int watchedWatermark,
+          }) =>
+              SyncStateCompanion.insert(
+            id: id,
+            watchedWatermark: watchedWatermark,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SyncStateTableProcessedTableManager = ProcessedTableManager<
+    _$SushiCatalogDatabase,
+    $SyncStateTable,
+    SyncStateData,
+    $$SyncStateTableFilterComposer,
+    $$SyncStateTableOrderingComposer,
+    $$SyncStateTableAnnotationComposer,
+    $$SyncStateTableCreateCompanionBuilder,
+    $$SyncStateTableUpdateCompanionBuilder,
+    (
+      SyncStateData,
+      BaseReferences<_$SushiCatalogDatabase, $SyncStateTable, SyncStateData>
+    ),
+    SyncStateData,
+    PrefetchHooks Function()>;
 
 class $SushiCatalogDatabaseManager {
   final _$SushiCatalogDatabase _db;
@@ -2196,4 +2809,8 @@ class $SushiCatalogDatabaseManager {
       $$SeasonEpisodeListsTableTableManager(_db, _db.seasonEpisodeLists);
   $$HomeSnapshotsTableTableManager get homeSnapshots =>
       $$HomeSnapshotsTableTableManager(_db, _db.homeSnapshots);
+  $$WatchedEpisodesTableTableManager get watchedEpisodes =>
+      $$WatchedEpisodesTableTableManager(_db, _db.watchedEpisodes);
+  $$SyncStateTableTableManager get syncState =>
+      $$SyncStateTableTableManager(_db, _db.syncState);
 }
