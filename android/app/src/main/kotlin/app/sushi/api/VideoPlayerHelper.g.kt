@@ -1187,6 +1187,8 @@ interface VideoPlayerApi {
   /** Sideload a decoded `.srt` as an ExoPlayer text track without tearing down Telegram playback. */
   fun setSubtitleFromText(data: String, title: String?, languageCode: String?, callback: (Result<Boolean>) -> Unit)
   fun clearExternalSubtitle(callback: (Result<Boolean>) -> Unit)
+  /** After a text sniff says the muxed track is Persian, rewrite the picker label. */
+  fun setEmbeddedSubtitleLanguage(index: Long, languageCode: String)
 
   companion object {
     /** The codec used by VideoPlayerApi. */
@@ -1454,6 +1456,25 @@ interface VideoPlayerApi {
           channel.setMessageHandler(null)
         }
       }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.setEmbeddedSubtitleLanguage$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val indexArg = args[0] as Long
+            val languageCodeArg = args[1] as String
+            val wrapped: List<Any?> = try {
+              api.setEmbeddedSubtitleLanguage(indexArg, languageCodeArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              VideoPlayerHelperPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
     }
   }
 }
@@ -1507,6 +1528,24 @@ class VideoPlayerListenerCallback(private val binaryMessenger: BinaryMessenger, 
     val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onPlaybackError$separatedMessageChannelSuffix"
     val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
     channel.send(listOf(errorCodeArg, errorCodeNameArg, messageArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else {
+          callback(Result.success(Unit))
+        }
+      } else {
+        callback(Result.failure(VideoPlayerHelperPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  /** One decoded cue from the muxed text track, for the English/unknown script sniff. */
+  fun onEmbeddedSubtitleCue(textArg: String, callback: (Result<Unit>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onEmbeddedSubtitleCue$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(textArg)) {
       if (it is List<*>) {
         if (it.size > 1) {
           callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))

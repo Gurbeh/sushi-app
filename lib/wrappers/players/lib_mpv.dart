@@ -42,6 +42,8 @@ import 'package:fladder/wrappers/players/base_player.dart';
 import 'package:fladder/wrappers/players/player_states.dart';
 
 class LibMPV extends BasePlayer {
+  /// Set while Dart is sampling muxed cues from [player.stream.subtitle].
+  void Function(String text)? embeddedCueListener;
   mpv.Player? _player;
   VideoController? _controller;
   String _currentSubtitleCodec = '';
@@ -385,6 +387,8 @@ class LibMPV extends BasePlayer {
         }
       }),
       player.stream.subtitle.listen((value) {
+        final text = value.map((line) => line.trim()).where((line) => line.isNotEmpty).join('\n');
+        if (text.isNotEmpty) embeddedCueListener?.call(text);
         if (value.any((line) => line.trim().isNotEmpty)) {
           if (!_subtitleTextSeen) {
             _subtitleTextSeen = true;
@@ -1140,8 +1144,14 @@ class LibMPV extends BasePlayer {
     // Fladder: jellyfin sub stream index → mpv demux list (skips auto/no).
     final internalTracks =
         subTracks.length > 2 ? subTracks.getRange(2, subTracks.length).toList() : <mpv.SubtitleTrack>[];
-    final sublistIndex = playbackModel.subStreams?.sublist(1).indexWhere((e) => e.id == wantedSubtitle.id);
-    final subTrack = internalTracks.elementAtOrNull(sublistIndex ?? -1);
+    final subs = playbackModel.subStreams?.sublist(1) ?? const <SubStreamModel>[];
+    var sublistIndex = subs.indexWhere((e) => e.id == wantedSubtitle.id);
+    // Catalog stubs use synthetic ids (`sushi_sub_…`) that mpv never reports. Fall back to
+    // list position so the first `fa`/`en` row selects the first muxed text track.
+    if (sublistIndex < 0) {
+      sublistIndex = subs.indexWhere((e) => e.index == wantedSubtitle.index);
+    }
+    final subTrack = internalTracks.elementAtOrNull(sublistIndex);
 
     final url = wantedSubtitle.url;
     final hasUrl = url != null && url.isNotEmpty;

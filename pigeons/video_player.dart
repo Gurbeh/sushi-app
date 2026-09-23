@@ -254,6 +254,9 @@ abstract class VideoPlayerApi {
 
   @async
   bool clearExternalSubtitle();
+
+  /// After a text sniff says the muxed track is Persian, rewrite the picker label.
+  void setEmbeddedSubtitleLanguage(int index, String languageCode);
 }
 
 class PlaybackState {
@@ -406,6 +409,9 @@ abstract class VideoPlayerListenerCallback {
 
   /// ExoPlayer [PlaybackException] surfaced to Dart for Sentry / Crashlytics.
   void onPlaybackError(int errorCode, String errorCodeName, String? message);
+
+  /// One decoded cue from the muxed text track, for the English/unknown script sniff.
+  void onEmbeddedSubtitleCue(String text);
 }
 
 @FlutterApi()

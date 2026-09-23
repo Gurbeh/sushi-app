@@ -27,6 +27,8 @@ import 'package:fladder/sushi/sushi_iran_content.dart';
 import 'package:fladder/sushi/subtitles/sushi_srt.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/sushi/sushi_tdlib_playback_resolver.dart';
+import 'package:fladder/sushi/playback/sushi_persian_language.dart';
+import 'package:fladder/sushi/sushi_playback_model.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/sushi/cache/sushi_catalog_providers.dart';
 import 'package:fladder/providers/api_provider.dart';
@@ -55,6 +57,9 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
   BasePlayer? _previousPlayer;
   final StreamController<PlayerState> _stateController = StreamController.broadcast();
   StreamSubscription<PlayerState>? _playerStateSubscription;
+  Completer<String>? _embeddedSniff;
+  final Set<String> _embeddedSniffCues = {};
+  Timer? _embeddedSniffTimer;
 
   bool get hasPlayer => _player != null;
 
@@ -195,7 +200,12 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     });
   }
 
-  Future<void> loadVideo(PlaybackModel model, Duration startPosition, bool play) async {
+  Future<void> loadVideo(
+    PlaybackModel model,
+    Duration startPosition,
+    bool play, {
+    bool applyStartSubtitlePlan = false,
+  }) async {
     final url = model.media?.url;
     if (sushiIsTdlibFileUrl(url)) {
       // Telegram-direct-play bytes only exist behind ExoPlayer's DataSource pipeline
@@ -210,9 +220,15 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     } else if (_previousPlayer != null) {
       await _restorePreviousPlayer();
     }
+    _bindEmbeddedCueListener();
     if (_player is NativePlayer) {
       final context = ref.read(localizationContextProvider);
-      await (_player as NativePlayer).sendPlaybackDataToNative(context, model, startPosition);
+      await (_player as NativePlayer).sendPlaybackDataToNative(
+        context,
+        model,
+        startPosition,
+        applyStartSubtitlePlan: applyStartSubtitlePlan,
+      );
     }
     _isNewPlayback = play;
     await _player?.loadVideo(model.media?.url ?? "", play, startPosition: startPosition);
@@ -867,42 +883,108 @@ class MediaControlsWrapper extends BaseAudioHandler implements VideoPlayerContro
     sushiBeginPlaybackSubtitleSession(ref, sessionKey);
   }
 
-  /// Non-hard-sub: Automatic (online) → AI if Gemini key set → muxed Farsi soft last.
-  /// Hardsub → Off. English audio does not reopen Automatic (doc 15 §7). Catalog-only
-  /// `sub_langs=fa` stubs are not playable. Iranian items are skipped entirely.
+  void armEmbeddedSubtitleSniff() {
+    final pending = _embeddedSniff;
+    if (pending != null && !pending.isCompleted) pending.complete('');
+    _embeddedSniffTimer?.cancel();
+    _embeddedSniffCues.clear();
+    _embeddedSniff = Completer<String>();
+    _bindEmbeddedCueListener();
+    _embeddedSniffTimer = Timer(const Duration(seconds: 4), _finishEmbeddedSniff);
+  }
+
+  void _bindEmbeddedCueListener() {
+    if (_embeddedSniff == null || _embeddedSniff!.isCompleted) return;
+    void onCue(String text) => _noteEmbeddedCue(text);
+    final player = _player;
+    if (player is LibMPV) player.embeddedCueListener = onCue;
+    if (player is NativePlayer) player.embeddedCueListener = onCue;
+  }
+
+  void _noteEmbeddedCue(String text) {
+    final cue = text.trim();
+    if (cue.isEmpty || !_embeddedSniffCues.add(cue)) return;
+    final sample = _embeddedSniffCues.join('\n');
+    final counts = sushiSubtitleScriptCounts(sample);
+    if (counts.letters >= 24 || _embeddedSniffCues.length >= 6) {
+      _finishEmbeddedSniff();
+    }
+  }
+
+  void _finishEmbeddedSniff() {
+    final pending = _embeddedSniff;
+    if (pending == null || pending.isCompleted) return;
+    _embeddedSniffTimer?.cancel();
+    _embeddedSniffTimer = null;
+    final player = _player;
+    if (player is LibMPV) player.embeddedCueListener = null;
+    if (player is NativePlayer) player.embeddedCueListener = null;
+    pending.complete(_embeddedSniffCues.join('\n'));
+  }
+
+  void _clearEmbeddedCueListener() {
+    final player = _player;
+    if (player is LibMPV) player.embeddedCueListener = null;
+    if (player is NativePlayer) player.embeddedCueListener = null;
+  }
+
+  /// Sample a few muxed cues. Persian text keeps that track and relabels it `fa`. Otherwise online.
+  Future<void> awaitEmbeddedSniffThenMaybeOnline(PlaybackModel model) async {
+    final pending = _embeddedSniff;
+    if (pending == null) {
+      await maybeSushiStartOnlineSubtitle(model);
+      return;
+    }
+    final sample = await pending.future.timeout(const Duration(seconds: 5), onTimeout: () {
+      _finishEmbeddedSniff();
+      return _embeddedSniffCues.join('\n');
+    });
+    if (sushiSubtitleSampleLooksPersian(sample)) {
+      final index = sushiScriptSniffSubtitleIndex(model.subStreams) ??
+          ref.read(playBackModel)?.mediaStreams?.defaultSubStreamIndex;
+      log('sushi_sub_sniff persian index=$index chars=${sample.length}', name: 'sushi.subs');
+      if (index != null && index >= 0) {
+        final player = _player;
+        if (player is NativePlayer) {
+          await player.setEmbeddedSubtitleLanguage(index, 'fa');
+        }
+        final current = ref.read(playBackModel);
+        final relabeled = sushiRelabelSubtitleAsPersian(current?.mediaStreams, index);
+        if (current is SushiPlaybackModel && relabeled != null) {
+          ref.read(playBackModel.notifier).update(
+                (_) => current.copyWith(mediaStreams: () => relabeled),
+              );
+        }
+      }
+      return;
+    }
+    log('sushi_sub_sniff not_persian chars=${sample.length}', name: 'sushi.subs');
+    _clearEmbeddedCueListener();
+    await maybeSushiStartOnlineSubtitle(model);
+  }
+
+  /// Online only when the file has no Persian muxed label. `fa` (including a catalog stub) stays.
+  /// Hardsub and Iranian items stay Off. A sniff that already proved the text is not Persian
+  /// calls this with the label still `en`.
   Future<void> maybeSushiStartOnlineSubtitle(PlaybackModel model) async {
     final sourceName = model.mediaStreams?.currentVersionStream?.name;
     final hardSub = sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams);
-    final hasPersianSoft = sushiHasPersianSoftSub(model.subStreams);
-    final isEnglishAudio = sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language);
+    final persianIndex = sushiPreferredPersianStreamIndex(model.subStreams);
     final isIranian = SushiIranContent.isIranian(
       tags: model.item.overview.tags,
       genres: model.item.overview.genreItems,
       name: model.item.name,
       mediaStreams: model.mediaStreams,
     );
-    final resolved = sushiResolveSubtitleStreamIndex(
-      selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
-      serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
-      subStreams: model.subStreams,
-      mediaSourceName: sourceName,
-    );
-    final choice = sushiStartSubtitleChoice(
-      hardSub: hardSub,
-      hasPersianSoft: hasPersianSoft,
-      isEnglishAudio: isEnglishAudio,
-      isIranian: isIranian,
-    );
     log(
-      'sushi_sub_start_choice choice=${choice.name} hardSub=$hardSub '
-      'hasPersianSoft=$hasPersianSoft isEnglishAudio=$isEnglishAudio isIranian=$isIranian resolved=$resolved',
+      'sushi_sub_start_choice hardSub=$hardSub persianIndex=$persianIndex isIranian=$isIranian',
       name: 'sushi.subs',
     );
-    if (choice != SushiStartSubtitle.automaticOnline) return;
+    if (hardSub || isIranian || persianIndex != null) return;
     final r = await sushiRunStartSubtitlePipeline(
       ref,
       player: this,
-      hasPersianSoft: hardSub ? false : hasPersianSoft,
+      hasPersianSoft: false,
       allowAiFallback: !hardSub,
       model: model,
     );

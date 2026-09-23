@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:fladder/sushi/playback/ox_persian_language.dart';
+import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 
 void main() {
   group('SushiPersianLanguage', () {

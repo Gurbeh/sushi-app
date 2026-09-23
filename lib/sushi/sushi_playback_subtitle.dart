@@ -8,7 +8,8 @@ import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 /// `زیرنویس چسبیده` is only a claim. The container decides: a playable srt/ass track means
 /// softsub; no playable track plus that claim means hardsub.
 bool sushiMediaSourceLooksHardSub(String? mediaSourceName, {List<SubStreamModel>? subStreams}) {
-  if (sushiHasPlayableSub(subStreams)) {
+  // Catalog `sub_langs` stubs have an index and no codec. That is still a muxed track.
+  if (subStreams != null && subStreams.any((s) => s.index != -1)) {
     return false;
   }
   final blob = (mediaSourceName ?? '').toLowerCase().trim();
@@ -102,7 +103,58 @@ bool sushiHasPersianSoftSub(List<SubStreamModel>? subStreams) {
 }
 
 /// What to apply at playback start. Previous title's AI / Automatic pick must not carry over.
-enum SushiStartSubtitle { persianSoft, automaticOnline, off }
+enum SushiStartSubtitle { persianSoft, sniffEmbedded, automaticOnline, off }
+
+/// What to select at playback start, and which follow-up to run.
+class SushiStartSubtitlePlan {
+  const SushiStartSubtitlePlan({required this.choice, required this.index});
+
+  final SushiStartSubtitle choice;
+
+  /// Track index to select. -1 leaves subtitles off.
+  final int index;
+}
+
+/// `fa` label wins. `en` / empty / und gets a text sniff before online. Anything else goes online.
+SushiStartSubtitlePlan sushiPlanStartSubtitle({
+  required List<SubStreamModel>? subStreams,
+  String? mediaSourceName,
+  bool isIranian = false,
+}) {
+  final hardSub = sushiMediaSourceLooksHardSub(mediaSourceName, subStreams: subStreams);
+  final persianIndex = sushiPreferredPersianStreamIndex(subStreams);
+  final sniffIndex = sushiScriptSniffSubtitleIndex(subStreams);
+  final choice = sushiStartSubtitleChoice(
+    hardSub: hardSub,
+    hasPersianSoft: persianIndex != null,
+    needsScriptSniff: sniffIndex != null,
+    isIranian: isIranian,
+  );
+  final index = switch (choice) {
+    SushiStartSubtitle.persianSoft => persianIndex ?? -1,
+    SushiStartSubtitle.sniffEmbedded => sniffIndex ?? -1,
+    SushiStartSubtitle.automaticOnline || SushiStartSubtitle.off => -1,
+  };
+  return SushiStartSubtitlePlan(choice: choice, index: index);
+}
+
+/// English, empty, or undetermined container tags. A real `fa` label is not sniffed.
+bool sushiSubtitleLanguageNeedsScriptSniff(String? language) {
+  if (SushiPersianLanguage.isPersianLanguage(language)) return false;
+  final lang = (language ?? '').trim().toLowerCase();
+  if (lang.isEmpty || lang == 'und' || lang == 'unknown' || lang == 'mul') return true;
+  return sushiIsEnglishLanguage(language);
+}
+
+/// First muxed track whose label is English or unknown. Null when a Persian label exists.
+int? sushiScriptSniffSubtitleIndex(List<SubStreamModel>? subStreams) {
+  if (subStreams == null || subStreams.isEmpty) return null;
+  if (sushiPreferredPersianStreamIndex(subStreams) != null) return null;
+  final track = subStreams.where((s) => s.index != -1).firstWhereOrNull(
+        (s) => sushiSubtitleLanguageNeedsScriptSniff(s.language),
+      );
+  return track?.index;
+}
 
 /// Ordered start pipeline for a non-hard-sub item. Hard-sub is always empty (Off) —
 /// burn-in must not get Automatic / AI / muxed Farsi stacked on top, including English-audio
@@ -116,40 +168,38 @@ bool sushiIsEnglishLanguage(String? language) {
   return lang == 'en' || lang == 'eng' || lang.startsWith('en-');
 }
 
-/// Default: Automatic (online). If that finds nothing and the user has a Gemini key, AI translate.
-/// Muxed Farsi soft is last. Hard-sub skips the chain (Off). English audio does not reopen it.
+/// `fa` label is the whole chain (select that track, stop). Otherwise Automatic, then AI.
+/// Hard-sub skips the chain (Off). English audio does not reopen it.
 List<SushiStartSubtitleStep> sushiStartSubtitleSteps({
   required bool hardSub,
   required bool hasPersianSoft,
   required bool aiSet,
 }) {
   if (hardSub) return const [];
+  if (hasPersianSoft) return const [SushiStartSubtitleStep.persianSoft];
   return [
     SushiStartSubtitleStep.automaticOnline,
     if (aiSet) SushiStartSubtitleStep.aiTranslate,
-    if (hasPersianSoft) SushiStartSubtitleStep.persianSoft,
   ];
 }
 
-/// First step of [sushiStartSubtitleSteps]. Hardsub sources default to Off (stacking soft Persian
-/// on top of burn-in duplicates the subtitle). English audio does not change that (doc 15 §7).
+/// `fa` label selects that track and stops. English or unknown labels sniff cue text first.
+/// Hardsub stays Off. English audio does not change that (doc 15 §7).
 ///
 /// Iranian content is skipped entirely: it's already Persian, so auto subtitle search has
 /// nothing useful to look for.
 SushiStartSubtitle sushiStartSubtitleChoice({
   required bool hardSub,
   required bool hasPersianSoft,
+  bool needsScriptSniff = false,
   bool subtitleOff = false,
   bool isEnglishAudio = false,
   bool isIranian = false,
 }) {
   if (isIranian) return SushiStartSubtitle.off;
-  final steps = sushiStartSubtitleSteps(
-    hardSub: hardSub,
-    hasPersianSoft: hasPersianSoft,
-    aiSet: false,
-  );
-  if (steps.isEmpty) return SushiStartSubtitle.off;
+  if (hardSub) return SushiStartSubtitle.off;
+  if (hasPersianSoft) return SushiStartSubtitle.persianSoft;
+  if (needsScriptSniff) return SushiStartSubtitle.sniffEmbedded;
   return SushiStartSubtitle.automaticOnline;
 }
 
@@ -183,4 +233,32 @@ int? sushiPreferredSubtitleStreamIndex(List<SubStreamModel>? subStreams) {
   if (english != null) return english.index;
 
   return real.first.index;
+}
+
+/// Rewrite one muxed track's label to Persian after a text sniff.
+MediaStreamsModel? sushiRelabelSubtitleAsPersian(MediaStreamsModel? streams, int index) {
+  if (streams == null || index < 0) return streams;
+  final current = streams.currentVersionStream;
+  if (current == null) return streams;
+  final versions = [
+    for (final version in streams.versionStreams)
+      identical(version, current)
+          ? VersionStreamModel(
+              name: version.name,
+              index: version.index,
+              id: version.id,
+              defaultAudioStreamIndex: version.defaultAudioStreamIndex,
+              defaultSubStreamIndex: index,
+              videoStreams: version.videoStreams,
+              audioStreams: version.audioStreams,
+              subStreams: [
+                for (final sub in version.subStreams)
+                  sub.index == index
+                      ? sub.copyWith(language: 'fa', displayTitle: 'FA', name: 'FA', title: 'FA')
+                      : sub,
+              ],
+            )
+          : version,
+  ];
+  return streams.copyWith(defaultSubStreamIndex: index, versionStreams: versions);
 }

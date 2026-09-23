@@ -16,6 +16,7 @@ import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/sushi/sushi_audio_log.dart';
 import 'package:collection/collection.dart';
 import 'package:fladder/sushi/sushi_env.dart';
+import 'package:fladder/sushi/sushi_iran_content.dart';
 import 'package:fladder/sushi/sushi_memory_telemetry.dart';
 import 'package:fladder/sushi/sushi_native_playback.dart';
 import 'package:fladder/sushi/sushi_playback_repair.dart';
@@ -253,7 +254,27 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
         'hasPrevious': model.previousVideo != null,
       });
       ref.read(playBackModel.notifier).update((state) => newPlaybackModel);
-      await state.loadVideo(model, effectiveStartPosition, true);
+      final startPlan = SushiEnv.isEnabled && !preserveSelection
+          ? sushiPlanStartSubtitle(
+              subStreams: model.subStreams,
+              mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
+              isIranian: SushiIranContent.isIranian(
+                tags: model.item.overview.tags,
+                genres: model.item.overview.genreItems,
+                name: model.item.name,
+                mediaStreams: model.mediaStreams,
+              ),
+            )
+          : null;
+      if (startPlan?.choice == SushiStartSubtitle.sniffEmbedded) {
+        state.armEmbeddedSubtitleSniff();
+      }
+      await state.loadVideo(
+        model,
+        effectiveStartPosition,
+        true,
+        applyStartSubtitlePlan: startPlan != null,
+      );
       final settingsVolume = ref.read(videoPlayerSettingsProvider).volume;
       final backend = ref.read(videoPlayerSettingsProvider).wantedPlayer;
       SushiAudioLog.event('playback_load_volume', fields: {
@@ -277,17 +298,8 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
               subStreams: model.subStreams,
               mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
             );
-      // Sushi start: Automatic (online) first — keep muxed Farsi Off until auto/AI miss.
-      if (SushiEnv.isEnabled && !preserveSelection) {
-        final sourceName = model.mediaStreams?.currentVersionStream?.name;
-        final startChoice = sushiStartSubtitleChoice(
-          hardSub: sushiMediaSourceLooksHardSub(sourceName, subStreams: model.subStreams),
-          hasPersianSoft: sushiHasPersianSoftSub(model.subStreams),
-          isEnglishAudio: sushiIsEnglishLanguage(model.mediaStreams?.currentAudioStream?.language),
-        );
-        if (startChoice == SushiStartSubtitle.automaticOnline) {
-          resolvedSubIndex = -1;
-        }
+      if (startPlan != null) {
+        resolvedSubIndex = startPlan.index;
       }
       final resolvedSub = resolvedSubIndex == -1
           ? (model.subStreams?.firstWhereOrNull((s) => s.index == -1) ?? SubStreamModel.no())
@@ -326,8 +338,14 @@ class VideoPlayerNotifier extends StateNotifier<MediaControlsWrapper> {
 
       await state.play();
 
+      if (SushiEnv.isEnabled && !preserveSelection) {
+        if (startPlan?.choice == SushiStartSubtitle.sniffEmbedded) {
+          unawaited(state.awaitEmbeddedSniffThenMaybeOnline(model));
+        } else if (startPlan?.choice == SushiStartSubtitle.automaticOnline) {
+          unawaited(state.maybeSushiStartOnlineSubtitle(model));
+        }
+      }
       if (SushiEnv.isEnabled) {
-        unawaited(state.maybeSushiStartOnlineSubtitle(model));
         SushiStreamRepairBridge.register(ref, newPlaybackModel);
         final runtime = model.item.overview.runTime;
         // Keep buffering=true until ExoPlayer reports STATE_READY — premature false

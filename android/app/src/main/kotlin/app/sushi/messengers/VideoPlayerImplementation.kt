@@ -87,6 +87,20 @@ class VideoPlayerImplementation(
 
     private var playbackErrorListener: Player.Listener? = null
 
+    private val embeddedCueSeen = LinkedHashSet<String>()
+
+    fun resetEmbeddedCueForward() {
+        embeddedCueSeen.clear()
+    }
+
+    /** Forwards a handful of distinct muxed cues so Dart can tell Persian text from an `en` tag. */
+    fun forwardEmbeddedCue(text: String?) {
+        val cue = text?.trim().orEmpty()
+        if (cue.isEmpty() || cue in embeddedCueSeen || embeddedCueSeen.size >= 8) return
+        embeddedCueSeen.add(cue)
+        VideoPlayerObject.videoPlayerListener?.onEmbeddedSubtitleCue(cue) {}
+    }
+
     private var initialPositionLogPosted = false
 
     private fun scheduleInitialPositionLog(exo: ExoPlayer, requestedStartMs: Long) {
@@ -257,6 +271,7 @@ class VideoPlayerImplementation(
             // line above is what proved that, and is worth re-adding for a day if it recurs.
             // See [clearSession].
             playbackData.value = playableData
+            resetEmbeddedCueForward()
             savedPositionMs = playableData.startPosition.coerceAtLeast(0L)
             callback(Result.success(true))
             return
@@ -323,6 +338,22 @@ class VideoPlayerImplementation(
                 callback(Result.success(false))
             }
         }
+    }
+
+    override fun setEmbeddedSubtitleLanguage(index: Long, languageCode: String) {
+        val label = if (languageCode.equals("fa", ignoreCase = true)) "FA" else languageCode.uppercase()
+        val data = playbackData.value
+        if (data != null) {
+            playbackData.value = data.copy(
+                subtitleTracks = data.subtitleTracks.map { track ->
+                    if (track.index == index) track.copy(name = label, languageCode = languageCode) else track
+                },
+            )
+        }
+        VideoPlayerObject.usePersianSubtitleFace =
+            languageCode.equals("fa", ignoreCase = true) ||
+                languageCode.equals("per", ignoreCase = true) ||
+                languageCode.equals("fas", ignoreCase = true)
     }
 
     override fun clearExternalSubtitle(callback: (Result<Boolean>) -> Unit) {
@@ -657,6 +688,14 @@ fun ExoPlayer.properlySetSubAndAudioTracks(playableData: PlayableData) {
                     }
                 }
             }
+            val serverLang = playableData.subtitleTracks
+                .firstOrNull { it.index == currentSubIndex }
+                ?.languageCode
+                ?.lowercase()
+            VideoPlayerObject.usePersianSubtitleFace = serverLang == "fa" ||
+                serverLang == "per" ||
+                serverLang == "fas" ||
+                serverLang == "pes"
         }
         }
 

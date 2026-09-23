@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:fladder/models/items/media_streams_model.dart';
+import 'package:fladder/sushi/playback/sushi_persian_language.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 
 SubStreamModel _sub({
@@ -155,22 +156,18 @@ void main() {
     );
   });
 
-  test('non-hard-sub always starts Automatic; Farsi soft is last fallback', () {
+  test('fa label is the start track; online only when there is no fa label', () {
     expect(
       sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true),
-      SushiStartSubtitle.automaticOnline,
+      SushiStartSubtitle.persianSoft,
     );
     expect(
       sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: true, aiSet: false),
-      [SushiStartSubtitleStep.automaticOnline, SushiStartSubtitleStep.persianSoft],
+      [SushiStartSubtitleStep.persianSoft],
     );
     expect(
       sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: true, aiSet: true),
-      [
-        SushiStartSubtitleStep.automaticOnline,
-        SushiStartSubtitleStep.aiTranslate,
-        SushiStartSubtitleStep.persianSoft,
-      ],
+      [SushiStartSubtitleStep.persianSoft],
     );
     expect(
       sushiStartSubtitleSteps(hardSub: false, hasPersianSoft: false, aiSet: true),
@@ -213,20 +210,18 @@ void main() {
       ),
       SushiStartSubtitle.automaticOnline,
     );
-    expect(
-      sushiStartSubtitleSteps(
-        hardSub: false,
-        hasPersianSoft: sushiHasPersianSoftSub([SubStreamModel.no(), stub]),
-        aiSet: false,
-      ),
-      [SushiStartSubtitleStep.automaticOnline],
+    final plan = sushiPlanStartSubtitle(
+      subStreams: [SubStreamModel.no(), stub],
+      mediaSourceName: '1080p SoftSub',
     );
+    expect(plan.choice, SushiStartSubtitle.persianSoft);
+    expect(plan.index, 0);
   });
 
-  test('Off selection still runs Automatic even if a Farsi track exists', () {
+  test('fa label wins over a stale Off flag', () {
     expect(
       sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true, subtitleOff: true),
-      SushiStartSubtitle.automaticOnline,
+      SushiStartSubtitle.persianSoft,
     );
     expect(
       sushiStartSubtitleChoice(hardSub: true, hasPersianSoft: true, subtitleOff: true),
@@ -275,6 +270,34 @@ void main() {
       sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: true, isEnglishAudio: true, isIranian: true),
       SushiStartSubtitle.off,
     );
+  });
+
+  test('en or unknown label is sniffed; fa and other languages are not', () {
+    expect(sushiSubtitleLanguageNeedsScriptSniff('en'), isTrue);
+    expect(sushiSubtitleLanguageNeedsScriptSniff('eng'), isTrue);
+    expect(sushiSubtitleLanguageNeedsScriptSniff(''), isTrue);
+    expect(sushiSubtitleLanguageNeedsScriptSniff('und'), isTrue);
+    expect(sushiSubtitleLanguageNeedsScriptSniff('unknown'), isTrue);
+    expect(sushiSubtitleLanguageNeedsScriptSniff('fa'), isFalse);
+    expect(sushiSubtitleLanguageNeedsScriptSniff('fr'), isFalse);
+    expect(
+      sushiStartSubtitleChoice(hardSub: false, hasPersianSoft: false, needsScriptSniff: true),
+      SushiStartSubtitle.sniffEmbedded,
+    );
+    final en = _sub(index: 2, language: 'en', displayTitle: 'EN');
+    final plan = sushiPlanStartSubtitle(
+      subStreams: [SubStreamModel.no(), en],
+      mediaSourceName: '1080p SoftSub',
+    );
+    expect(plan.choice, SushiStartSubtitle.sniffEmbedded);
+    expect(plan.index, 2);
+  });
+
+  test('subtitle sample is Persian only when Arabic script is the body', () {
+    expect(sushiSubtitleSampleLooksPersian('سلام این یک جمله فارسی برای تست زیرنویس است'), isTrue);
+    expect(sushiSubtitleSampleLooksPersian('This is a full English subtitle line about the plot'), isFalse);
+    expect(sushiSubtitleSampleLooksPersian('Translated by علی\nRoss: We were on a break!'), isFalse);
+    expect(sushiSubtitleSampleLooksPersian('سلام'), isFalse);
   });
 
   test('sushiIsEnglishLanguage matches en/eng/en-* only', () {

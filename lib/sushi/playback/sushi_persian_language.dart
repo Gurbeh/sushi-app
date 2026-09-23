@@ -72,3 +72,38 @@ abstract final class SushiPersianLanguage {
     return isPersianFilmFromStreams(mediaStreams);
   }
 }
+
+/// Letter counts in a subtitle sample. Arabic-script block is what a Persian cue looks like
+/// when the container language tag is wrong.
+class SushiSubtitleScriptCounts {
+  const SushiSubtitleScriptCounts({required this.arabic, required this.latin});
+
+  final int arabic;
+  final int latin;
+
+  int get letters => arabic + latin;
+}
+
+SushiSubtitleScriptCounts sushiSubtitleScriptCounts(String sample) {
+  var arabic = 0;
+  var latin = 0;
+  for (final r in sample.runes) {
+    final arabicScript = (r >= 0x0600 && r <= 0x06FF) ||
+        (r >= 0x0750 && r <= 0x077F) ||
+        (r >= 0xFB50 && r <= 0xFDFF) ||
+        (r >= 0xFE70 && r <= 0xFEFF);
+    if (arabicScript) {
+      arabic++;
+    } else if ((r >= 0x41 && r <= 0x5A) || (r >= 0x61 && r <= 0x7A)) {
+      latin++;
+    }
+  }
+  return SushiSubtitleScriptCounts(arabic: arabic, latin: latin);
+}
+
+/// True when [sample] is mostly Persian/Arabic letters, not a Latin subtitle with one credit line.
+bool sushiSubtitleSampleLooksPersian(String sample) {
+  final counts = sushiSubtitleScriptCounts(sample);
+  if (counts.letters < 12) return false;
+  return counts.arabic >= 8 && counts.arabic * 2 >= counts.latin;
+}

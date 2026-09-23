@@ -35,6 +35,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -240,6 +241,13 @@ internal fun ExoPlayer(
             override fun onEvents(player: Player, events: Player.Events) {
                 super.onEvents(player, events)
                 updatePlaybackState()
+            }
+
+            override fun onCues(cueGroup: CueGroup) {
+                val impl = VideoPlayerObject.implementation
+                for (cue in cueGroup.cues) {
+                    impl.forwardEmbeddedCue(cue.text?.toString())
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {

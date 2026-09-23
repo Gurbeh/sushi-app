@@ -12,6 +12,7 @@ import 'package:fladder/models/playback/tv_playback_model.dart';
 import 'package:fladder/models/settings/video_player_settings.dart';
 import 'package:fladder/sushi/sushi_audio_log.dart';
 import 'package:fladder/sushi/sushi_playback_audio.dart';
+import 'package:fladder/sushi/sushi_iran_content.dart';
 import 'package:fladder/sushi/sushi_playback_subtitle.dart';
 import 'package:fladder/sushi/sushi_memory_telemetry.dart';
 import 'package:fladder/sushi/sushi_playback_telemetry.dart';
@@ -25,6 +26,9 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   final player = VideoPlayerApi();
   final activity = NativeVideoActivity();
   Timer? _playbackMemoryTimer;
+
+  /// Set while Dart is sampling muxed cues. Exo forwards them through [onEmbeddedSubtitleCue].
+  void Function(String text)? embeddedCueListener;
 
   @override
   Future<void> dispose() async {
@@ -190,6 +194,15 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   }
 
   @override
+  void onEmbeddedSubtitleCue(String text) {
+    embeddedCueListener?.call(text);
+  }
+
+  Future<void> setEmbeddedSubtitleLanguage(int index, String languageCode) {
+    return player.setEmbeddedSubtitleLanguage(index, languageCode);
+  }
+
+  @override
   void onPlaybackError(int errorCode, String errorCodeName, String? message) {
     unawaited(SushiPlaybackTelemetry.reportNativePlayerError(
       errorCode: errorCode,
@@ -210,8 +223,21 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
   Future<void> sendPlaybackDataToNative(
     BuildContext? context,
     PlaybackModel model,
-    Duration startPosition,
-  ) async {
+    Duration startPosition, {
+    bool applyStartSubtitlePlan = false,
+  }) async {
+    final startPlan = applyStartSubtitlePlan
+        ? sushiPlanStartSubtitle(
+            subStreams: model.subStreams,
+            mediaSourceName: model.mediaStreams?.currentVersionStream?.name,
+            isIranian: SushiIranContent.isIranian(
+              tags: model.item.overview.tags,
+              genres: model.item.overview.genreItems,
+              name: model.item.name,
+              mediaStreams: model.mediaStreams,
+            ),
+          )
+        : null;
     final playableData = PlayableData(
       currentItem: model.item.toSimpleItem(context),
       startPosition: startPosition.inMilliseconds,
@@ -231,7 +257,8 @@ class NativePlayer extends BasePlayer implements VideoPlayerListenerCallback {
               )
               .toList() ??
           [],
-      defaultSubtrack: sushiResolveSubtitleStreamIndex(
+      defaultSubtrack: startPlan?.index ??
+          sushiResolveSubtitleStreamIndex(
             selectedIndex: model.mediaStreams?.defaultSubStreamIndex,
             serverDefaultIndex: model.mediaStreams?.defaultSubStreamIndex,
             subStreams: model.subStreams,

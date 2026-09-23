@@ -1830,6 +1830,30 @@ class VideoPlayerApi {
       return (pigeonVar_replyList[0] as bool?)!;
     }
   }
+
+  /// After a text sniff says the muxed track is Persian, rewrite the picker label.
+  Future<void> setEmbeddedSubtitleLanguage(int index, String languageCode) async {
+    final String pigeonVar_channelName = 'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerApi.setEmbeddedSubtitleLanguage$pigeonVar_messageChannelSuffix';
+    final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[index, languageCode]);
+    final List<Object?>? pigeonVar_replyList =
+        await pigeonVar_sendFuture as List<Object?>?;
+    if (pigeonVar_replyList == null) {
+      throw _createConnectionError(pigeonVar_channelName);
+    } else if (pigeonVar_replyList.length > 1) {
+      throw PlatformException(
+        code: pigeonVar_replyList[0]! as String,
+        message: pigeonVar_replyList[1] as String?,
+        details: pigeonVar_replyList[2],
+      );
+    } else {
+      return;
+    }
+  }
 }
 
 abstract class VideoPlayerListenerCallback {
@@ -1842,6 +1866,9 @@ abstract class VideoPlayerListenerCallback {
 
   /// ExoPlayer [PlaybackException] surfaced to Dart for Sentry / Crashlytics.
   void onPlaybackError(int errorCode, String errorCodeName, String? message);
+
+  /// One decoded cue from the muxed text track, for the English/unknown script sniff.
+  void onEmbeddedSubtitleCue(String text);
 
   static void setUp(VideoPlayerListenerCallback? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
     messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
@@ -1918,6 +1945,31 @@ abstract class VideoPlayerListenerCallback {
           final String? arg_message = (args[2] as String?);
           try {
             api.onPlaybackError(arg_errorCode!, arg_errorCodeName!, arg_message);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          }          catch (e) {
+            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          }
+        });
+      }
+    }
+    {
+      final BasicMessageChannel<Object?> pigeonVar_channel = BasicMessageChannel<Object?>(
+          'dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onEmbeddedSubtitleCue$messageChannelSuffix', pigeonChannelCodec,
+          binaryMessenger: binaryMessenger);
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          assert(message != null,
+          'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onEmbeddedSubtitleCue was null.');
+          final List<Object?> args = (message as List<Object?>?)!;
+          final String? arg_text = (args[0] as String?);
+          assert(arg_text != null,
+              'Argument for dev.flutter.pigeon.nl_jknaapen_fladder.video.VideoPlayerListenerCallback.onEmbeddedSubtitleCue was null, expected non-null String.');
+          try {
+            api.onEmbeddedSubtitleCue(arg_text!);
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
