@@ -128,16 +128,15 @@ class _ItemDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                           selectedIcon: IconsaxPlusBold.heart,
                           icon: IconsaxPlusLinear.heart,
                         ),
-                        SelectableIconButton(
-                          onPressed: () async {
-                            await ref
-                                .read(userProvider.notifier)
-                                .markAsPlayed(!episodePlayed, episodeDetails.id);
-                          },
-                          selected: episodePlayed,
-                          selectedIcon: IconsaxPlusBold.tick_circle,
-                          icon: IconsaxPlusLinear.tick_circle,
-                        ),
+                        if (episodePlayed)
+                          SelectableIconButton(
+                            onPressed: () async {
+                              await ref.read(userProvider.notifier).markAsPlayed(false, episodeDetails.id);
+                            },
+                            selected: true,
+                            selectedIcon: IconsaxPlusBold.tick_circle,
+                            icon: IconsaxPlusLinear.tick_circle,
+                          ),
                         SelectableIconButton(
                           refreshOnEnd: false,
                           onPressed: () async {

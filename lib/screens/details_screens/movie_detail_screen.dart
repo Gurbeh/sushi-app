@@ -164,15 +164,15 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                             );
                           },
                         ),
-                        SelectableIconButton(
-                          onPressed: () async {
-                            await ref.read(userProvider.notifier).markAsPlayed(
-                                !details.userData.played, details.id);
-                          },
-                          selected: details.userData.played,
-                          selectedIcon: IconsaxPlusBold.tick_circle,
-                          icon: IconsaxPlusLinear.tick_circle,
-                        ),
+                        if (details.userData.played)
+                          SelectableIconButton(
+                            onPressed: () async {
+                              await ref.read(userProvider.notifier).markAsPlayed(false, details.id);
+                            },
+                            selected: true,
+                            selectedIcon: IconsaxPlusBold.tick_circle,
+                            icon: IconsaxPlusLinear.tick_circle,
+                          ),
                         SelectableIconButton(
                           refreshOnEnd: false,
                           onPressed: () async {

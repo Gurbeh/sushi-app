@@ -194,17 +194,16 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                             );
                           },
                         ),
-                        SelectableIconButton(
-                          onPressed: () async {
-                            final target = currentEpisode;
-                            final markId = target?.id ?? details.id;
-                            final played = target?.userData.played ?? details.userData.played;
-                            await ref.read(userProvider.notifier).markAsPlayed(!played, markId);
-                          },
-                          selected: currentEpisode?.userData.played ?? details.userData.played,
-                          selectedIcon: IconsaxPlusBold.tick_circle,
-                          icon: IconsaxPlusLinear.tick_circle,
-                        ),
+                        if (currentEpisode?.userData.played ?? false)
+                          SelectableIconButton(
+                            onPressed: () async {
+                              final markId = currentEpisode?.id ?? details.id;
+                              await ref.read(userProvider.notifier).markAsPlayed(false, markId);
+                            },
+                            selected: true,
+                            selectedIcon: IconsaxPlusBold.tick_circle,
+                            icon: IconsaxPlusLinear.tick_circle,
+                          ),
                         SelectableIconButton(
                           onPressed: () async {
                             final trailer = await ref.read(

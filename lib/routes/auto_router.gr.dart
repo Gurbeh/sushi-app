@@ -53,7 +53,6 @@ import 'package:fladder/screens/settings/settings_selection_screen.dart'
 import 'package:fladder/screens/splash_screen.dart' as _i27;
 import 'package:fladder/screens/syncing/synced_screen.dart' as _i31;
 import 'package:fladder/screens/watch_later/watch_later_screen.dart' as _i32;
-import 'package:fladder/sushi/sushi_help_screen.dart' as _i28;
 import 'package:fladder/sushi/sushi_login_screen.dart' as _i29;
 import 'package:fladder/sushi/sushi_playback_diag_screen.dart' as _i30;
 import 'package:flutter/foundation.dart' as _i36;
@@ -865,22 +864,6 @@ class SplashRouteArgs {
 
   @override
   int get hashCode => key.hashCode;
-}
-
-/// generated route for
-/// [_i28.SushiHelpScreen]
-class SushiHelpRoute extends _i33.PageRouteInfo<void> {
-  const SushiHelpRoute({List<_i33.PageRouteInfo>? children})
-      : super(SushiHelpRoute.name, initialChildren: children);
-
-  static const String name = 'SushiHelpRoute';
-
-  static _i33.PageInfo page = _i33.PageInfo(
-    name,
-    builder: (data) {
-      return const _i28.SushiHelpScreen();
-    },
-  );
 }
 
 /// generated route for

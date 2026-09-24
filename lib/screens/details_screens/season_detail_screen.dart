@@ -9,6 +9,7 @@ import 'package:fladder/models/items/season_model.dart';
 import 'package:fladder/providers/items/season_details_provider.dart';
 import 'package:fladder/providers/user_provider.dart';
 import 'package:fladder/sushi/sushi_library_detail_labels.dart';
+import 'package:fladder/sushi/sushi_season_availability.dart';
 import 'package:fladder/sushi/sushi_season_playable.dart';
 import 'package:fladder/sushi/sushi_season_user_data.dart';
 import 'package:fladder/sushi/sushi_season_watch_actions.dart';
@@ -28,6 +29,8 @@ import 'package:fladder/util/people_extension.dart';
 import 'package:fladder/util/string_extensions.dart';
 import 'package:fladder/util/theme_extensions.dart';
 import 'package:fladder/util/widget_extensions.dart';
+import 'package:fladder/widgets/shared/item_actions.dart';
+import 'package:fladder/widgets/shared/modal_bottom_sheet.dart';
 import 'package:fladder/widgets/shared/selectable_icon_button.dart';
 
 class SeasonDetailScreen extends ConsumerStatefulWidget {
@@ -124,16 +127,47 @@ class _SeasonDetailScreenState extends ConsumerState<SeasonDetailScreen> {
                                 selectedIcon: IconsaxPlusBold.heart,
                                 icon: IconsaxPlusLinear.heart,
                               ),
-                            if (sushiSeasonHasPlayableEpisodes(details))
+                            if (sushiSeasonHasPlayableEpisodes(details) &&
+                                sushiSeasonShowWatchedTick(details))
                               SelectableIconButton(
-                                onPressed: () async => await sushiSeasonMarkPlayed(
-                                  ref,
-                                  details,
-                                  !details.userData.played,
-                                ),
-                                selected: details.userData.played,
+                                onPressed: () async => await sushiSeasonMarkPlayed(ref, details, false),
+                                selected: true,
                                 selectedIcon: IconsaxPlusBold.tick_circle,
                                 icon: IconsaxPlusLinear.tick_circle,
+                              ),
+                            if (sushiSeasonHasPlayableEpisodes(details))
+                              SelectableIconButton(
+                                refreshOnEnd: false,
+                                onPressed: () async {
+                                  final played = sushiSeasonShowWatchedTick(details);
+                                  await showBottomSheetPill(
+                                    context: context,
+                                    content: (sheetContext, scrollController) => ListView(
+                                      controller: scrollController,
+                                      shrinkWrap: true,
+                                      children: [
+                                        ItemActionButton(
+                                          icon: Icon(
+                                            played ? IconsaxPlusLinear.eye_slash : IconsaxPlusLinear.eye,
+                                          ),
+                                          label: Text(
+                                            played
+                                                ? context.localized.markAsUnwatched
+                                                : context.localized.markAsWatched,
+                                          ),
+                                          action: () => sushiSeasonMarkPlayed(ref, details, !played),
+                                        ),
+                                        ItemActionDivider(),
+                                        ...details.generateActions(context, ref, exclude: {
+                                          ItemActions.markPlayed,
+                                          ItemActions.markUnplayed,
+                                        }),
+                                      ].listTileItems(sheetContext, useIcons: true),
+                                    ),
+                                  );
+                                },
+                                selected: false,
+                                icon: IconsaxPlusLinear.more,
                               ),
                           ],
                         ),

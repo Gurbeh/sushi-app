@@ -92,7 +92,6 @@ final List<AutoRoute> _defaultRoutes = [
   AutoRoute(page: SplashRoute.page, path: '/splash'),
   AutoRoute(page: LoginRoute.page, path: '/login', maintainState: false),
   AutoRoute(page: SushiLoginRoute.page, path: '/sushi-login', maintainState: false),
-  AutoRoute(page: SushiHelpRoute.page, path: '/sushi-help'),
 ];
 
 final List<AutoRoute> _settingsChildren = [
@@ -134,7 +133,6 @@ class AuthGuard extends AutoRouteGuard {
     if (ref.read(userProvider) != null ||
         resolver.routeName == LoginRoute().routeName ||
         resolver.routeName == const SushiLoginRoute().routeName ||
-        resolver.routeName == const SushiHelpRoute().routeName ||
         resolver.routeName == SplashRoute().routeName) {
       // We assume the last main focus is no longer active after navigating
       lastMainFocus = null;
