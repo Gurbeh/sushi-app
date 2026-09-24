@@ -67,41 +67,49 @@ class MediaPlayButton extends ConsumerWidget {
       duration: const Duration(milliseconds: 250),
       child: onPressed == null
           ? const SizedBox.shrink(key: ValueKey('empty'))
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              spacing: 4,
-              children: [
-                Flexible(
-                  child: PositionProvider(
-                    position: PositionContext.first,
-                    child: _PlayButton(
-                      onPressed: onPressed,
-                      onLongPressed: onLongPressed,
-                      autoFocus: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
-                      forceFocusOutline: forceFocusOutline,
-                      progress: progress,
-                      buttonTitle: buttonTitle,
-                      theme: theme,
-                      radius: radius,
-                      smallRadius: smallRadius,
-                      showRestart: showRestart,
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final expand = AdaptiveLayout.viewSizeOf(context) == ViewSize.phone &&
+                    constraints.hasBoundedWidth &&
+                    constraints.maxWidth < double.infinity;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+                  spacing: 4,
+                  children: [
+                    Flexible(
+                      fit: expand ? FlexFit.tight : FlexFit.loose,
+                      child: PositionProvider(
+                        position: PositionContext.first,
+                        child: _PlayButton(
+                          onPressed: onPressed,
+                          onLongPressed: onLongPressed,
+                          autoFocus: AdaptiveLayout.inputDeviceOf(context) == InputDevice.dPad,
+                          forceFocusOutline: forceFocusOutline,
+                          progress: progress,
+                          buttonTitle: buttonTitle,
+                          theme: theme,
+                          radius: radius,
+                          smallRadius: smallRadius,
+                          showRestart: showRestart,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                if (showRestart)
-                  PositionProvider(
-                    position: PositionContext.last,
-                    child: _RestartButton(
-                      onPressed: onPressed,
-                      onLongPressed: onLongPressed,
-                      forceFocusOutline: forceFocusOutline,
-                      theme: theme,
-                      radius: radius,
-                      smallRadius: smallRadius,
-                    ),
-                  ),
-              ],
+                    if (showRestart)
+                      PositionProvider(
+                        position: PositionContext.last,
+                        child: _RestartButton(
+                          onPressed: onPressed,
+                          onLongPressed: onLongPressed,
+                          forceFocusOutline: forceFocusOutline,
+                          theme: theme,
+                          radius: radius,
+                          smallRadius: smallRadius,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
     );
   }

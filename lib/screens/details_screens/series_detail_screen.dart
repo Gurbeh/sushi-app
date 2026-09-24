@@ -70,6 +70,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         : sushiPaintSeriesWatchState(detailsRaw, playedIds: playedIds);
     final wrapAlignment =
         AdaptiveLayout.viewSizeOf(context) != ViewSize.phone ? WrapAlignment.start : WrapAlignment.center;
+    final isPhone = AdaptiveLayout.viewSizeOf(context) == ViewSize.phone;
 
     final currentEpisode = sushiSeriesDetailPlayTarget(details);
     final sushiHasPlayback = details != null && sushiItemHasPlaybackActions(details);
@@ -80,6 +81,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final sushiResolved = sushiTitleResolved(ref, details?.id, sushiEnabled: true);
     final sushiSeriesRequestTmdb = details != null && sushiResolved && !sushiHasPlayback && !sushiCarried
         ? sushiTmdbIdFromItemId(details.id)
+        : null;
+    final MediaStreamHelper? streamHelper = currentEpisode != null &&
+            sushiShowMediaStreamHelper(currentEpisode.mediaStreams)
+        ? MediaStreamHelper(
+            mediaStream: currentEpisode.mediaStreams,
+            onItemChanged: (changed) {
+              sushiOnUserMediaStreamsChanged(ref, changed, currentEpisode);
+              final updateEpisode = currentEpisode.copyWith(mediaStreams: changed);
+              ref.read(providerId.notifier).updateEpisodeInfo(updateEpisode);
+            },
+          )
         : null;
 
     return DetailScaffold(
@@ -101,8 +113,105 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
       ),
       onRefresh: () => ref.read(providerId.notifier).fetchDetails(widget.item),
       backDrops: details?.images,
-      content: (detailsContext, padding) => details != null
-          ? Padding(
+      content: (detailsContext, padding) {
+        if (details == null) {
+          return SushiDetailLoadingContent(item: widget.item, padding: padding);
+        }
+        final actionChildren = <Widget>[
+            Consumer(
+              builder: (context, ref, _) {
+                final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                    const SushiItemFlags();
+                return SelectableIconButton(
+                  onPressed: () async {
+                    await ref
+                        .read(sushiItemFlagsProvider.notifier)
+                        .setWatchLater(details, !flags.watchLater);
+                  },
+                  selected: flags.watchLater,
+                  selectedIcon: IconsaxPlusBold.clock,
+                  icon: IconsaxPlusLinear.clock,
+                );
+              },
+            ),
+            // Follow the series for new-episode notifications (ADR 0014 §D3).
+            Consumer(
+              builder: (context, ref, _) {
+                final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                    const SushiItemFlags();
+                return SelectableIconButton(
+                  onPressed: () async {
+                    await ref
+                        .read(sushiItemFlagsProvider.notifier)
+                        .setFollowing(details, !flags.following);
+                  },
+                  selected: flags.following,
+                  selectedIcon: IconsaxPlusBold.notification,
+                  icon: IconsaxPlusLinear.notification,
+                  // Phone: icon-only — shares the quality wrap with watch-later / ⋯.
+                  label: isPhone
+                      ? null
+                      : (flags.following
+                          ? context.localized.sushiFollowing
+                          : context.localized.sushiFollow),
+                );
+              },
+            ),
+            if (currentEpisode?.userData.played ?? false)
+              SelectableIconButton(
+                onPressed: () async {
+                  final markId = currentEpisode?.id ?? details.id;
+                  await ref.read(userProvider.notifier).markAsPlayed(false, markId);
+                },
+                selected: true,
+                selectedIcon: IconsaxPlusBold.tick_circle,
+                icon: IconsaxPlusLinear.tick_circle,
+              ),
+            SelectableIconButton(
+              onPressed: () async {
+                final trailer = await ref.read(
+                  sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.series)).future,
+                );
+                if (!detailsContext.mounted) return;
+                final actions = sushiInsertWatchedTrailer(
+                  details.generateActions(detailsContext, ref, exclude: {
+                    ItemActions.openParent,
+                    ItemActions.details,
+                    if (!sushiHasPlayback) ...{
+                      ItemActions.play,
+                      ItemActions.playFromStart,
+                      ItemActions.download,
+                    },
+                  }),
+                  state: trailer,
+                  engaged: (currentEpisode?.userData.played ?? details.userData.played) ||
+                      (currentEpisode?.progress ?? details.progress) != 0,
+                  onOpen: () => SushiTrailerPlayer.open(
+                    detailsContext,
+                    youtubeKey: trailer.trailerKey,
+                    title: details.name,
+                  ),
+                );
+                await showBottomSheetPill(
+                  context: detailsContext,
+                  item: details,
+                  content: (context, scrollController) => ListView(
+                    controller: scrollController,
+                    shrinkWrap: true,
+                    children: actions.listTileItems(context, useIcons: true),
+                  ),
+                );
+              },
+              selected: false,
+              refreshOnEnd: false,
+              icon: IconsaxPlusLinear.more,
+            ),
+          ];
+        final actionButtons = SushiDetailActionLayout(
+          alignment: wrapAlignment,
+          children: actionChildren,
+        );
+        return Padding(
               padding: const EdgeInsets.only(bottom: 64),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
@@ -117,6 +226,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       title: details.name,
                       engaged: (currentEpisode?.userData.played ?? details.userData.played) ||
                           (currentEpisode?.progress ?? details.progress) != 0,
+                      versionHelper: streamHelper,
+                      trailingActions: isPhone ? actionChildren : const [],
                       primary: currentEpisode != null && (sushiHasPlayback || sushiCarried)
                         ? SushiSeriesDetailPlayButtons(
                             series: details,
@@ -155,96 +266,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                               )
                             : null,
                     ),
-                    centerButtons: SushiDetailActionLayout(
-                      alignment: wrapAlignment,
-                      children: [
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                const SushiItemFlags();
-                            return SelectableIconButton(
-                              onPressed: () async {
-                                await ref
-                                    .read(sushiItemFlagsProvider.notifier)
-                                    .setWatchLater(details, !flags.watchLater);
-                              },
-                              selected: flags.watchLater,
-                              selectedIcon: IconsaxPlusBold.clock,
-                              icon: IconsaxPlusLinear.clock,
-                            );
-                          },
-                        ),
-                        // Follow the series for new-episode notifications (ADR 0014 §D3).
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                const SushiItemFlags();
-                            return SelectableIconButton(
-                              onPressed: () async {
-                                await ref
-                                    .read(sushiItemFlagsProvider.notifier)
-                                    .setFollowing(details, !flags.following);
-                              },
-                              selected: flags.following,
-                              selectedIcon: IconsaxPlusBold.notification,
-                              icon: IconsaxPlusLinear.notification,
-                              label: flags.following
-                                  ? context.localized.sushiFollowing
-                                  : context.localized.sushiFollow,
-                            );
-                          },
-                        ),
-                        if (currentEpisode?.userData.played ?? false)
-                          SelectableIconButton(
-                            onPressed: () async {
-                              final markId = currentEpisode?.id ?? details.id;
-                              await ref.read(userProvider.notifier).markAsPlayed(false, markId);
-                            },
-                            selected: true,
-                            selectedIcon: IconsaxPlusBold.tick_circle,
-                            icon: IconsaxPlusLinear.tick_circle,
-                          ),
-                        SelectableIconButton(
-                          onPressed: () async {
-                            final trailer = await ref.read(
-                              sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.series)).future,
-                            );
-                            if (!detailsContext.mounted) return;
-                            final actions = sushiInsertWatchedTrailer(
-                              details.generateActions(detailsContext, ref, exclude: {
-                                ItemActions.openParent,
-                                ItemActions.details,
-                                if (!sushiHasPlayback) ...{
-                                  ItemActions.play,
-                                  ItemActions.playFromStart,
-                                  ItemActions.download,
-                                },
-                              }),
-                              state: trailer,
-                              engaged: (currentEpisode?.userData.played ?? details.userData.played) ||
-                                  (currentEpisode?.progress ?? details.progress) != 0,
-                              onOpen: () => SushiTrailerPlayer.open(
-                                detailsContext,
-                                youtubeKey: trailer.trailerKey,
-                                title: details.name,
-                              ),
-                            );
-                            await showBottomSheetPill(
-                              context: detailsContext,
-                              item: details,
-                              content: (context, scrollController) => ListView(
-                                controller: scrollController,
-                                shrinkWrap: true,
-                                children: actions.listTileItems(context, useIcons: true),
-                              ),
-                            );
-                          },
-                          selected: false,
-                          refreshOnEnd: false,
-                          icon: IconsaxPlusLinear.more,
-                        ),
-                      ],
-                    ),
+                    centerButtons: isPhone ? null : actionButtons,
                     padding: padding,
                     originalTitle: details.originalTitle,
                     productionYear: details.overview.yearAired.toString(),
@@ -260,23 +282,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       widget.item.id,
                       details.overview,
                     ),
-                    mediaStreamHelper: currentEpisode != null &&
-                            sushiShowMediaStreamHelper(currentEpisode.mediaStreams)
-                        ? MediaStreamHelper(
-                            mediaStream: currentEpisode.mediaStreams,
-                            onItemChanged: (changed) {
-                              sushiOnUserMediaStreamsChanged(
-                                ref,
-                                changed,
-                                currentEpisode,
-                              );
-                              final updateEpisode = currentEpisode.copyWith(
-                                mediaStreams: changed,
-                              );
-                              ref.read(providerId.notifier).updateEpisodeInfo(updateEpisode);
-                            },
-                          )
-                        : null,
+                    mediaStreamHelper: streamHelper,
                   ),
                   if (details.overview.summary.isNotEmpty)
                     Padding(
@@ -359,8 +365,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     )
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
-            )
-          : SushiDetailLoadingContent(item: widget.item, padding: padding),
+            );
+      },
     );
   }
 }

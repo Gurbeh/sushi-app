@@ -67,6 +67,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
     final wrapAlignment = AdaptiveLayout.viewSizeOf(context) != ViewSize.phone
         ? WrapAlignment.start
         : WrapAlignment.center;
+    final isPhone = AdaptiveLayout.viewSizeOf(context) == ViewSize.phone;
     final hasPlayableMedia = details != null && sushiMovieHasPlayableMedia(details);
     // Only after /item has resolved (sushiTitleResolved): before that the placeholder card cannot
     // tell "no file" from "not loaded", which flashed Request before Play. Until resolved,
@@ -77,6 +78,16 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
             details.canDownload == false &&
             !hasPlayableMedia
         ? sushiTmdbIdFromItemId(details.id)
+        : null;
+    final MediaStreamHelper? streamHelper = details != null &&
+            sushiShowMediaStreamHelper(details.mediaStreams)
+        ? MediaStreamHelper(
+            mediaStream: details.mediaStreams,
+            onItemChanged: (changed) {
+              sushiOnUserMediaStreamsChanged(ref, changed, details);
+              ref.read(providerInstance.notifier).setMediaStreamHelper(changed);
+            },
+          )
         : null;
 
     return DetailScaffold(
@@ -99,8 +110,77 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
       onRefresh: () async =>
           await ref.read(providerInstance.notifier).fetchDetails(widget.item),
       backDrops: details?.images,
-      content: (detailsContext, padding) => details != null
-          ? Padding(
+      content: (detailsContext, padding) {
+        if (details == null) {
+          return SushiDetailLoadingContent(item: widget.item, padding: padding);
+        }
+        final actionChildren = <Widget>[
+            Consumer(
+              builder: (context, ref, _) {
+                final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
+                    const SushiItemFlags();
+                return SelectableIconButton(
+                  onPressed: () async {
+                    await ref
+                        .read(sushiItemFlagsProvider.notifier)
+                        .setWatchLater(details, !flags.watchLater);
+                  },
+                  selected: flags.watchLater,
+                  selectedIcon: IconsaxPlusBold.clock,
+                  icon: IconsaxPlusLinear.clock,
+                );
+              },
+            ),
+            if (details.userData.played)
+              SelectableIconButton(
+                onPressed: () async {
+                  await ref.read(userProvider.notifier).markAsPlayed(false, details.id);
+                },
+                selected: true,
+                selectedIcon: IconsaxPlusBold.tick_circle,
+                icon: IconsaxPlusLinear.tick_circle,
+              ),
+            SelectableIconButton(
+              refreshOnEnd: false,
+              onPressed: () async {
+                final trailer = await ref.read(
+                  sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.movie)).future,
+                );
+                if (!detailsContext.mounted) return;
+                final actions = sushiInsertWatchedTrailer(
+                  details.generateActions(detailsContext, ref, exclude: {
+                    if (!hasPlayableMedia) ...{
+                      ItemActions.play,
+                      ItemActions.playFromStart,
+                      ItemActions.download,
+                    },
+                  }),
+                  state: trailer,
+                  engaged: details.userData.played || details.progress != 0,
+                  onOpen: () => SushiTrailerPlayer.open(
+                    detailsContext,
+                    youtubeKey: trailer.trailerKey,
+                    title: details.name,
+                  ),
+                );
+                await showBottomSheetPill(
+                  context: detailsContext,
+                  content: (context, scrollController) => ListView(
+                    controller: scrollController,
+                    shrinkWrap: true,
+                    children: actions.listTileItems(context, useIcons: true),
+                  ),
+                );
+              },
+              selected: false,
+              icon: IconsaxPlusLinear.more,
+            ),
+          ];
+        final actionButtons = SushiDetailActionLayout(
+          alignment: wrapAlignment,
+          children: actionChildren,
+        );
+        return Padding(
               padding: const EdgeInsets.only(bottom: 64),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
@@ -115,6 +195,8 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       kind: SushiKind.movie,
                       title: details.name,
                       engaged: details.userData.played || details.progress != 0,
+                      versionHelper: streamHelper,
+                      trailingActions: isPhone ? actionChildren : const [],
                       primary: hasPlayableMedia
                           ? MediaPlayButton(
                               item: details,
@@ -145,71 +227,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                                 )
                               : null,
                     ),
-                    centerButtons: SushiDetailActionLayout(
-                      alignment: wrapAlignment,
-                      children: [
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final flags = ref.watch(sushiItemFlagsProvider)[details.id] ??
-                                const SushiItemFlags();
-                            return SelectableIconButton(
-                              onPressed: () async {
-                                await ref
-                                    .read(sushiItemFlagsProvider.notifier)
-                                    .setWatchLater(details, !flags.watchLater);
-                              },
-                              selected: flags.watchLater,
-                              selectedIcon: IconsaxPlusBold.clock,
-                              icon: IconsaxPlusLinear.clock,
-                            );
-                          },
-                        ),
-                        if (details.userData.played)
-                          SelectableIconButton(
-                            onPressed: () async {
-                              await ref.read(userProvider.notifier).markAsPlayed(false, details.id);
-                            },
-                            selected: true,
-                            selectedIcon: IconsaxPlusBold.tick_circle,
-                            icon: IconsaxPlusLinear.tick_circle,
-                          ),
-                        SelectableIconButton(
-                          refreshOnEnd: false,
-                          onPressed: () async {
-                            final trailer = await ref.read(
-                              sushiTrailerStateProvider((itemId: details.id, kind: SushiKind.movie)).future,
-                            );
-                            if (!detailsContext.mounted) return;
-                            final actions = sushiInsertWatchedTrailer(
-                              details.generateActions(detailsContext, ref, exclude: {
-                                if (!hasPlayableMedia) ...{
-                                  ItemActions.play,
-                                  ItemActions.playFromStart,
-                                  ItemActions.download,
-                                },
-                              }),
-                              state: trailer,
-                              engaged: details.userData.played || details.progress != 0,
-                              onOpen: () => SushiTrailerPlayer.open(
-                                detailsContext,
-                                youtubeKey: trailer.trailerKey,
-                                title: details.name,
-                              ),
-                            );
-                            await showBottomSheetPill(
-                              context: detailsContext,
-                              content: (context, scrollController) => ListView(
-                                controller: scrollController,
-                                shrinkWrap: true,
-                                children: actions.listTileItems(context, useIcons: true),
-                              ),
-                            );
-                          },
-                          selected: false,
-                          icon: IconsaxPlusLinear.more,
-                        ),
-                      ],
-                    ),
+                    centerButtons: isPhone ? null : actionButtons,
                     originalTitle: details.originalTitle,
                     productionYear: details.premiereDate.year.toString(),
                     runTime: details.overview.runTime,
@@ -224,22 +242,7 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                       widget.item.id,
                       details.overview,
                     ),
-                    mediaStreamHelper:
-                        sushiShowMediaStreamHelper(details.mediaStreams)
-                            ? MediaStreamHelper(
-                                mediaStream: details.mediaStreams,
-                                onItemChanged: (changed) {
-                                  sushiOnUserMediaStreamsChanged(
-                                    ref,
-                                    changed,
-                                    details,
-                                  );
-                                  ref
-                                      .read(providerInstance.notifier)
-                                      .setMediaStreamHelper(changed);
-                                },
-                              )
-                            : null,
+                    mediaStreamHelper: streamHelper,
                   ),
                   if (details.overview.summary.isNotEmpty == true)
                     ExpandingText(
@@ -294,8 +297,8 @@ class _ItemDetailScreenState extends ConsumerState<MovieDetailScreen> {
                     )
                 ].addPadding(const EdgeInsets.symmetric(vertical: 16)),
               ),
-            )
-          : SushiDetailLoadingContent(item: widget.item, padding: padding),
+            );
+      },
     );
   }
 }

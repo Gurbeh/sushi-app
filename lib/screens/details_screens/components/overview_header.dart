@@ -267,34 +267,14 @@ class OverviewHeader extends ConsumerWidget {
             ),
             if (summary != null) summary!,
             if (AdaptiveLayout.viewSizeOf(context) <= ViewSize.phone)
+              // Trailer / quality / watch-later / ⋯ live inside [SushiDetailPrimaryRow].
               Column(
                 mainAxisSize: MainAxisSize.min,
-                spacing: 6,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 8,
                 children: [
                   if (mainButton != null) mainButton!,
-                  if (mediaStreamHelper != null)
-                    Center(
-                      child: FittedBox(
-                        child: Row(
-                          spacing: 4,
-                          mainAxisSize: MainAxisSize.min,
-                          children: streamOptionsButtons,
-                        ),
-                      ),
-                    ),
-                  if (centerButtons != null) centerButtons!,
-                ].addInBetween(
-                  Center(
-                    child: Container(
-                      width: 12,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.onSurface.withAlpha(64),
-                        borderRadius: FladderTheme.smallShape.borderRadius,
-                      ),
-                    ),
-                  ),
-                ),
+                ],
               )
             else
               Flexible(

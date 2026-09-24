@@ -13,6 +13,8 @@ class SushiEnumBox extends StatelessWidget {
   final String? current;
   final Widget? currentWidget;
   final bool autoFocus;
+  /// Surface chip next to Trailer — must not match Play's primaryContainer.
+  final bool secondary;
   final List<ItemAction> Function(BuildContext context) itemBuilder;
   final Function(bool focused)? onFocusChanged;
 
@@ -20,6 +22,7 @@ class SushiEnumBox extends StatelessWidget {
     this.current,
     this.currentWidget,
     this.autoFocus = false,
+    this.secondary = false,
     required this.itemBuilder,
     this.onFocusChanged,
     super.key,
@@ -30,11 +33,13 @@ class SushiEnumBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final textStyle = Theme.of(context).textTheme.titleMedium;
     const padding = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
     final itemList = itemBuilder(context);
     final useBottomSheet = AdaptiveLayout.inputDeviceOf(context) != InputDevice.pointer;
-    final foreGroundColor = Theme.of(context).colorScheme.onPrimaryContainer;
+    final foreGroundColor = secondary ? scheme.onSurface : scheme.onPrimaryContainer;
+    final fillColor = secondary ? scheme.surfaceContainerLow : scheme.primaryContainer;
     final hasItems = itemList.isNotEmpty;
     final hasMultipleItems = itemList.length > 1;
 
@@ -61,25 +66,24 @@ class SushiEnumBox extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Flexible(
-              child: currentWidget != null
-                  ? DefaultTextStyle.merge(
-                      style: textStyle?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: foreGroundColor,
-                      ),
-                      child: currentWidget!,
-                    )
-                  : Text(current ?? '', textAlign: TextAlign.start),
-            ),
-            const SizedBox(width: 6),
-            if (hasMultipleItems)
+            if (currentWidget != null)
+              DefaultTextStyle.merge(
+                style: textStyle?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: foreGroundColor,
+                ),
+                child: currentWidget!,
+              )
+            else
+              Text(current ?? '', textAlign: TextAlign.start),
+            if (hasMultipleItems) ...[
+              const SizedBox(width: 6),
               Icon(
                 Icons.keyboard_arrow_down,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                color: foreGroundColor,
               ),
+            ],
           ],
         ),
       ),
@@ -91,12 +95,13 @@ class SushiEnumBox extends StatelessWidget {
       right: position == null || position == PositionContext.last ? const Radius.circular(16) : const Radius.circular(4),
     );
 
+    // No [Center] — that expands to maxWidth and breaks [Wrap] packing (one chip per line).
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(hasItems ? 255 : 100),
+        color: fillColor.withAlpha(hasItems ? 255 : 100),
         borderRadius: borderRadius,
         border: BoxBorder.all(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          color: fillColor,
           strokeAlign: BorderSide.strokeAlignInside,
           width: 1,
         ),
@@ -121,7 +126,7 @@ class SushiEnumBox extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               enabled: hasItems,
               itemBuilder: (context) => itemList.map((e) => e.toPopupMenuItem()).toList(),
-              padding: padding,
+              padding: EdgeInsets.zero,
               child: labelWidget,
               requestFocus: true,
             ),
