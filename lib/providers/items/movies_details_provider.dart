@@ -29,18 +29,25 @@ part 'movies_details_provider.g.dart';
 @riverpod
 class MovieDetails extends _$MovieDetails {
   int _loadGeneration = 0;
+  bool _disposed = false;
 
   late final JellyService api = ref.read(jellyApiProvider);
 
   @override
-  MovieModel? build(String arg) => null;
+  MovieModel? build(String arg) {
+    ref.onDispose(() {
+      _disposed = true;
+      _loadGeneration++;
+    });
+    return null;
+  }
 
   Future<Response?> fetchDetails(ItemBaseModel item) async {
     Future<Response?> load() async {
       try {
         final loadGen = ++_loadGeneration;
         void apply(MovieModel? next) {
-          if (loadGen != _loadGeneration) return;
+          if (_disposed || loadGen != _loadGeneration) return;
           state = next;
         }
 
@@ -97,7 +104,7 @@ class MovieDetails extends _$MovieDetails {
             tmdbId: tmdbId,
             kind: SushiKind.movie,
           );
-      if (loadGen != _loadGeneration) return;
+      if (_disposed || loadGen != _loadGeneration) return;
       if (snap.page == null) {
         log('[sushi] movie details: itemRes null tmdbId=$tmdbId');
         return;
@@ -115,25 +122,26 @@ class MovieDetails extends _$MovieDetails {
         localPreference: localPreference,
       );
       next = await _paintWatchState(next, files: snap.filesRes);
-      if (loadGen != _loadGeneration) return;
+      if (_disposed || loadGen != _loadGeneration) return;
       state = next;
       filesKnown = snap.filesKnown;
       sushiPlayWarmup.scheduleFromStreams(state?.mediaStreams);
     } finally {
       // A timed-out /files is not "no file". Home rows are playable; Request waits
       // until the file list actually arrived.
-      if (loadGen == _loadGeneration && filesKnown) {
-        ref.read(sushiTitleResolvedProvider.notifier).markResolved(item.id);
-      }
+      if (_disposed || loadGen != _loadGeneration || !filesKnown) return;
+      ref.read(sushiTitleResolvedProvider.notifier).markResolved(item.id);
     }
   }
 
   void setMediaStreamHelper(MediaStreamsModel changed) {
+    if (_disposed) return;
     state = state?.copyWith(mediaStreams: changed);
     sushiPlayWarmup.scheduleFromStreams(changed);
   }
 
   void patchUserData(UserData userData) {
+    if (_disposed) return;
     final current = state;
     if (current == null) return;
     _loadGeneration++;

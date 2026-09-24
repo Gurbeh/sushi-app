@@ -1,7 +1,9 @@
 package app.sushi.tdlibbridge.session
 
 import android.util.Log
+import go.Seq
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +39,14 @@ import kotlinx.coroutines.withContext
  * the same `bulkBarrierPreWrite: unaligned arguments` during subtitle push + prefetch. Every
  * gomobile entry has to come through here; sync Pigeon uses [tryEnterBlocking] / [enqueue]
  * instead of waiting out a long protocol call on the platform thread.
+ *
+ * Upstream gomobile still frees Go refs on a separate `GoRefQueue Finalizer Thread` via
+ * `Seq.destroyRef`. That JNI entry is invisible to this gate and raced `sendText` during
+ * rapid navigation (device log 2026-09-24: `jni run op=sendText running=1` then
+ * `bulkBarrierPreWrite`). [installGoRefReleaser] wires Seq.setReleaser so those frees queue
+ * onto this same `ox-gomobile` executor — fire-and-forget, never blocking the finalizer
+ * thread waiting for a long sendText. Requires the patched Seq.java baked into oxtelegram.aar
+ * by `go/oxtelegram/bind-android.ps1`.
  */
 object GomobileCallGate {
     val mutex = Mutex()
@@ -48,6 +58,29 @@ object GomobileCallGate {
 
     private val enqueueScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val running = AtomicInteger(0)
+    private val releaserInstalled = AtomicBoolean(false)
+
+    /**
+     * Install before the first [mobile.Client] / [mobile.PlaybackSession] proxy is created so
+     * every GoRefQueue destroy routes through [executor]. Idempotent.
+     */
+    fun installGoRefReleaser() {
+        if (!releaserInstalled.compareAndSet(false, true)) return
+        Seq.touch()
+        Seq.setReleaser { refnum ->
+            Log.i("OXPLAY_TDLIB", "jni enqueue op=destroyRef refnum=$refnum")
+            executor.execute {
+                val n = running.incrementAndGet()
+                Log.i("OXPLAY_TDLIB", "jni run op=destroyRef running=$n")
+                try {
+                    Seq.releaseOnCallerThread(refnum)
+                } finally {
+                    Log.i("OXPLAY_TDLIB", "jni done op=destroyRef running=${running.decrementAndGet()}")
+                }
+            }
+        }
+        Log.i("OXPLAY_TDLIB", "gomobile GoRef releaser installed on ox-gomobile")
+    }
 
     suspend fun <T> enter(op: String = "jni", block: () -> T): T {
         Log.i("OXPLAY_TDLIB", "jni wait op=$op")

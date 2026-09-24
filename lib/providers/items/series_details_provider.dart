@@ -39,7 +39,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       try {
         final loadGen = ++_loadGeneration;
         void apply(SeriesModel? next) {
-          if (loadGen != _loadGeneration) return;
+          if (!mounted || loadGen != _loadGeneration) return;
           state = next;
         }
 
@@ -96,7 +96,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
     try {
       final catalog = ref.read(sushiCatalogControllerProvider);
       final snap = await catalog.openTitle(tmdbId: tmdbId, kind: SushiKind.series);
-      if (loadGen != _loadGeneration) return;
+      if (!mounted || loadGen != _loadGeneration) return;
       if (snap.page == null) {
         log('[sushi] series details: itemRes null tmdbId=$tmdbId');
         return;
@@ -113,33 +113,41 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
       if (playEpisodeId != null && playEpisodeId != firstEpisodeId) {
         files = await catalog.openFiles(episodeId: playEpisodeId);
         filesKnown = files.known;
-        if (loadGen != _loadGeneration) return;
+        if (!mounted || loadGen != _loadGeneration) return;
       }
       next = await _paintWatchState(
         next,
         files: files,
         filesEpisodeId: playEpisodeId,
       );
+      final localPreference = await sushiReadVariantPreference('series:$tmdbId');
+      if (!mounted || loadGen != _loadGeneration) return;
       state = sushiApplySeriesFiles(
         next,
         files.files,
         preferredFileId: files.lastFileId,
-        localPreference: await sushiReadVariantPreference('series:$tmdbId'),
+        localPreference: localPreference,
         filesEpisodeId: playEpisodeId,
       );
       sushiPlayWarmup.scheduleFromStreams(
         (state?.selectedEpisode ?? state?.nextUp)?.mediaStreams,
       );
-      if (loadGen == _loadGeneration && filesKnown) {
-        ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
-      }
+      if (!mounted || loadGen != _loadGeneration || !filesKnown) return;
+      ref.read(sushiTitleResolvedProvider.notifier).markResolved(seriesModel.id);
       unawaited(_loadIncompleteSeasons(loadGen));
     } catch (e, s) {
       log('[sushi] series details: refresh failed tmdbId=$tmdbId: $e', stackTrace: s);
     }
   }
 
+  @override
+  void dispose() {
+    _loadGeneration++;
+    super.dispose();
+  }
+
   void updateEpisodeInfo(EpisodeModel episode) {
+    if (!mounted) return;
     final index = state?.availableEpisodes?.indexWhere((e) => e.id == episode.id);
 
     final newList = state?.availableEpisodes?.toList() ?? [];
@@ -154,11 +162,13 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
   }
 
   void setCurrentEpisode(EpisodeModel? episodeModel) {
+    if (!mounted) return;
     state = state?.copyWith(selectedEpisode: episodeModel);
     sushiPlayWarmup.scheduleFromStreams(episodeModel?.mediaStreams);
   }
 
   void mergeSeason(int seasonNo, List<EpisodeModel> loaded) {
+    if (!mounted) return;
     final current = state;
     if (current == null) return;
     state = sushiMergeSeasonEpisodes(current, seasonNo, loaded);
@@ -180,6 +190,7 @@ class SeriesDetailViewNotifier extends StateNotifier<SeriesModel?> {
           kind: SushiKind.series,
           seasonNo: seasonNo,
         );
+    if (!mounted) return const [];
     final loaded = sushiEpisodesFromWire(current, wire);
     mergeSeason(seasonNo, loaded);
     return loaded;

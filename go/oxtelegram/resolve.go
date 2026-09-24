@@ -271,14 +271,49 @@ func clonePushedDocument(doc *tg.Document) *tg.Document {
 		return nil
 	}
 	cp := *doc
+	cp.MimeType = strings.Clone(doc.MimeType)
 	cp.FileReference = cloneBytes(doc.FileReference)
 	if len(doc.Attributes) > 0 {
 		cp.Attributes = append([]tg.DocumentAttributeClass(nil), doc.Attributes...)
 	}
-	if len(doc.Thumbs) > 0 {
-		cp.Thumbs = append([]tg.PhotoSizeClass(nil), doc.Thumbs...)
-	}
+	cp.Thumbs = clonePhotoSizes(doc.Thumbs)
+	cp.VideoThumbs = cloneVideoSizes(doc.VideoThumbs)
 	return &cp
+}
+
+func clonePhotoSizes(in []tg.PhotoSizeClass) []tg.PhotoSizeClass {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]tg.PhotoSizeClass, len(in))
+	for i, thumb := range in {
+		switch p := thumb.(type) {
+		case *tg.PhotoCachedSize:
+			cp := *p
+			cp.Bytes = cloneBytes(p.Bytes)
+			out[i] = &cp
+		case *tg.PhotoStrippedSize:
+			cp := *p
+			cp.Bytes = cloneBytes(p.Bytes)
+			out[i] = &cp
+		case *tg.PhotoPathSize:
+			cp := *p
+			cp.Bytes = cloneBytes(p.Bytes)
+			out[i] = &cp
+		default:
+			out[i] = thumb
+		}
+	}
+	return out
+}
+
+func cloneVideoSizes(in []tg.VideoSizeClass) []tg.VideoSizeClass {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]tg.VideoSizeClass, len(in))
+	copy(out, in)
+	return out
 }
 
 func videoFileRefFromDocument(doc *tg.Document, providerBotID int64) *VideoFileRef {

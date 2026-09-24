@@ -203,7 +203,9 @@ func (c *Client) unregisterTextWaiter(peerID, corr int64, ch chan string) {
 // rather than guessed at -- silently discarding an occasional unmatched reply is far cheaper than
 // handing one request's answer to another's caller.
 func (c *Client) deliverTextReply(fromUserID int64, text string) {
-	text = strings.TrimSpace(text)
+	// gotd's decoder builds this string from the reused packet buffer. Keep an owned copy
+	// before the next update overwrites it — aliasing that buffer is bulkBarrierPreWrite.
+	text = strings.Clone(strings.TrimSpace(text))
 	if fromUserID == 0 || text == "" || text[0] != '!' {
 		return
 	}

@@ -39,10 +39,18 @@ flutter run -d windows --dart-define-from-file=dart_defines.dev.json
 If `dart_defines.dev.json` is missing, from `oxplayer-be`: `pnpm run sync:client-env`.
 
 ## Android AAR (shared Go core)
+
+Use the bind script — it patches gomobile's `Seq.java` so Go ref frees run on the same
+`ox-gomobile` thread as every other JNI entry (avoids `bulkBarrierPreWrite` from the
+upstream `GoRefQueue Finalizer Thread`):
+
 ```powershell
 cd go\oxtelegram
-gomobile bind -target=android -androidapi 24 -o ..\..\android\ox_tdlib_bridge\libs\oxtelegram.aar .\mobile
+.\bind-android.ps1
 ```
+
+Bare `gomobile bind` still works for a throwaway check but ships the unpatched Seq and
+will crash under rapid navigation. Patch source: `go/oxtelegram/patches/Seq.java`.
 
 HTTP bridge lives in Go (`http_bridge.go`); Android may still use the Kotlin loopback server
 backed by the same `PlaybackSession` until the AAR is regenerated with `NewHttpBridgeServer`.

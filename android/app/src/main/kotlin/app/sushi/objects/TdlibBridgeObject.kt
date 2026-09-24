@@ -178,6 +178,8 @@ object TdlibBridgeObject : SushiTdlibBridgeApi {
         }
 
         val storage = OxTelegramSessionStorage(appContext)
+        // Before the first mobile.Client proxy: Seq.GoRefQueue must not destroyRef off-thread.
+        GomobileCallGate.installGoRefReleaser()
         val oxClient = OxTelegramClient(apiId, apiHash, storage)
         val controller = OxTelegramAuthController(oxClient)
         client = oxClient
