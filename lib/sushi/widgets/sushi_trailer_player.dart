@@ -3,8 +3,10 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_windows/webview_windows.dart' as win;
 
 import 'package:fladder/sushi/sushi_http.dart';
@@ -29,7 +31,10 @@ class SushiTrailerPlayer extends StatefulWidget {
     required String title,
   }) {
     if (youtubeKey.isEmpty) return Future.value();
-    return Navigator.of(context).push(MaterialPageRoute<void>(
+    // Root navigator sits above the TV side rail. The nested navigator leaves
+    // the rail painted and focused on top of this route, so the embed never
+    // receives the remote.
+    return Navigator.of(context, rootNavigator: true).push(MaterialPageRoute<void>(
       fullscreenDialog: true,
       builder: (_) => SushiTrailerPlayer(youtubeKey: youtubeKey, title: title),
     ));
@@ -43,7 +48,7 @@ class _SushiTrailerPlayerState extends State<SushiTrailerPlayer> {
   late final Uri _embedUri = Uri.https(
     'www.youtube-nocookie.com',
     '/embed/${widget.youtubeKey}',
-    const {'rel': '0', 'playsinline': '1'},
+    const {'rel': '0', 'playsinline': '1', 'autoplay': '1'},
   );
 
   WebViewController? _flutterController;
@@ -76,7 +81,13 @@ class _SushiTrailerPlayerState extends State<SushiTrailerPlayer> {
     if (!mounted) return;
     final referer = 'https://${info.packageName.toLowerCase()}';
     debugPrint('[sushi] trailer referer=$referer key=${widget.youtubeKey}');
-    final controller = WebViewController()
+    final controller = WebViewController();
+    if (!kIsWeb && Platform.isAndroid && controller.platform is AndroidWebViewController) {
+      final android = controller.platform as AndroidWebViewController;
+      await android.setMediaPlaybackRequiresUserGesture(false);
+    }
+    if (!mounted) return;
+    controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
       ..setNavigationDelegate(NavigationDelegate(
@@ -123,13 +134,40 @@ class _SushiTrailerPlayerState extends State<SushiTrailerPlayer> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(widget.title, overflow: TextOverflow.ellipsis),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: ExcludeFocus(
+          child: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(widget.title, overflow: TextOverflow.ellipsis),
+          ),
+        ),
       ),
-      body: SafeArea(child: _body()),
+      body: SafeArea(
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: _onPlayerKey,
+          child: _body(),
+        ),
+      ),
     );
+  }
+
+  /// TV remote Select/Enter never reaches the embed's HTML play button while
+  /// Flutter still owns focus. Toggle the embed `<video>` from here.
+  KeyEventResult _onPlayerKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || _flutterController == null) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final play = key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.gameButtonA;
+    if (!play) return KeyEventResult.ignored;
+    unawaited(_flutterController!.runJavaScript(
+      "(function(){var v=document.querySelector('video');if(v){if(v.paused){v.play();}else{v.pause();}return;}var b=document.querySelector('.ytp-large-play-button,.ytp-play-button');if(b)b.click();})();",
+    ));
+    return KeyEventResult.handled;
   }
 
   Widget _body() {
