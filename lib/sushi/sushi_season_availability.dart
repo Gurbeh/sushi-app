@@ -34,15 +34,17 @@ bool sushiSeasonShowWatchedTick(SeasonModel season) {
   return playable.every((episode) => episode.userData.played);
 }
 
-/// Season poster badge: `3/10` partial on disk, `0/10` none, unplayed when full on disk, else tick.
+/// Season poster badge: `3/10` partial on disk, `0/10` none,
+/// `1/20` watched/total when the season is fully on disk, else tick.
 String? sushiSeasonPosterCountText(SeasonModel season) {
   final total = sushiSeasonTotalEpisodeCount(season);
   if (total <= 0) return null;
   final onDisk = sushiSeasonAvailableEpisodeCount(season);
   if (onDisk < total) return '$onDisk/$total';
   final unplayed = season.userData.unPlayedItemCount;
-  if (unplayed != null && unplayed > 0) return unplayed.toString();
-  return null;
+  if (unplayed == null || unplayed <= 0) return null;
+  final watched = (total - unplayed).clamp(0, total);
+  return '$watched/$total';
 }
 
 /// ADR 0028: series home shows the season index, not a stub of the play-target

@@ -114,6 +114,23 @@ void main() {
     expect(sushiSeasonPosterCountText(season), '5/27');
   });
 
+  test('a fully-ingested, partly-watched season shows watched/total', () {
+    final episodes = [
+      for (var n = 1; n <= 20; n++)
+        n == 1 ? _episode(n).copyWith(userData: const UserData(played: true)) : _episode(n),
+    ];
+    final season = _season(episodes, episodeCount: 20).copyWith(
+      userData: const UserData(unPlayedItemCount: 19, played: false),
+    );
+    expect(sushiSeasonShowWatchedTick(season), isFalse);
+    expect(sushiSeasonPosterCountText(season), '1/20');
+  });
+
+  test('a fully-ingested, unwatched season shows 0/total', () {
+    final season = _season([_episode(1), _episode(2)], episodeCount: 2);
+    expect(sushiSeasonPosterCountText(season), '0/2');
+  });
+
   test('a fully-ingested, fully-watched season shows the tick', () {
     final watched = [
       for (final e in [_episode(1), _episode(2)])
