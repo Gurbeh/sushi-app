@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:fladder/sushi/sushi_dmca_page.dart';
 import 'package:fladder/sushi/sushi_login_kind_store.dart';
 import 'package:fladder/sushi/sushi_tdlib_bridge_controller.dart';
 import 'package:fladder/providers/user_provider.dart';
@@ -46,6 +47,14 @@ class _SushiAboutSettingsPageState extends ConsumerState<SushiAboutSettingsPage>
     setState(() => _loginKind = kind);
   }
 
+  Future<void> _openSupport(BuildContext context) async {
+    final opened = await sushiOpenSupportChannel();
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(SushiDmcaCopy.of(context).openFailed)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final applicationInfo = ref.watch(applicationInfoProvider);
@@ -83,8 +92,10 @@ class _SushiAboutSettingsPageState extends ConsumerState<SushiAboutSettingsPage>
             endIndent: 16,
           ),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             FilledButton.tonal(
               onPressed: () => showLicensePage(
@@ -95,6 +106,16 @@ class _SushiAboutSettingsPageState extends ConsumerState<SushiAboutSettingsPage>
                 useRootNavigator: true,
               ),
               child: Text(context.localized.aboutLicenses),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute<void>(builder: (_) => const SushiDmcaPage()),
+              ),
+              child: Text(SushiDmcaCopy.of(context).button),
+            ),
+            FilledButton.tonal(
+              onPressed: () => _openSupport(context),
+              child: Text(SushiDmcaCopy.of(context).support),
             ),
           ],
         ),
