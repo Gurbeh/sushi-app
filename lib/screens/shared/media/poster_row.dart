@@ -26,6 +26,9 @@ class PosterRow extends ConsumerWidget {
   /// Adds an "Add / Remove Continue Watching" entry to each poster's overflow menu. Sushi-only
   /// (the continue rail is client-owned) and deliberately scoped to the home rows that pass it.
   final bool sushiContinueToggle;
+
+  /// Optional per-poster subtitle (non-TV layout only).
+  final Widget? Function(BuildContext context, ItemBaseModel poster)? subTitleBuilder;
   const PosterRow({
     required this.posters,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
@@ -38,6 +41,7 @@ class PosterRow extends ConsumerWidget {
     this.showSyncStatus = false,
     this.sushiDetailBadges = false,
     this.sushiContinueToggle = false,
+    this.subTitleBuilder,
     super.key,
   });
 
@@ -76,6 +80,7 @@ class PosterRow extends ConsumerWidget {
         return PosterWidget(
           key: Key(poster.id),
           poster: poster,
+          subTitle: subTitleBuilder?.call(context, poster),
           aspectRatio: dominantRatio,
           primaryPosters: primaryPosters,
           showSyncStatus: showSyncStatus,

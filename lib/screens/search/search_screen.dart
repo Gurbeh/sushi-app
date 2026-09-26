@@ -1,9 +1,9 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:fladder/models/item_base_model.dart';
 import 'package:fladder/models/settings/client_settings_model.dart';
 import 'package:fladder/providers/search_provider.dart';
 import 'package:fladder/providers/settings/client_settings_provider.dart';
-import 'package:fladder/screens/shared/media/poster_grid.dart';
-import 'package:fladder/screens/shared/media/poster_widget.dart';
+import 'package:fladder/screens/shared/media/poster_row.dart';
 import 'package:fladder/screens/shared/nested_scaffold.dart';
 import 'package:fladder/screens/shared/outlined_text_field.dart';
 import 'package:fladder/theme.dart';
@@ -11,7 +11,6 @@ import 'package:fladder/util/adaptive_layout/adaptive_layout.dart';
 import 'package:fladder/util/debouncer.dart';
 import 'package:fladder/util/localization_helper.dart';
 import 'package:fladder/util/router_extension.dart';
-import 'package:fladder/util/string_extensions.dart';
 import 'package:fladder/widgets/navigation_scaffold/components/background_image.dart';
 import 'package:fladder/widgets/shared/fladder_scrollbar.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +82,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final useBlurredBackground = ref.watch(clientSettingsProvider.select(
       (value) => value.backgroundImage == BackgroundType.blurred && value.enableBlurEffects,
     ));
+    final useTVExpandedLayout = ref.watch(clientSettingsProvider.select((value) => value.useTVExpandedLayout));
+    final rowPadding = AdaptiveLayout.adaptivePadding(context);
+    // Movies first, then series, then anything else; "More from TMDB" is appended last.
+    const typeOrder = [FladderItemType.movie, FladderItemType.series];
+    int rank(FladderItemType type) {
+      final i = typeOrder.indexOf(type);
+      return i == -1 ? typeOrder.length : i;
+    }
+
+    final orderedResults = searchResults.results.entries.where((e) => e.value.isNotEmpty).toList()
+      ..sort((a, b) => rank(a.key).compareTo(rank(b.key)));
     final posters = [
       ...searchResults.results.values.expand((e) => e),
       ...searchResults.missing,
@@ -227,43 +237,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: EdgeInsets.only(
-                      left: mediaQuery.padding.left,
-                      right: mediaQuery.padding.right,
-                      bottom: MediaQuery.sizeOf(context).height * 0.20,
-                    ).add(
-                      EdgeInsetsDirectional.only(
-                        start: adaptiveLayout.sideBarWidth,
-                        end: 12,
-                      ),
-                    ),
+                    padding: EdgeInsets.only(bottom: MediaQuery.sizeOf(context).height * 0.20),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        ...searchResults.results.entries.map(
-                          (e) => PosterGrid(
-                            stickyHeader: false,
-                            name: e.key.name.capitalize(),
+                        ...orderedResults.map(
+                          (e) => PosterRow(
+                            tvMode: useTVExpandedLayout,
+                            contentPadding: rowPadding,
+                            label: e.key.label(context.localized, count: 2),
                             posters: e.value,
                           ),
                         ),
                         if (searchResults.missing.isNotEmpty)
-                          PosterGrid(
-                            stickyHeader: false,
-                            name: context.localized.moreFromTmdb,
+                          PosterRow(
+                            tvMode: useTVExpandedLayout,
+                            contentPadding: rowPadding,
+                            label: context.localized.moreFromTmdb,
                             posters: searchResults.missing,
-                            itemBuilder: (context, index) {
-                              final poster = searchResults.missing[index];
-                              return PosterWidget(
-                                poster: poster,
-                                subTitle: Text(
-                                  context.localized.unavailable,
-                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).colorScheme.error,
-                                      ),
-                                ),
-                              );
-                            },
+                            subTitleBuilder: (context, _) => Text(
+                              context.localized.unavailable,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                            ),
                           ),
                       ]),
                     ),
