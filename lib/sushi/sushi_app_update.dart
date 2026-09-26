@@ -296,11 +296,29 @@ Future<void> _installFile(File file) async {
     return;
   }
   if (Platform.isWindows) {
-    await Process.start(
+    // ProcessStartMode.detached stays in the parent's Windows job. windowManager.close()
+    // then kills the installer before Inno can replace fladder.exe. `start` breaks the
+    // setup process out of that job. Wait until cmd returns so setup is already running.
+    final launch = await Process.run('cmd.exe', [
+      '/c',
+      'start',
+      '',
+      '/b',
       file.path,
-      const ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', '/RESTARTAPPLICATIONS'],
-      mode: ProcessStartMode.detached,
-    );
+      '/VERYSILENT',
+      '/SUPPRESSMSGBOXES',
+      '/NORESTART',
+      '/CLOSEAPPLICATIONS',
+      '/RESTARTAPPLICATIONS',
+    ]);
+    if (launch.exitCode != 0) {
+      final detail = (launch.stderr as String).trim();
+      throw StateError(
+        detail.isEmpty
+            ? 'Could not launch the Windows installer (exit ${launch.exitCode})'
+            : 'Could not launch the Windows installer (exit ${launch.exitCode}): $detail',
+      );
+    }
     await windowManager.close();
     return;
   }
